@@ -97,3 +97,21 @@ SERVER_URL=https://medtourserver.nnmc.kz
   - `/health` signaling отвечает;
   - patient case flow проходит end to end;
   - browser console без CORS и mixed-content ошибок.
+
+## 8. Case-first chat and manager workspace
+
+- Patient видит fixed bottom-right chat widget на `/patient/*`.
+- Widget отсутствует на видеоконсультации `/consultation/:roomId`.
+- Если manager online, patient видит `Manager online`.
+- Если manager offline, patient видит `We will reply later`.
+- Patient отправляет текстовое сообщение, файл и изображение.
+- Manager видит case chat в shared inbox на `/manager`.
+- Unread counter увеличивается у manager после patient message.
+- Manager нажимает `Take over`, событие появляется в timeline/case events.
+- Typing indicator виден второй стороне.
+- Read receipt появляется после открытия чата получателем.
+- Обновление страницы сохраняет историю сообщений.
+- Другой patient не может открыть conversation напрямую.
+- Doctor не видит case chat, если `doctorChatEnabled=false`.
+- `npm run check:chat-permissions` проходит в server.
+- `npm run smoke:chat-workspace` проходит на staging с JWT ролей.

@@ -41,6 +41,7 @@
         "CHAT_UPLOAD",
         "DOCUMENT_REQUESTED",
         "REMINDER_CREATED",
+        "SLA_OVERDUE",
         "NOTE"
       ]
     },

@@ -92,7 +92,12 @@ function PatientChatWidget() {
       {!isOpen ? (
         <button
           type="button"
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            if ('Notification' in window && Notification.permission === 'default') {
+              Notification.requestPermission().catch(() => {})
+            }
+            setIsOpen(true)
+          }}
           className="relative w-14 h-14 rounded-full bg-teal-600 text-white shadow-lg shadow-teal-900/20 flex items-center justify-center hover:bg-teal-700"
           aria-label="Open chat"
         >

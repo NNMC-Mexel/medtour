@@ -117,12 +117,32 @@ EPAY_QR_CLIENT_SECRET=...
 EPAY_QR_TERMINAL_ID=...
 STRAPI_API_URL=https://medtourserver.nnmc.kz
 STRAPI_API_TOKEN=...
+REDIS_URL=redis://redis:6379
 ```
 
 Health check:
 
 ```bash
 curl https://medtourrtc.nnmc.kz/health
+```
+
+For more than one signaling instance, `REDIS_URL` is required. Without it, chat presence and staff queue events are single-instance only.
+
+## Case-first chat release steps
+
+Before enabling chat for existing users:
+
+```bash
+cd server
+npm run migrate:case-chats:dry
+npm run migrate:case-chats
+npm run check:chat-permissions
+```
+
+Run staging API smoke with role JWTs:
+
+```bash
+API_URL=https://medtourserver.nnmc.kz CASE_ID=<case-documentId> PATIENT_JWT=<jwt> MANAGER_JWT=<jwt> npm run smoke:chat-workspace
 ```
 
 ## TURN relay

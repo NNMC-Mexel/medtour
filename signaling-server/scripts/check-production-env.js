@@ -1,0 +1,55 @@
+'use strict';
+
+const required = [
+  'PORT',
+  'CORS_ORIGINS',
+  'SIGNALING_PUBLIC_URL',
+  'STRAPI_API_URL',
+  'STRAPI_API_TOKEN',
+];
+
+const paymentKeys = [
+  'EPAY_CLIENT_ID',
+  'EPAY_CLIENT_SECRET',
+  'EPAY_TERMINAL_ID',
+  'EPAY_QR_CLIENT_ID',
+  'EPAY_QR_CLIENT_SECRET',
+  'EPAY_QR_TERMINAL_ID',
+];
+
+console.log('=== Signaling production env check ===\n');
+
+let failed = false;
+for (const key of required) {
+  if (!process.env[key]) {
+    failed = true;
+    console.error(`  [FAIL] ${key} is missing`);
+  } else {
+    console.log(`  [OK] ${key}`);
+  }
+}
+
+if (process.env.NODE_ENV === 'production') {
+  if (process.env.PAYMENTS_LIVE !== 'true') {
+    failed = true;
+    console.error('  [FAIL] PAYMENTS_LIVE=true is required in production');
+  }
+  if (!process.env.CORS_ORIGINS?.includes('https://medtour.nnmc.kz')) {
+    failed = true;
+    console.error('  [FAIL] CORS_ORIGINS must include production frontend origin');
+  }
+  for (const key of paymentKeys) {
+    if (!process.env[key]) {
+      failed = true;
+      console.error(`  [FAIL] ${key} is required when PAYMENTS_LIVE=true`);
+    } else {
+      console.log(`  [OK] ${key}`);
+    }
+  }
+}
+
+if (process.env.REDIS_URL) console.log('  [OK] REDIS_URL configured for Socket.IO adapter');
+else console.log('  [WARN] REDIS_URL not set; Socket.IO presence is single-instance only');
+
+if (failed) process.exit(1);
+console.log('\nSignaling env check OK.');

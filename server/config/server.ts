@@ -1,3 +1,5 @@
+import cronTasks from './cron-tasks';
+
 export default ({ env }) => {
   const isProduction =
     process.env.NODE_ENV === 'production' || env('NODE_ENV') === 'production';
@@ -19,5 +21,9 @@ export default ({ env }) => {
         ? 'https://medtourserver.nnmc.kz'
         : `http://localhost:${localPort}`
     ),
+    cron: {
+      enabled: env.bool('CRON_ENABLED', true),
+      tasks: cronTasks,
+    },
   };
 };

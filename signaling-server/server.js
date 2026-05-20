@@ -3,6 +3,8 @@ const express = require('express')
 const http = require('http')
 const { Server } = require('socket.io')
 const cors = require('cors')
+const { createAdapter } = require('@socket.io/redis-adapter')
+const { createClient } = require('redis')
 
 const app = express()
 const server = http.createServer(app)
@@ -737,6 +739,23 @@ const io = new Server(server, {
   cors: corsOptions,
 })
 
+async function configureRedisAdapter() {
+  if (!process.env.REDIS_URL) {
+    console.warn('[Socket.IO] REDIS_URL is not set; running in single-instance realtime mode')
+    return
+  }
+
+  const pubClient = createClient({ url: process.env.REDIS_URL })
+  const subClient = pubClient.duplicate()
+
+  pubClient.on('error', (error) => console.error('[Redis] pub client error:', error.message))
+  subClient.on('error', (error) => console.error('[Redis] sub client error:', error.message))
+
+  await Promise.all([pubClient.connect(), subClient.connect()])
+  io.adapter(createAdapter(pubClient, subClient))
+  console.log('[Socket.IO] Redis adapter enabled')
+}
+
 // Verified token cache: token → { userId, expiresAt }
 // Avoids hitting Strapi /api/users/me on every socket event.
 const tokenCache = new Map()
@@ -1322,6 +1341,13 @@ app.get('/health', (req, res) => {
 // В продакшене на отдельном домене: https://medtourrtc.nnmc.kz
 const PORT = process.env.PORT || 1341
 
-server.listen(PORT, () => {
-  console.log(`Signaling server running on port ${PORT}`)
-})
+configureRedisAdapter()
+  .then(() => {
+    server.listen(PORT, () => {
+      console.log(`Signaling server running on port ${PORT}`)
+    })
+  })
+  .catch((error) => {
+    console.error('[Socket.IO] Failed to initialize realtime adapter:', error)
+    process.exit(1)
+  })
