@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Paperclip, Image, Smile, MoreVertical, Phone, Video, Search, Loader2 } from 'lucide-react'
+import { Send, Paperclip, Image, Smile, MoreVertical, Phone, Video, Search, Loader2, CheckCheck, ShieldCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import Avatar from '../ui/Avatar'
 import Button from '../ui/Button'
 import { cn, formatTimeAgo, getSpecName } from '../../utils/helpers'
 import useChatStore from '../../stores/chatStore'
 import useAuthStore from '../../stores/authStore'
-import { getMediaUrl, appointmentsAPI } from '../../services/api'
+import { getMediaUrl, appointmentsAPI, openMediaInNewTab } from '../../services/api'
 
 function ChatComponent({ userRole = 'patient' }) {
   const { t, i18n } = useTranslation()
@@ -17,17 +17,26 @@ function ChatComponent({ userRole = 'patient' }) {
     conversations, 
     messages, 
     currentConversation,
+    managerPresence,
+    typingUsers,
     isLoading,
     fetchConversations, 
     fetchMessages, 
     sendMessage,
+    sendTyping,
+    uploadAttachment,
+    markConversationRead,
+    takeoverChat,
     setCurrentConversation,
   } = useChatStore()
   
   const [newMessage, setNewMessage] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const messagesEndRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const typingTimeoutRef = useRef(null)
 
   // Past consultation chats (from appointment.chatLog)
   const [consultationChats, setConsultationChats] = useState([])
@@ -41,9 +50,14 @@ function ChatComponent({ userRole = 'patient' }) {
 
   useEffect(() => {
     if (currentConversation?.id) {
-      fetchMessages(currentConversation.id)
+      fetchMessages(currentConversation.documentId || currentConversation.id)
     }
-  }, [currentConversation?.id])
+  }, [currentConversation?.id, currentConversation?.documentId])
+
+  useEffect(() => {
+    const id = currentConversation?.documentId || currentConversation?.id
+    if (id && messages.length > 0) markConversationRead(id)
+  }, [currentConversation?.id, currentConversation?.documentId, messages.length])
 
   useEffect(() => {
     if (userRole === 'patient' && user?.id) {
@@ -77,16 +91,43 @@ function ChatComponent({ userRole = 'patient' }) {
 
   const handleSendMessage = async (e) => {
     e.preventDefault()
-    if (!newMessage.trim() || !currentConversation?.id || isSending) return
+    const conversationId = currentConversation?.documentId || currentConversation?.id
+    if (!newMessage.trim() || !conversationId || isSending) return
 
     setIsSending(true)
     try {
-      await sendMessage(currentConversation.id, newMessage.trim(), user.id)
+      await sendMessage(conversationId, newMessage.trim(), user.id)
       setNewMessage('')
+      sendTyping(conversationId, false)
     } catch (error) {
       console.error('Error sending message:', error)
     } finally {
       setIsSending(false)
+    }
+  }
+
+  const handleMessageChange = (event) => {
+    const value = event.target.value
+    setNewMessage(value)
+    const conversationId = currentConversation?.documentId || currentConversation?.id
+    if (!conversationId) return
+    sendTyping(conversationId, value.trim().length > 0)
+    window.clearTimeout(typingTimeoutRef.current)
+    typingTimeoutRef.current = window.setTimeout(() => sendTyping(conversationId, false), 1200)
+  }
+
+  const handleUpload = async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    const conversationId = currentConversation?.documentId || currentConversation?.id
+    if (!file || !conversationId || isUploading) return
+    setIsUploading(true)
+    try {
+      await uploadAttachment(conversationId, file)
+    } catch (error) {
+      console.error('Attachment upload failed:', error)
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -168,14 +209,14 @@ function ChatComponent({ userRole = 'patient' }) {
                         {participantName}
                       </h4>
                       <span className="text-xs text-slate-400">
-                        {conversation.lastMessage?.createdAt
+                      {conversation.lastMessage?.createdAt
                           ? formatTimeAgo(conversation.lastMessage.createdAt)
                           : ''}
                       </span>
                     </div>
                     {spec && <p className="text-xs text-teal-600">{spec}</p>}
                     <p className="text-sm text-slate-500 truncate">
-                      {conversation.lastMessage?.content || t('chat.no_messages')}
+                      {conversation.lastMessage?.content || conversation.lastMessage || t('chat.no_messages')}
                     </p>
                   </div>
                   {conversation.unreadCount > 0 && (
@@ -316,6 +357,11 @@ function ChatComponent({ userRole = 'patient' }) {
                 const spec = userRole === 'patient'
                   ? getSpecName(participant.specialization, lang)
                   : ''
+                const statusText = userRole === 'patient'
+                  ? (managerPresence.managerOnline ? 'Manager online' : 'We will reply later')
+                  : (currentConversation.activeManager?.fullName
+                      ? `Taken by ${currentConversation.activeManager.fullName}`
+                      : 'Shared queue')
 
                 return (
                   <>
@@ -327,9 +373,14 @@ function ChatComponent({ userRole = 'patient' }) {
                     <div>
                       <h3 className="font-semibold text-slate-900">{participantName}</h3>
                       <p className="text-sm text-slate-500">
-                        {spec}
+                        {spec || (userRole === 'patient' ? '' : statusText)}
                         {isOnline && (
                           <span className="text-emerald-600 ml-2">{t('chat.online_status')}</span>
+                        )}
+                        {userRole === 'patient' && (
+                          <span className={cn(managerPresence.managerOnline ? 'text-emerald-600' : 'text-slate-400')}>
+                            {statusText}
+                          </span>
                         )}
                       </p>
                     </div>
@@ -347,6 +398,16 @@ function ChatComponent({ userRole = 'patient' }) {
               <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-600">
                 <MoreVertical className="w-5 h-5" />
               </button>
+              {['manager', 'coordinator', 'admin'].includes(userRole) && (
+                <button
+                  type="button"
+                  onClick={() => takeoverChat(currentConversation.documentId || currentConversation.id)}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 text-white text-sm hover:bg-slate-800"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  Take over
+                </button>
+              )}
             </div>
           </div>
 
@@ -365,6 +426,9 @@ function ChatComponent({ userRole = 'patient' }) {
               messages.map((message) => {
                 const isMe = message.sender?.id === user?.id || message.senderId === user?.id
                 const time = new Date(message.createdAt || message.time)
+                const attachments = message.attachments || []
+                const readBy = message.readBy || {}
+                const isReadByOther = Object.keys(readBy).some((key) => key !== String(user?.id))
 
                 return (
                   <div
@@ -377,34 +441,79 @@ function ChatComponent({ userRole = 'patient' }) {
                         ? 'bg-teal-600 text-white rounded-br-md'
                         : 'bg-slate-100 text-slate-900 rounded-bl-md'
                     )}>
-                      <p className="text-sm">{message.content}</p>
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      {attachments.length > 0 && (
+                        <div className="mt-2 space-y-2">
+                          {attachments.map((file) => {
+                            const url = getMediaUrl(file)
+                            const isImageFile = file.mime?.startsWith('image/') || message.messageType === 'image'
+                            return (
+                              <button
+                                key={file.id || file.documentId || file.url}
+                                type="button"
+                                onClick={() => openMediaInNewTab(file)}
+                                className={cn(
+                                  'block text-left rounded-lg overflow-hidden border',
+                                  isMe ? 'border-teal-400/50' : 'border-slate-200'
+                                )}
+                              >
+                                {isImageFile && url ? (
+                                  <img src={url} alt={file.name || 'Attachment'} className="max-h-40 max-w-full object-cover" />
+                                ) : (
+                                  <span className={cn('block px-3 py-2 text-xs', isMe ? 'text-white' : 'text-slate-700')}>
+                                    {file.name || 'Attachment'}
+                                  </span>
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
                       <p className={cn(
-                        'text-xs mt-1',
+                        'text-xs mt-1 flex items-center gap-1 justify-end',
                         isMe ? 'text-teal-100' : 'text-slate-400'
                       )}>
                         {time.toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}
+                        {isMe && <CheckCheck className={cn('w-3.5 h-3.5', isReadByOther ? 'opacity-100' : 'opacity-50')} />}
                       </p>
                     </div>
                   </div>
                 )
               })
             )}
+            {(() => {
+              const id = currentConversation?.documentId || currentConversation?.id
+              const names = Object.values(typingUsers[String(id)] || {})
+              if (names.length === 0) return null
+              return <p className="text-xs text-slate-500 px-1">{names.join(', ')} typing...</p>
+            })()}
             <div ref={messagesEndRef} />
           </div>
 
           {/* Message Input */}
           <form onSubmit={handleSendMessage} className="p-3 sm:p-4 border-t border-slate-100 safe-bottom sm:pb-4">
             <div className="flex items-center gap-2">
-              <button type="button" className="hidden sm:inline-flex p-2 hover:bg-slate-100 rounded-lg text-slate-500">
+              <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="hidden sm:inline-flex p-2 hover:bg-slate-100 rounded-lg text-slate-500"
+                disabled={isUploading}
+              >
                 <Paperclip className="w-5 h-5" />
               </button>
-              <button type="button" className="hidden sm:inline-flex p-2 hover:bg-slate-100 rounded-lg text-slate-500">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="hidden sm:inline-flex p-2 hover:bg-slate-100 rounded-lg text-slate-500"
+                disabled={isUploading}
+              >
                 <Image className="w-5 h-5" />
               </button>
               <input
                 type="text"
                 value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
+                onChange={handleMessageChange}
                 placeholder={t('chat.message_placeholder')}
                 className="flex-1 px-4 py-3 bg-slate-100 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
@@ -414,8 +523,8 @@ function ChatComponent({ userRole = 'patient' }) {
               <Button
                 type="submit"
                 size="icon"
-                disabled={!newMessage.trim() || isSending}
-                isLoading={isSending}
+                disabled={!newMessage.trim() || isSending || isUploading}
+                isLoading={isSending || isUploading}
               >
                 <Send className="w-4 h-4" />
               </Button>

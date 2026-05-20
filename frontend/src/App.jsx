@@ -253,6 +253,7 @@ function App() {
           <Route index element={<StaffDashboard />} />
           <Route path="cases" element={<MedicalCasesPage />} />
           <Route path="cases/:id" element={<MedicalCaseDetail />} />
+          <Route path="chat" element={<PatientChat />} />
           <Route path="doctors" element={<AdminDoctors />} />
           <Route path="documents" element={<PatientDocuments />} />
         </Route>

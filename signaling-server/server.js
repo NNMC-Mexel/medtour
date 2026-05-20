@@ -741,6 +741,22 @@ const io = new Server(server, {
 // Avoids hitting Strapi /api/users/me on every socket event.
 const tokenCache = new Map()
 const TOKEN_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+const STAFF_CHAT_ROLES = new Set(['manager', 'coordinator', 'admin'])
+const onlineStaffSockets = new Map()
+
+async function strapiJson(path, token, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+  const res = await fetch(`${STRAPI_API_URL}${path}`, {
+    ...options,
+    headers,
+  }).catch(() => null)
+  if (!res?.ok) return null
+  return res.json().catch(() => null)
+}
 
 async function verifySocketToken(token) {
   if (!token) return null
@@ -813,6 +829,7 @@ io.use(async (socket, next) => {
   }
   socket.verifiedUser = user
   socket.verifiedUserId = user.id
+  socket.verifiedToken = token
   next()
 })
 
@@ -829,6 +846,109 @@ const MAX_CHAT_HISTORY = 200
 
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`)
+  const connectedRole = socket.verifiedUser?.userRole || socket.verifiedUser?.role?.type
+  if (STAFF_CHAT_ROLES.has(connectedRole)) {
+    onlineStaffSockets.set(socket.id, {
+      userId: socket.verifiedUserId,
+      role: connectedRole,
+      name: socket.verifiedUser?.fullName || socket.verifiedUser?.username || 'Manager',
+    })
+  }
+
+  const emitStaffPresence = () => {
+    io.emit('chat:manager-presence', {
+      managerOnline: onlineStaffSockets.size > 0,
+      onlineManagers: onlineStaffSockets.size,
+    })
+  }
+
+  emitStaffPresence()
+
+  async function fetchAuthorizedConversation(conversationId) {
+    if (!conversationId) return null
+    const json = await strapiJson(`/api/conversations/${encodeURIComponent(conversationId)}`, socket.verifiedToken)
+    return json?.data || null
+  }
+
+  function chatRoom(conversation) {
+    return `case-chat:${conversation.documentId || conversation.id}`
+  }
+
+  socket.on('chat:presence:get', () => {
+    socket.emit('chat:manager-presence', {
+      managerOnline: onlineStaffSockets.size > 0,
+      onlineManagers: onlineStaffSockets.size,
+    })
+  })
+
+  socket.on('chat:join-staff-queue', () => {
+    const role = socket.verifiedUser?.userRole || socket.verifiedUser?.role?.type
+    if (!STAFF_CHAT_ROLES.has(role)) return
+    socket.join('case-chat:staff-queue')
+    socket.emit('chat:staff-queue-joined', { ok: true })
+  })
+
+  socket.on('chat:join', async ({ conversationId }) => {
+    const conversation = await fetchAuthorizedConversation(conversationId)
+    if (!conversation) {
+      socket.emit('chat:error', { reason: 'Conversation access denied' })
+      return
+    }
+    const room = chatRoom(conversation)
+    socket.join(room)
+    socket.emit('chat:joined', {
+      conversationId: conversation.documentId || conversation.id,
+      managerOnline: onlineStaffSockets.size > 0,
+      onlineManagers: onlineStaffSockets.size,
+    })
+  })
+
+  socket.on('chat:typing', async ({ conversationId, isTyping }) => {
+    const conversation = await fetchAuthorizedConversation(conversationId)
+    if (!conversation) return
+    socket.to(chatRoom(conversation)).emit('chat:typing', {
+      conversationId: conversation.documentId || conversation.id,
+      userId: socket.verifiedUserId,
+      userName: socket.verifiedUser?.fullName || socket.verifiedUser?.username || 'User',
+      isTyping: isTyping === true,
+    })
+  })
+
+  socket.on('chat:message-created', async ({ conversationId, message }) => {
+    const conversation = await fetchAuthorizedConversation(conversationId)
+    if (!conversation || !message?.id) return
+    const payload = {
+      conversationId: conversation.documentId || conversation.id,
+      message,
+    }
+    io.to(chatRoom(conversation)).emit('chat:message-created', payload)
+    io.to('case-chat:staff-queue').emit('chat:message-created', payload)
+  })
+
+  socket.on('chat:read', async ({ conversationId, readAt }) => {
+    const conversation = await fetchAuthorizedConversation(conversationId)
+    if (!conversation) return
+    const payload = {
+      conversationId: conversation.documentId || conversation.id,
+      userId: socket.verifiedUserId,
+      readAt: readAt || new Date().toISOString(),
+    }
+    socket.to(chatRoom(conversation)).emit('chat:read', payload)
+    io.to('case-chat:staff-queue').emit('chat:read', payload)
+  })
+
+  socket.on('chat:takeover', async ({ conversationId }) => {
+    const conversation = await fetchAuthorizedConversation(conversationId)
+    if (!conversation) return
+    const payload = {
+      conversationId: conversation.documentId || conversation.id,
+      managerId: socket.verifiedUserId,
+      managerName: socket.verifiedUser?.fullName || socket.verifiedUser?.username || 'Manager',
+      takeoverAt: new Date().toISOString(),
+    }
+    io.to(chatRoom(conversation)).emit('chat:takeover', payload)
+    io.to('case-chat:staff-queue').emit('chat:takeover', payload)
+  })
 
   // Присоединение к комнате
   socket.on('join-room', async ({ roomId, isPortrait }) => {
@@ -1127,6 +1247,8 @@ io.on('connection', (socket) => {
   // Отключение
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`)
+    onlineStaffSockets.delete(socket.id)
+    emitStaffPresence()
     releaseSlotBySocket(socket.id)
 
     // Находим комнату пользователя

@@ -35,6 +35,12 @@
         "PLAN_SENT",
         "PLAN_ACCEPTED",
         "TRAVEL_UPDATED",
+        "CHAT_MESSAGE_SENT",
+        "CHAT_READ",
+        "CHAT_TAKEOVER",
+        "CHAT_UPLOAD",
+        "DOCUMENT_REQUESTED",
+        "REMINDER_CREATED",
         "NOTE"
       ]
     },

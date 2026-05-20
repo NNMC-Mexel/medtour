@@ -20,6 +20,7 @@ const DEFAULT_POPULATE = {
   visa_requests: true,
   tourism_packages: true,
   conversation: true,
+  case_events: { populate: { actor: { fields: ['id', 'documentId', 'fullName', 'email', 'userRole'] } } },
 } as any;
 
 const STAFF_ROLES = ['manager', 'coordinator', 'admin'];
@@ -48,6 +49,8 @@ const FIELD_ALLOWLIST_BY_ROLE: Record<string, string[]> = {
     'status',
     'manager',
     'coordinator',
+    'clinic',
+    'doctor',
     'arrivalDate',
     'departureDate',
     'flightDetails',

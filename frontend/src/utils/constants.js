@@ -107,6 +107,7 @@ export const MANAGER_NAV_ITEMS = [
 export const COORDINATOR_NAV_ITEMS = [
   { path: '/coordinator', label: 'nav.home', icon: 'home' },
   { path: '/coordinator/cases', label: 'nav.medical_cases', icon: 'activity' },
+  { path: '/coordinator/chat', label: 'nav.chat', icon: 'message-circle' },
   { path: '/coordinator/doctors', label: 'nav.doctors', icon: 'stethoscope' },
   { path: '/coordinator/documents', label: 'nav.documents', icon: 'file-text' },
 ]

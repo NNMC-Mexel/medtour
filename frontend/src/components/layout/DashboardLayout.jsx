@@ -4,10 +4,13 @@ import { useTranslation } from 'react-i18next'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import { cn } from '../../utils/helpers'
+import useAuthStore from '../../stores/authStore'
+import PatientChatWidget from '../chat/PatientChatWidget'
 
 function DashboardLayout({ navItems }) {
   const { t } = useTranslation()
   const location = useLocation()
+  const { user } = useAuthStore()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const sidebarTouchStartX = useRef(null)
 
@@ -59,6 +62,7 @@ function DashboardLayout({ navItems }) {
           <Outlet />
         </main>
       </div>
+      {user?.userRole === 'patient' && location.pathname.startsWith('/patient') && <PatientChatWidget />}
     </div>
   )
 }

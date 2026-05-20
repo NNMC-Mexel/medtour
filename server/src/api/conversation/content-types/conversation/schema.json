@@ -23,6 +23,46 @@
     "lastMessageAt": {
       "type": "datetime"
     },
+    "channel": {
+      "type": "enumeration",
+      "default": "case",
+      "enum": [
+        "case",
+        "appointment",
+        "support"
+      ]
+    },
+    "lifecycleStatus": {
+      "type": "enumeration",
+      "default": "open",
+      "enum": [
+        "open",
+        "pending",
+        "closed"
+      ]
+    },
+    "sharedQueue": {
+      "type": "boolean",
+      "default": true
+    },
+    "doctorChatEnabled": {
+      "type": "boolean",
+      "default": false
+    },
+    "activeManager": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "takeoverAt": {
+      "type": "datetime"
+    },
+    "lastReadBy": {
+      "type": "json"
+    },
+    "unreadBy": {
+      "type": "json"
+    },
     "appointment": {
       "type": "relation",
       "relation": "oneToOne",

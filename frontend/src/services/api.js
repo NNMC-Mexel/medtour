@@ -597,6 +597,20 @@ export const conversationsAPI = {
             `/api/conversations/${id}?populate[users_permissions_users][populate]=*&populate[messages][populate]=*`
         ),
 
+    getForCase: (caseId) =>
+        api.get(`/api/conversations/for-case/${encodeURIComponent(caseId)}`),
+
+    getMessages: (id) => {
+        const query = new URLSearchParams();
+        query.append("populate", "*");
+        query.append("sort", "createdAt:asc");
+        return api.get(`/api/conversations/${id}/messages?${query}`);
+    },
+
+    markRead: (id) => api.put(`/api/conversations/${id}/read`),
+
+    takeover: (id) => api.put(`/api/conversations/${id}/takeover`),
+
     create: (participantIds) =>
         api.post("/api/conversations", {
             data: { users_permissions_users: participantIds },

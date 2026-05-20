@@ -27,6 +27,16 @@
       "type": "text",
       "required": true
     },
+    "messageType": {
+      "type": "enumeration",
+      "default": "text",
+      "enum": [
+        "text",
+        "file",
+        "image",
+        "system"
+      ]
+    },
     "attachments": {
       "type": "media",
       "multiple": true,
@@ -43,6 +53,15 @@
     },
     "readAt": {
       "type": "datetime"
+    },
+    "readBy": {
+      "type": "json"
+    },
+    "deliveredAt": {
+      "type": "datetime"
+    },
+    "metadata": {
+      "type": "json"
     }
   }
 }
