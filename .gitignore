@@ -1,0 +1,29 @@
+.DS_Store
+node_modules/
+dist/
+build/
+
+# Local secrets and runtime state
+.env
+.env.*
+!.env.example
+*.local
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
+# Strapi/local uploads and generated output
+server/.tmp/
+server/.strapi/
+server/public/uploads/*
+!server/public/uploads/.gitkeep
+server/dist/
+server/build/
+
+# Frontend generated assets
+frontend/dist/
+
+# Tool caches
+.eslintcache
+*.tsbuildinfo

@@ -1,0 +1,78 @@
+{
+  "kind": "collectionType",
+  "collectionName": "clinics",
+  "info": {
+    "singularName": "clinic",
+    "pluralName": "clinics",
+    "displayName": "Clinic"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name"
+    },
+    "clinicType": {
+      "type": "enumeration",
+      "default": "other",
+      "enum": [
+        "nnmc",
+        "mexelhealth",
+        "umit",
+        "other"
+      ]
+    },
+    "description": {
+      "type": "richtext"
+    },
+    "specializations": {
+      "type": "json"
+    },
+    "address": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "email": {
+      "type": "email"
+    },
+    "website": {
+      "type": "string"
+    },
+    "contactPerson": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true
+    },
+    "doctors": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::doctor.doctor",
+      "mappedBy": "clinic"
+    },
+    "medical_cases": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::medical-case.medical-case",
+      "mappedBy": "clinic"
+    },
+    "treatment_plans": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::treatment-plan.treatment-plan",
+      "mappedBy": "clinic"
+    }
+  }
+}

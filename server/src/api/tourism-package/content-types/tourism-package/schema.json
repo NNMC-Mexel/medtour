@@ -1,0 +1,62 @@
+{
+  "kind": "collectionType",
+  "collectionName": "tourism_packages",
+  "info": {
+    "singularName": "tourism-package",
+    "pluralName": "tourism-packages",
+    "displayName": "TourismPackage"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "medical_case": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::medical-case.medical-case",
+      "inversedBy": "tourism_packages"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "text"
+    },
+    "city": {
+      "type": "string"
+    },
+    "itinerary": {
+      "type": "json"
+    },
+    "status": {
+      "type": "enumeration",
+      "default": "DRAFT",
+      "enum": [
+        "DRAFT",
+        "OFFERED",
+        "ACCEPTED",
+        "DECLINED",
+        "BOOKED",
+        "COMPLETED",
+        "CANCELLED"
+      ]
+    },
+    "totalCost": {
+      "type": "decimal"
+    },
+    "currency": {
+      "type": "enumeration",
+      "default": "USD",
+      "enum": [
+        "USD",
+        "EUR",
+        "GBP",
+        "KZT"
+      ]
+    },
+    "notes": {
+      "type": "text"
+    }
+  }
+}

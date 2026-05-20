@@ -1,0 +1,36 @@
+{
+  "kind": "collectionType",
+  "collectionName": "trip_checklists",
+  "info": {
+    "singularName": "trip-checklist",
+    "pluralName": "trip-checklists",
+    "displayName": "TripChecklist"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "medical_case": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::medical-case.medical-case",
+      "inversedBy": "trip_checklist"
+    },
+    "status": {
+      "type": "enumeration",
+      "default": "OPEN",
+      "enum": [
+        "OPEN",
+        "IN_PROGRESS",
+        "COMPLETED"
+      ]
+    },
+    "items": {
+      "type": "json"
+    },
+    "managerNotes": {
+      "type": "text"
+    }
+  }
+}

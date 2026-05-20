@@ -1,0 +1,734 @@
+import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Eye, FileText, Globe2, LayoutTemplate, Loader2, RefreshCcw, Save } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
+import Button from '../../components/ui/Button'
+import Input from '../../components/ui/Input'
+import Textarea from '../../components/ui/Textarea'
+import { contentAPI, normalizeResponse } from '../../services/api'
+
+const defaultLandingConfig = {
+  hero: {
+    badge: 'Лечение в Казахстане под ключ',
+    titlePrefix: 'Медицинское лечение',
+    titleHighlight: 'без долгого ожидания',
+    description:
+      'MedTour помогает иностранным пациентам попасть в партнерские клиники Казахстана: документы, подбор врача, поездка и сопровождение лечения ведутся персональным менеджером.',
+    primaryButtonLabel: 'Начать заявку',
+    secondaryButtonLabel: 'Создать аккаунт',
+  },
+  heroCard: {
+    title: 'Персональная медицинская заявка',
+    subtitle: 'Ведет команда MedTour',
+    items: [
+      {
+        title: 'Партнерские клиники',
+        description: 'ННМЦ, MexelHealth и UMIT/Томотерапия в Астане',
+      },
+      {
+        title: 'Подбор врача',
+        description: 'Координатор направляет заявку в нужную клинику и к нужному врачу',
+      },
+      {
+        title: 'Поддержка поездки',
+        description: 'Виза, билеты, отель, трансфер и сопровождение в Казахстане',
+      },
+    ],
+    buttonLabel: 'Начать заявку',
+  },
+  stats: [
+    { value: '1100+', label: 'Заявок' },
+    { value: '3', label: 'Клиники' },
+    { value: '<2h', label: 'SLA ответа' },
+    { value: '24/7', label: 'Сопровождение' },
+  ],
+  featuresSection: {
+    badge: 'Почему мы',
+    title: 'Почему выбирают MedTour',
+    subtitle: 'Одна ответственная команда для лечения, логистики и поддержки пациента',
+    cards: [
+      {
+        title: 'Первичный врачебный review',
+        description: 'Онлайн-консультация помогает клинике понять, нужно ли лечение или операция.',
+      },
+      {
+        title: 'Безопасность данных',
+        description: 'Шифрование данных и соответствие стандартам медицинской безопасности.',
+      },
+      {
+        title: 'Персональный менеджер',
+        description: 'Менеджер MedTour ведет заявку от первого контакта до пост-ухода.',
+      },
+      {
+        title: 'Чеклист поездки',
+        description: 'Виза, билеты, отель, трансфер, визиты в клинику и выписка идут в одном процессе.',
+      },
+    ],
+  },
+  stepsSection: {
+    badge: 'Как это работает',
+    title: 'Всего 4 простых шага',
+    subtitle: 'От первой заявки до лечения в Казахстане',
+    steps: [
+      {
+        title: 'Создайте заявку',
+        description: 'Зарегистрируйтесь и опишите диагноз, симптомы и желаемые даты поездки',
+      },
+      {
+        title: 'Загрузите документы',
+        description: 'Добавьте анализы, снимки, выписки и направления для медицинского review',
+      },
+      {
+        title: 'Решение врача',
+        description: 'Врач партнерской клиники оценивает случай на онлайн-консультации',
+      },
+      {
+        title: 'Лечение под ключ',
+        description: 'MedTour координирует план лечения, визу, поездку, прилет и сопровождение',
+      },
+    ],
+  },
+  aboutSection: {
+    badge: 'О нас',
+    title: 'MedTour — лечение в Казахстане под ключ',
+    description:
+      'Мы соединяем иностранных пациентов с партнерскими клиниками Казахстана и координируем сервис вокруг лечения.',
+    bullets: [
+      'Три партнерские клиники по ключевым направлениям',
+      'Персональный менеджер и медицинский координатор',
+      'Безопасная работа с документами и коммуникацией',
+      'Виза, отель, трансфер и пост-уход в одном процессе',
+    ],
+    buttonLabel: 'Начать заявку',
+  },
+  contactSection: {
+    badge: 'Контакты',
+    title: 'Свяжитесь с нами',
+    subtitle: 'Мы всегда на связи и готовы ответить на ваши вопросы',
+    phone: {
+      title: 'Телефон',
+      note: 'Пн-Пт: 8:00 — 20:00, Сб: 9:00 — 15:00',
+      value: '+7 (717) 270-12-34',
+    },
+    email: {
+      title: 'Электронная почта',
+      note: 'Ответим в течение 24 часов',
+      value: 'info@medtour.kz',
+    },
+    address: {
+      title: 'Адрес',
+      note: 'Приём по записи',
+      value: 'г. Астана, просп. Абылай хана, 42',
+    },
+    quickCard: {
+      title: 'Нужна помощь с лечением за границей?',
+      description:
+        'Создайте медицинскую заявку, и команда MedTour подскажет следующие шаги.',
+      bullets: ['Не нужно самостоятельно выбирать врача', 'Документы смотрит команда координаторов', 'План, чат и статус сохраняются в кабинете'],
+      buttonLabel: 'Начать медицинскую заявку',
+    },
+    mapEmbedUrl:
+      'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2505.5!2d71.4926513!3d51.1492038!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x4245817a521995c9%3A0xe653c982ba77912!2z0J3QsNGG0LjQvtC90LDQu9GM0L3Ri9C5INC90LDRg9GH0L3Ri9C5INC80LXQtNC40YbQuNC90YHQutC40Lkg0YbQtdC90YLRgA!5e0!3m2!1sru!2skz!4v1700000000000!5m2!1sru!2skz',
+  },
+}
+
+function mergeConfig(base, incoming) {
+  return {
+    ...base,
+    ...(incoming || {}),
+    hero: { ...base.hero, ...(incoming?.hero || {}) },
+    heroCard: {
+      ...base.heroCard,
+      ...(incoming?.heroCard || {}),
+      items: Array.isArray(incoming?.heroCard?.items) && incoming.heroCard.items.length > 0
+        ? incoming.heroCard.items
+        : base.heroCard.items,
+    },
+    stats: Array.isArray(incoming?.stats) && incoming.stats.length > 0 ? incoming.stats : base.stats,
+    featuresSection: {
+      ...base.featuresSection,
+      ...(incoming?.featuresSection || {}),
+      cards: Array.isArray(incoming?.featuresSection?.cards) && incoming.featuresSection.cards.length > 0
+        ? incoming.featuresSection.cards
+        : base.featuresSection.cards,
+    },
+    stepsSection: {
+      ...base.stepsSection,
+      ...(incoming?.stepsSection || {}),
+      steps: Array.isArray(incoming?.stepsSection?.steps) && incoming.stepsSection.steps.length > 0
+        ? incoming.stepsSection.steps
+        : base.stepsSection.steps,
+    },
+    aboutSection: {
+      ...base.aboutSection,
+      ...(incoming?.aboutSection || {}),
+      bullets: Array.isArray(incoming?.aboutSection?.bullets) && incoming.aboutSection.bullets.length > 0
+        ? incoming.aboutSection.bullets
+        : base.aboutSection.bullets,
+    },
+    contactSection: {
+      ...base.contactSection,
+      ...(incoming?.contactSection || {}),
+      phone: { ...base.contactSection.phone, ...(incoming?.contactSection?.phone || {}) },
+      email: { ...base.contactSection.email, ...(incoming?.contactSection?.email || {}) },
+      address: { ...base.contactSection.address, ...(incoming?.contactSection?.address || {}) },
+      quickCard: {
+        ...base.contactSection.quickCard,
+        ...(incoming?.contactSection?.quickCard || {}),
+        bullets:
+          Array.isArray(incoming?.contactSection?.quickCard?.bullets) && incoming.contactSection.quickCard.bullets.length > 0
+            ? incoming.contactSection.quickCard.bullets
+            : base.contactSection.quickCard.bullets,
+      },
+    },
+  }
+}
+
+function linesToArray(value) {
+  return (value || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+function arrayToLines(value) {
+  return Array.isArray(value) ? value.join('\n') : ''
+}
+
+function AdminContent() {
+  const { t } = useTranslation()
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const [siteName, setSiteName] = useState('')
+  const [siteDescription, setSiteDescription] = useState('')
+  const [seoMetaTitle, setSeoMetaTitle] = useState('')
+  const [seoMetaDescription, setSeoMetaDescription] = useState('')
+  const [landingConfig, setLandingConfig] = useState(defaultLandingConfig)
+
+  const heroCardItemsText = useMemo(
+    () => landingConfig.heroCard.items.map((item) => `${item.title} | ${item.description}`).join('\n'),
+    [landingConfig.heroCard.items],
+  )
+  const featuresCardsText = useMemo(
+    () => landingConfig.featuresSection.cards.map((item) => `${item.title} | ${item.description}`).join('\n'),
+    [landingConfig.featuresSection.cards],
+  )
+  const stepsText = useMemo(
+    () => landingConfig.stepsSection.steps.map((item) => `${item.title} | ${item.description}`).join('\n'),
+    [landingConfig.stepsSection.steps],
+  )
+
+  const loadContent = async () => {
+    setIsLoading(true)
+    try {
+      const globalRes = await contentAPI.getGlobal()
+      const { data: globalData } = normalizeResponse(globalRes)
+
+      const mergedConfig = mergeConfig(defaultLandingConfig, globalData?.landingConfig || {})
+      setLandingConfig(mergedConfig)
+
+      setSiteName(globalData?.siteName || 'MedTour')
+      setSiteDescription(globalData?.siteDescription || mergedConfig.hero.description)
+      setSeoMetaTitle(globalData?.defaultSeo?.metaTitle || 'MedTour — лечение в Казахстане под ключ')
+      setSeoMetaDescription(
+        globalData?.defaultSeo?.metaDescription ||
+          'MedTour помогает иностранным пациентам пройти лечение в Казахстане: медицинская заявка, документы, клиника, врач, поездка и сопровождение.',
+      )
+    } catch (error) {
+      console.error('Error loading content:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadContent()
+  }, [])
+
+  const setConfigValue = (path, value) => {
+    setLandingConfig((prev) => {
+      const next = structuredClone(prev)
+      let ref = next
+      for (let i = 0; i < path.length - 1; i += 1) {
+        ref = ref[path[i]]
+      }
+      ref[path[path.length - 1]] = value
+      return next
+    })
+  }
+
+  const parseTitleDescriptionRows = (textValue, fallbackRows) => {
+    const rows = linesToArray(textValue)
+    if (rows.length === 0) return fallbackRows
+    return rows.map((row, index) => {
+      const [titlePart, ...descriptionParts] = row.split('|')
+      const title = titlePart?.trim() || fallbackRows[index]?.title || ''
+      const description = descriptionParts.join('|').trim() || fallbackRows[index]?.description || ''
+      return { title, description }
+    })
+  }
+
+  const handleSave = async () => {
+    if (!siteName.trim()) {
+      alert(t('admin_content.err_name'))
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      await contentAPI.updateGlobal({
+        siteName: siteName.trim(),
+        siteDescription: siteDescription.trim() || landingConfig.hero.description,
+        defaultSeo: {
+          metaTitle: seoMetaTitle.trim() || 'MedTour — лечение в Казахстане под ключ',
+          metaDescription:
+            seoMetaDescription.trim() ||
+            'MedTour помогает иностранным пациентам пройти лечение в Казахстане: медицинская заявка, документы, клиника, врач, поездка и сопровождение.',
+        },
+        landingConfig,
+      })
+
+      await loadContent()
+      alert(t('admin_content.saved'))
+    } catch (error) {
+      console.error('Error saving content:', error)
+      alert(t('admin_content.err_save'))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className='flex items-center justify-center py-12'>
+        <Loader2 className='w-8 h-8 text-teal-600 animate-spin' />
+      </div>
+    )
+  }
+
+  return (
+    <div className='space-y-6 animate-fadeIn'>
+      <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+        <div>
+          <h1 className='text-2xl font-bold text-slate-900'>{t('admin_content.title')}</h1>
+          <p className='text-slate-600'>{t('admin_content.subtitle')}</p>
+        </div>
+        <div className='flex gap-2'>
+          <Button variant='secondary' leftIcon={<RefreshCcw className='w-4 h-4' />} onClick={loadContent}>
+            {t('admin_content.refresh')}
+          </Button>
+          <Button leftIcon={<Save className='w-4 h-4' />} onClick={handleSave} isLoading={isSaving}>
+            {t('admin_content.save')}
+          </Button>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('admin_content.hero_title')}</CardTitle>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <Input
+            label={t('admin_content.label_badge')}
+            value={landingConfig.hero.badge}
+            onChange={(e) => setConfigValue(['hero', 'badge'], e.target.value)}
+          />
+          <div className='grid md:grid-cols-2 gap-4'>
+            <Input
+              label={t('admin_content.label_title_prefix')}
+              value={landingConfig.hero.titlePrefix}
+              onChange={(e) => setConfigValue(['hero', 'titlePrefix'], e.target.value)}
+            />
+            <Input
+              label={t('admin_content.label_title_highlight')}
+              value={landingConfig.hero.titleHighlight}
+              onChange={(e) => setConfigValue(['hero', 'titleHighlight'], e.target.value)}
+            />
+          </div>
+          <Textarea
+            label={t('admin_content.label_hero_desc')}
+            rows={3}
+            value={landingConfig.hero.description}
+            onChange={(e) => setConfigValue(['hero', 'description'], e.target.value)}
+          />
+          <div className='grid md:grid-cols-2 gap-4'>
+            <Input
+              label={t('admin_content.label_btn1')}
+              value={landingConfig.hero.primaryButtonLabel}
+              onChange={(e) => setConfigValue(['hero', 'primaryButtonLabel'], e.target.value)}
+            />
+            <Input
+              label={t('admin_content.label_btn2')}
+              value={landingConfig.hero.secondaryButtonLabel}
+              onChange={(e) => setConfigValue(['hero', 'secondaryButtonLabel'], e.target.value)}
+            />
+          </div>
+          <div className='rounded-xl border border-dashed border-teal-300 bg-teal-50 p-4'>
+            <div className='flex items-center gap-2 text-sm font-medium text-teal-800 mb-2'>
+              <Eye className='w-4 h-4' />
+              {t('admin_content.hero_preview')}
+            </div>
+            <p className='text-slate-800 font-semibold'>{landingConfig.hero.badge}</p>
+            <p className='text-slate-900 text-lg mt-1'>
+              {landingConfig.hero.titlePrefix} <span className='text-teal-600'>{landingConfig.hero.titleHighlight}</span>
+            </p>
+            <p className='text-slate-700 mt-1'>{landingConfig.hero.description}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('admin_content.hero_card_title')}</CardTitle>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <div className='grid md:grid-cols-2 gap-4'>
+            <Input
+              label={t('admin_content.label_card_title')}
+              value={landingConfig.heroCard.title}
+              onChange={(e) => setConfigValue(['heroCard', 'title'], e.target.value)}
+            />
+            <Input
+              label={t('admin_content.label_card_subtitle')}
+              value={landingConfig.heroCard.subtitle}
+              onChange={(e) => setConfigValue(['heroCard', 'subtitle'], e.target.value)}
+            />
+          </div>
+          <Textarea
+            label={t('admin_content.label_card_items')}
+            rows={4}
+            value={heroCardItemsText}
+            onChange={(e) =>
+              setConfigValue(
+                ['heroCard', 'items'],
+                parseTitleDescriptionRows(e.target.value, landingConfig.heroCard.items).slice(0, 3),
+              )
+            }
+          />
+          <Input
+            label={t('admin_content.label_card_btn')}
+            value={landingConfig.heroCard.buttonLabel}
+            onChange={(e) => setConfigValue(['heroCard', 'buttonLabel'], e.target.value)}
+          />
+          <div className='grid md:grid-cols-2 lg:grid-cols-4 gap-4'>
+            {landingConfig.stats.map((item, index) => (
+              <div key={index} className='space-y-2 p-3 rounded-xl border border-slate-200'>
+                <Input
+                  label={t('admin_content.metric_value', { index: index + 1 })}
+                  value={item.value}
+                  onChange={(e) => {
+                    const next = [...landingConfig.stats]
+                    next[index] = { ...next[index], value: e.target.value }
+                    setConfigValue(['stats'], next)
+                  }}
+                />
+                <Input
+                  label={t('admin_content.metric_label_input', { index: index + 1 })}
+                  value={item.label}
+                  onChange={(e) => {
+                    const next = [...landingConfig.stats]
+                    next[index] = { ...next[index], label: e.target.value }
+                    setConfigValue(['stats'], next)
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('admin_content.features_title')}</CardTitle>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <div className='grid md:grid-cols-3 gap-4'>
+            <Input
+              label={t('admin_content.label_badge_s')}
+              value={landingConfig.featuresSection.badge}
+              onChange={(e) => setConfigValue(['featuresSection', 'badge'], e.target.value)}
+            />
+            <Input
+              label={t('admin_content.label_title_s')}
+              value={landingConfig.featuresSection.title}
+              onChange={(e) => setConfigValue(['featuresSection', 'title'], e.target.value)}
+            />
+            <Input
+              label={t('admin_content.label_subtitle_s')}
+              value={landingConfig.featuresSection.subtitle}
+              onChange={(e) => setConfigValue(['featuresSection', 'subtitle'], e.target.value)}
+            />
+          </div>
+          <Textarea
+            label={t('admin_content.label_cards')}
+            rows={6}
+            value={featuresCardsText}
+            onChange={(e) =>
+              setConfigValue(
+                ['featuresSection', 'cards'],
+                parseTitleDescriptionRows(e.target.value, landingConfig.featuresSection.cards).slice(0, 4),
+              )
+            }
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('admin_content.steps_title')}</CardTitle>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <div className='grid md:grid-cols-3 gap-4'>
+            <Input
+              label={t('admin_content.label_badge_s')}
+              value={landingConfig.stepsSection.badge}
+              onChange={(e) => setConfigValue(['stepsSection', 'badge'], e.target.value)}
+            />
+            <Input
+              label={t('admin_content.label_title_s')}
+              value={landingConfig.stepsSection.title}
+              onChange={(e) => setConfigValue(['stepsSection', 'title'], e.target.value)}
+            />
+            <Input
+              label={t('admin_content.label_subtitle_s')}
+              value={landingConfig.stepsSection.subtitle}
+              onChange={(e) => setConfigValue(['stepsSection', 'subtitle'], e.target.value)}
+            />
+          </div>
+          <Textarea
+            label={t('admin_content.label_steps')}
+            rows={6}
+            value={stepsText}
+            onChange={(e) =>
+              setConfigValue(
+                ['stepsSection', 'steps'],
+                parseTitleDescriptionRows(e.target.value, landingConfig.stepsSection.steps).slice(0, 4),
+              )
+            }
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('admin_content.about_title')}</CardTitle>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <div className='grid md:grid-cols-3 gap-4'>
+            <Input
+              label={t('admin_content.label_badge_s')}
+              value={landingConfig.aboutSection.badge}
+              onChange={(e) => setConfigValue(['aboutSection', 'badge'], e.target.value)}
+            />
+            <Input
+              label={t('admin_content.label_title_s')}
+              value={landingConfig.aboutSection.title}
+              onChange={(e) => setConfigValue(['aboutSection', 'title'], e.target.value)}
+            />
+            <Input
+              label={t('admin_content.label_btn_s')}
+              value={landingConfig.aboutSection.buttonLabel}
+              onChange={(e) => setConfigValue(['aboutSection', 'buttonLabel'], e.target.value)}
+            />
+          </div>
+          <Textarea
+            label={t('admin_content.label_about_desc')}
+            rows={4}
+            value={landingConfig.aboutSection.description}
+            onChange={(e) => setConfigValue(['aboutSection', 'description'], e.target.value)}
+          />
+          <Textarea
+            label={t('admin_content.label_bullets')}
+            rows={4}
+            value={arrayToLines(landingConfig.aboutSection.bullets)}
+            onChange={(e) => setConfigValue(['aboutSection', 'bullets'], linesToArray(e.target.value))}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('admin_content.contact_title')}</CardTitle>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <div className='grid md:grid-cols-3 gap-4'>
+            <Input
+              label={t('admin_content.label_badge_s')}
+              value={landingConfig.contactSection.badge}
+              onChange={(e) => setConfigValue(['contactSection', 'badge'], e.target.value)}
+            />
+            <Input
+              label={t('admin_content.label_title_s')}
+              value={landingConfig.contactSection.title}
+              onChange={(e) => setConfigValue(['contactSection', 'title'], e.target.value)}
+            />
+            <Input
+              label={t('admin_content.label_subtitle_s')}
+              value={landingConfig.contactSection.subtitle}
+              onChange={(e) => setConfigValue(['contactSection', 'subtitle'], e.target.value)}
+            />
+          </div>
+
+          <div className='grid lg:grid-cols-3 gap-4'>
+            <div className='space-y-2 p-3 rounded-xl border border-slate-200'>
+              <h3 className='text-sm font-medium text-slate-700'>{t('admin_content.section_phone')}</h3>
+              <Input
+                label={t('admin_content.label_phone_title')}
+                value={landingConfig.contactSection.phone.title}
+                onChange={(e) => setConfigValue(['contactSection', 'phone', 'title'], e.target.value)}
+              />
+              <Input
+                label={t('admin_content.label_phone_note')}
+                value={landingConfig.contactSection.phone.note}
+                onChange={(e) => setConfigValue(['contactSection', 'phone', 'note'], e.target.value)}
+              />
+              <Input
+                label={t('admin_content.label_phone_value')}
+                value={landingConfig.contactSection.phone.value}
+                onChange={(e) => setConfigValue(['contactSection', 'phone', 'value'], e.target.value)}
+              />
+            </div>
+            <div className='space-y-2 p-3 rounded-xl border border-slate-200'>
+              <h3 className='text-sm font-medium text-slate-700'>Email</h3>
+              <Input
+                label={t('admin_content.label_email_title')}
+                value={landingConfig.contactSection.email.title}
+                onChange={(e) => setConfigValue(['contactSection', 'email', 'title'], e.target.value)}
+              />
+              <Input
+                label={t('admin_content.label_email_note')}
+                value={landingConfig.contactSection.email.note}
+                onChange={(e) => setConfigValue(['contactSection', 'email', 'note'], e.target.value)}
+              />
+              <Input
+                label={t('admin_content.label_email_value')}
+                value={landingConfig.contactSection.email.value}
+                onChange={(e) => setConfigValue(['contactSection', 'email', 'value'], e.target.value)}
+              />
+            </div>
+            <div className='space-y-2 p-3 rounded-xl border border-slate-200'>
+              <h3 className='text-sm font-medium text-slate-700'>{t('admin_content.section_address')}</h3>
+              <Input
+                label={t('admin_content.label_address_title')}
+                value={landingConfig.contactSection.address.title}
+                onChange={(e) => setConfigValue(['contactSection', 'address', 'title'], e.target.value)}
+              />
+              <Input
+                label={t('admin_content.label_address_note')}
+                value={landingConfig.contactSection.address.note}
+                onChange={(e) => setConfigValue(['contactSection', 'address', 'note'], e.target.value)}
+              />
+              <Input
+                label={t('admin_content.label_address_value')}
+                value={landingConfig.contactSection.address.value}
+                onChange={(e) => setConfigValue(['contactSection', 'address', 'value'], e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className='space-y-3 p-4 rounded-xl border border-slate-200'>
+            <h3 className='font-medium text-slate-800'>{t('admin_content.qcard_heading')}</h3>
+            <Input
+              label={t('admin_content.label_qcard_title')}
+              value={landingConfig.contactSection.quickCard.title}
+              onChange={(e) => setConfigValue(['contactSection', 'quickCard', 'title'], e.target.value)}
+            />
+            <Textarea
+              label={t('admin_content.label_qcard_desc')}
+              rows={3}
+              value={landingConfig.contactSection.quickCard.description}
+              onChange={(e) => setConfigValue(['contactSection', 'quickCard', 'description'], e.target.value)}
+            />
+            <Textarea
+              label={t('admin_content.label_qcard_bullets')}
+              rows={3}
+              value={arrayToLines(landingConfig.contactSection.quickCard.bullets)}
+              onChange={(e) => setConfigValue(['contactSection', 'quickCard', 'bullets'], linesToArray(e.target.value))}
+            />
+            <Input
+              label={t('admin_content.label_qcard_btn')}
+              value={landingConfig.contactSection.quickCard.buttonLabel}
+              onChange={(e) => setConfigValue(['contactSection', 'quickCard', 'buttonLabel'], e.target.value)}
+            />
+            <Input
+              label={t('admin_content.label_map')}
+              value={landingConfig.contactSection.mapEmbedUrl}
+              onChange={(e) => setConfigValue(['contactSection', 'mapEmbedUrl'], e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('admin_content.seo_title')}</CardTitle>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <div className='grid md:grid-cols-2 gap-4'>
+            <Input
+              label={t('admin_content.label_site_name')}
+              value={siteName}
+              onChange={(e) => setSiteName(e.target.value)}
+            />
+            <Input
+              label={t('admin_content.label_site_desc')}
+              value={siteDescription}
+              onChange={(e) => setSiteDescription(e.target.value)}
+            />
+          </div>
+          <Input
+            label={t('admin_content.label_seo_title')}
+            value={seoMetaTitle}
+            onChange={(e) => setSeoMetaTitle(e.target.value)}
+          />
+          <Textarea
+            label={t('admin_content.label_seo_desc')}
+            rows={3}
+            value={seoMetaDescription}
+            onChange={(e) => setSeoMetaDescription(e.target.value)}
+          />
+          <div className='rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4'>
+            <div className='flex items-center gap-2 text-sm font-medium text-slate-700 mb-2'>
+              <FileText className='w-4 h-4' />
+              {t('admin_content.save_section_title')}
+            </div>
+            <p className='text-sm text-slate-600'>{t('admin_content.save_info_1')}</p>
+            <p className='text-sm text-slate-600 mt-1'>{t('admin_content.save_info_2')}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('admin_content.preview_title')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className='grid md:grid-cols-2 gap-4'>
+            <div className='p-4 rounded-xl border border-slate-200 bg-slate-50'>
+              <div className='flex items-center gap-2 text-slate-800 font-medium mb-2'>
+                <LayoutTemplate className='w-4 h-4 text-teal-600' />
+                Hero
+              </div>
+              <p className='text-sm text-slate-600'>{landingConfig.hero.badge}</p>
+              <p className='text-lg font-semibold text-slate-900 mt-1'>
+                {landingConfig.hero.titlePrefix} {landingConfig.hero.titleHighlight}
+              </p>
+            </div>
+            <div className='p-4 rounded-xl border border-slate-200 bg-slate-50'>
+              <div className='flex items-center gap-2 text-slate-800 font-medium mb-2'>
+                <Globe2 className='w-4 h-4 text-teal-600' />
+                {t('admin_content.preview_contacts')}
+              </div>
+              <p className='text-sm text-slate-600'>{landingConfig.contactSection.title}</p>
+              <p className='text-sm text-slate-900 mt-1'>{landingConfig.contactSection.phone.value}</p>
+              <p className='text-sm text-slate-900'>{landingConfig.contactSection.email.value}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+export default AdminContent

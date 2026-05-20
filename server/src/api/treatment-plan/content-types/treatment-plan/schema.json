@@ -1,0 +1,94 @@
+{
+  "kind": "collectionType",
+  "collectionName": "treatment_plans",
+  "info": {
+    "singularName": "treatment-plan",
+    "pluralName": "treatment-plans",
+    "displayName": "TreatmentPlan"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "medical_case": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::medical-case.medical-case",
+      "inversedBy": "treatment_plans"
+    },
+    "clinic": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::clinic.clinic",
+      "inversedBy": "treatment_plans"
+    },
+    "doctor": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::doctor.doctor",
+      "inversedBy": "treatment_plans"
+    },
+    "status": {
+      "type": "enumeration",
+      "default": "DRAFT",
+      "enum": [
+        "DRAFT",
+        "SENT",
+        "ACCEPTED",
+        "DECLINED",
+        "EXPIRED"
+      ]
+    },
+    "treatmentNeeded": {
+      "type": "boolean",
+      "default": true
+    },
+    "diagnosisSummary": {
+      "type": "text"
+    },
+    "doctorDecisionNotes": {
+      "type": "text"
+    },
+    "procedures": {
+      "type": "json"
+    },
+    "estimatedDurationDays": {
+      "type": "integer"
+    },
+    "totalCost": {
+      "type": "decimal"
+    },
+    "currency": {
+      "type": "enumeration",
+      "default": "USD",
+      "enum": [
+        "USD",
+        "EUR",
+        "GBP",
+        "KZT"
+      ]
+    },
+    "includedServices": {
+      "type": "json"
+    },
+    "excludedServices": {
+      "type": "json"
+    },
+    "risks": {
+      "type": "text"
+    },
+    "recommendations": {
+      "type": "text"
+    },
+    "sentAt": {
+      "type": "datetime"
+    },
+    "acceptedAt": {
+      "type": "datetime"
+    }
+  }
+}

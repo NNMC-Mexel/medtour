@@ -1,0 +1,79 @@
+{
+  "kind": "collectionType",
+  "collectionName": "finance_ledgers",
+  "info": {
+    "singularName": "finance-ledger",
+    "pluralName": "finance-ledgers",
+    "displayName": "FinanceLedger"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "entryType": {
+      "type": "enumeration",
+      "required": true,
+      "enum": [
+        "PAYMENT_AUTHORIZED",
+        "PAYMENT_CAPTURED",
+        "PAYMENT_FAILED",
+        "REFUND_REQUESTED",
+        "REFUND_APPROVED",
+        "REFUND_REJECTED",
+        "REFUND_SETTLED",
+        "ADJUSTMENT"
+      ]
+    },
+    "amount": {
+      "type": "decimal",
+      "required": true
+    },
+    "currency": {
+      "type": "string",
+      "default": "KZT"
+    },
+    "paymentProvider": {
+      "type": "string"
+    },
+    "providerPaymentId": {
+      "type": "string"
+    },
+    "reconciliationStatus": {
+      "type": "enumeration",
+      "default": "PENDING",
+      "enum": [
+        "PENDING",
+        "MATCHED",
+        "MISMATCH",
+        "MANUAL_REVIEW"
+      ]
+    },
+    "appointment": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::appointment.appointment"
+    },
+    "medical_case": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::medical-case.medical-case"
+    },
+    "patient": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "createdByUser": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "notes": {
+      "type": "text"
+    },
+    "metadata": {
+      "type": "json"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "kind": "collectionType",
+  "collectionName": "case_events",
+  "info": {
+    "singularName": "case-event",
+    "pluralName": "case-events",
+    "displayName": "CaseEvent"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "medical_case": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::medical-case.medical-case",
+      "inversedBy": "case_events"
+    },
+    "actor": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "eventType": {
+      "type": "enumeration",
+      "default": "NOTE",
+      "enum": [
+        "CREATED",
+        "STATUS_CHANGED",
+        "ASSIGNED",
+        "DOCUMENT_UPLOADED",
+        "CONSULTATION_SCHEDULED",
+        "DOCTOR_DECISION",
+        "PLAN_SENT",
+        "PLAN_ACCEPTED",
+        "TRAVEL_UPDATED",
+        "NOTE"
+      ]
+    },
+    "fromStatus": {
+      "type": "string"
+    },
+    "toStatus": {
+      "type": "string"
+    },
+    "message": {
+      "type": "text"
+    },
+    "metadata": {
+      "type": "json"
+    }
+  }
+}

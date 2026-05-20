@@ -1,0 +1,193 @@
+{
+  "kind": "collectionType",
+  "collectionName": "medical_cases",
+  "info": {
+    "singularName": "medical-case",
+    "pluralName": "medical-cases",
+    "displayName": "MedicalCase"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "caseNumber": {
+      "type": "string",
+      "unique": true
+    },
+    "status": {
+      "type": "enumeration",
+      "default": "NEW_LEAD",
+      "enum": [
+        "NEW_LEAD",
+        "REGISTERED",
+        "WAITING_FOR_DOCUMENTS",
+        "DOCUMENTS_UPLOADED",
+        "UNDER_REVIEW",
+        "DOCTOR_ASSIGNED",
+        "WAITING_PATIENT_CONFIRMATION",
+        "WAITING_PAYMENT",
+        "CONSULTATION_BOOKED",
+        "CONSULTATION_COMPLETED",
+        "LOCAL_TREATMENT",
+        "TREATMENT_IN_KAZAKHSTAN",
+        "TRAVEL_PREPARATION",
+        "ARRIVED_TO_KAZAKHSTAN",
+        "IN_TREATMENT",
+        "RECOVERY",
+        "COMPLETED",
+        "CANCELLED"
+      ]
+    },
+    "patient": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "medical_cases"
+    },
+    "manager": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "managed_medical_cases"
+    },
+    "coordinator": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "inversedBy": "coordinated_medical_cases"
+    },
+    "clinic": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::clinic.clinic",
+      "inversedBy": "medical_cases"
+    },
+    "doctor": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::doctor.doctor",
+      "inversedBy": "medical_cases"
+    },
+    "country": {
+      "type": "string"
+    },
+    "language": {
+      "type": "string",
+      "default": "en"
+    },
+    "timezone": {
+      "type": "string"
+    },
+    "diagnosis": {
+      "type": "text"
+    },
+    "symptoms": {
+      "type": "text"
+    },
+    "treatmentCategory": {
+      "type": "string"
+    },
+    "desiredDates": {
+      "type": "json"
+    },
+    "urgency": {
+      "type": "enumeration",
+      "default": "routine",
+      "enum": [
+        "routine",
+        "soon",
+        "urgent"
+      ]
+    },
+    "budgetRange": {
+      "type": "string"
+    },
+    "preferredContact": {
+      "type": "string"
+    },
+    "visaSupportNeeded": {
+      "type": "boolean",
+      "default": false
+    },
+    "currentTreatment": {
+      "type": "text"
+    },
+    "arrivalDate": {
+      "type": "date"
+    },
+    "departureDate": {
+      "type": "date"
+    },
+    "flightDetails": {
+      "type": "json"
+    },
+    "hotelName": {
+      "type": "string"
+    },
+    "tourismRequested": {
+      "type": "boolean",
+      "default": false
+    },
+    "tourismNotes": {
+      "type": "text"
+    },
+    "internalNotes": {
+      "type": "text"
+    },
+    "cancellationReason": {
+      "type": "text"
+    },
+    "medical_documents": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::medical-document.medical-document",
+      "mappedBy": "medical_case"
+    },
+    "appointments": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::appointment.appointment",
+      "mappedBy": "medical_case"
+    },
+    "conversation": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::conversation.conversation",
+      "mappedBy": "medical_case"
+    },
+    "treatment_plans": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::treatment-plan.treatment-plan",
+      "mappedBy": "medical_case"
+    },
+    "trip_checklist": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::trip-checklist.trip-checklist",
+      "mappedBy": "medical_case"
+    },
+    "visa_requests": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::visa-request.visa-request",
+      "mappedBy": "medical_case"
+    },
+    "tourism_packages": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::tourism-package.tourism-package",
+      "mappedBy": "medical_case"
+    },
+    "case_events": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::case-event.case-event",
+      "mappedBy": "medical_case"
+    }
+  }
+}
