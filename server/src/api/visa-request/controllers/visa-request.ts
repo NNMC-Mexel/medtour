@@ -19,6 +19,25 @@ function pickAllowedFields(body: Record<string, any>) {
   return Object.fromEntries(Object.entries(body).filter(([key]) => ALLOWED_FIELDS.includes(key)));
 }
 
+function getRelationRef(value: any) {
+  if (!value) return undefined;
+  return typeof value === 'object' ? value.documentId || value.id : value;
+}
+
+async function createTravelEvent(strapi: any, user: any, medicalCase: any, status: any) {
+  const medicalCaseRef = getRelationRef(medicalCase);
+  if (!medicalCaseRef) return;
+  await strapi.documents('api::case-event.case-event' as any).create({
+    data: {
+      medical_case: medicalCaseRef,
+      actor: user.documentId || user.id,
+      eventType: 'TRAVEL_UPDATED',
+      message: 'Visa request updated',
+      metadata: { source: 'visa_request_controller', status: status || null },
+    },
+  });
+}
+
 export default factories.createCoreController(UID, () => ({
   async find(ctx) {
     const user = ctx.state.user;
@@ -58,6 +77,7 @@ export default factories.createCoreController(UID, () => ({
       status: 'published',
       populate: '*',
     });
+    await createTravelEvent(strapi, user, body.medical_case, (item as any).status);
     return { data: item };
   },
 
@@ -81,6 +101,7 @@ export default factories.createCoreController(UID, () => ({
       status: 'published',
       populate: '*',
     });
+    await createTravelEvent(strapi, user, (existing as any).medical_case, (item as any).status);
     return { data: item };
   },
 

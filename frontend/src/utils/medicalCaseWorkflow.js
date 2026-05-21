@@ -144,8 +144,16 @@ export function normalizeCaseStatus(status) {
   return LEGACY_MEDICAL_CASE_STATUS_MAP[status] || status
 }
 
-export function formatCaseStatus(status) {
-  return String(normalizeCaseStatus(status) || 'NEW_LEAD').replaceAll('_', ' ')
+export function formatCaseStatus(status, t) {
+  const key = normalizeCaseStatus(status) || 'NEW_LEAD'
+  if (t) {
+    const translated = t(`case_status.${key}`, { defaultValue: '' })
+    if (translated) return translated
+  }
+  return String(key)
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
 }
 
 export function getAllowedCaseTransitions(role, fromStatus) {

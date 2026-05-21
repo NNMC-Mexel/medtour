@@ -71,6 +71,48 @@ const specializations = [
   { name: 'Уролог', description: 'Специалист по мочеполовой системе', icon: 'male', sortOrder: 12 },
 ];
 
+const priceItems = [
+  {
+    title: 'Первичный разбор медицинских документов',
+    category: 'Консультации',
+    description: 'Координатор проверяет документы и направляет заявку в подходящую клинику.',
+    price: 15000,
+    currency: 'KZT',
+    unit: 'заявка',
+    badge: 'Старт',
+    note: 'Финальная стоимость лечения рассчитывается клиникой после review.',
+    sortOrder: 1,
+    isActive: true,
+    isFeatured: true,
+  },
+  {
+    title: 'Онлайн-консультация профильного врача',
+    category: 'Консультации',
+    description: 'Видео-консультация с врачом партнерской клиники по вашему направлению.',
+    price: 30000,
+    currency: 'KZT',
+    unit: 'консультация',
+    badge: 'Популярно',
+    note: 'Длительность до 30 минут.',
+    sortOrder: 2,
+    isActive: true,
+    isFeatured: true,
+  },
+  {
+    title: 'Пакет сопровождения поездки',
+    category: 'Сервис',
+    description: 'Помощь с визой, отелем, трансфером, расписанием визитов и коммуникацией с клиникой.',
+    price: 120000,
+    currency: 'KZT',
+    unit: 'поездка',
+    badge: 'Под ключ',
+    note: 'Билеты, проживание и лечение оплачиваются отдельно.',
+    sortOrder: 3,
+    isActive: true,
+    isFeatured: true,
+  },
+];
+
 async function createSpecializations() {
   console.log('Creating specializations...');
   
@@ -107,6 +149,38 @@ async function createSpecializations() {
   }
 }
 
+async function createPriceItems() {
+  console.log('Creating price list items...');
+
+  for (const item of priceItems) {
+    const existingPublished = await strapi.documents('api::price-item.price-item').findMany({
+      filters: { title: item.title },
+      status: 'published',
+    });
+    const existingDraft = await strapi.documents('api::price-item.price-item').findMany({
+      filters: { title: item.title },
+      status: 'draft',
+    });
+
+    if (existingPublished.length === 0 && existingDraft.length === 0) {
+      const created = await strapi.documents('api::price-item.price-item').create({
+        data: item,
+      });
+      await strapi.documents('api::price-item.price-item').publish({
+        documentId: created.documentId,
+      });
+      console.log(`Created and published price item: ${item.title}`);
+    } else if (existingDraft.length > 0) {
+      await strapi.documents('api::price-item.price-item').publish({
+        documentId: existingDraft[0].documentId,
+      });
+      console.log(`Published existing draft price item: ${item.title}`);
+    } else {
+      console.log(`Price item already exists: ${item.title}`);
+    }
+  }
+}
+
 async function seedMedicalData() {
   try {
     console.log('Setting up medical API permissions...');
@@ -116,6 +190,7 @@ async function seedMedicalData() {
       specialization: ['find', 'findOne'],
       doctor: ['find', 'findOne'],
       review: ['find', 'findOne'],
+      'price-item': ['find', 'findOne'],
     });
     
     // Authenticated permissions - CRUD for appointments, documents, etc.
@@ -124,6 +199,7 @@ async function seedMedicalData() {
       doctor: ['find', 'findOne', 'create', 'update'],
       appointment: ['find', 'findOne', 'create', 'update'],
       review: ['find', 'findOne', 'create'],
+      'price-item': ['find', 'findOne', 'create', 'update', 'delete'],
       'medical-document': ['find', 'findOne', 'create', 'update', 'delete'],
       conversation: ['find', 'findOne', 'create', 'update'],
       message: ['find', 'findOne', 'create'],
@@ -134,6 +210,7 @@ async function seedMedicalData() {
     
     // Create specializations
     await createSpecializations();
+    await createPriceItems();
     
     console.log('Medical seed data imported successfully!');
   } catch (error) {

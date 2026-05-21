@@ -6,6 +6,7 @@ import {
   isMedicalCaseStatus,
   normalizeCaseStatus,
 } from '../../../utils/medical-case-workflow';
+import { sendCaseStatusEmail, sendNewLeadEmailToStaff } from '../../../utils/case-email';
 
 const DEFAULT_POPULATE = {
   patient: { fields: ['id', 'documentId', 'fullName', 'email', 'phone', 'country', 'language', 'timezone'] },
@@ -38,11 +39,13 @@ const FIELD_ALLOWLIST_BY_ROLE: Record<string, string[]> = {
     'urgency',
     'budgetRange',
     'preferredContact',
+    'leadSource',
+    'leadMedium',
+    'leadCampaign',
+    'leadReferrer',
     'visaSupportNeeded',
     'currentTreatment',
     'tourismRequested',
-    'tourismNotes',
-    'cancellationReason',
   ],
   doctor: ['status', 'internalNotes'],
   manager: [
@@ -57,6 +60,10 @@ const FIELD_ALLOWLIST_BY_ROLE: Record<string, string[]> = {
     'hotelName',
     'budgetRange',
     'preferredContact',
+    'leadSource',
+    'leadMedium',
+    'leadCampaign',
+    'leadReferrer',
     'visaSupportNeeded',
     'tourismRequested',
     'tourismNotes',
@@ -197,6 +204,9 @@ export default factories.createCoreController('api::medical-case.medical-case' a
       metadata: { role },
     });
 
+    // Notify staff about the new lead (async — don't block response)
+    sendNewLeadEmailToStaff(strapi, created as any).catch(() => {});
+
     return { data: created };
   },
 
@@ -255,6 +265,14 @@ export default factories.createCoreController('api::medical-case.medical-case' a
         message: `Status changed from ${previousStatus} to ${data.status}`,
         metadata: { role },
       });
+
+      // Email patient about the status change (async — don't block response)
+      sendCaseStatusEmail(strapi, updated as any, data.status).catch(() => {});
+    }
+
+    if (data.status === 'DOCTOR_ASSIGNED' && data.doctor) {
+      // Also email when doctor is newly assigned even if status didn't change
+      sendCaseStatusEmail(strapi, updated as any, 'DOCTOR_ASSIGNED').catch(() => {});
     }
 
     if (hasAssignmentChange(data)) {

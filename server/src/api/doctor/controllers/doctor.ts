@@ -26,10 +26,11 @@ export default factories.createCoreController('api::doctor.doctor', ({ strapi })
     const user = ctx.state.user;
     const isAdmin = user?.role?.type === 'admin' || user?.userRole === 'admin';
     const isDoctor = user?.role?.type === 'doctor' || user?.userRole === 'doctor';
+    const isStaff = ['manager', 'coordinator'].includes(user?.userRole);
 
-    // Public/patient-facing catalog must only expose active doctors created by the clinic admin.
-    // Admins need the full list; doctors need access to their own profile even if inactive.
-    if (!isAdmin && !isDoctor) {
+    // Public/patient-facing catalog must only expose active doctors.
+    // Admins, doctors, and internal staff (manager/coordinator) need the full list.
+    if (!isAdmin && !isDoctor && !isStaff) {
       ctx.query = {
         ...ctx.query,
         filters: {
@@ -47,9 +48,10 @@ export default factories.createCoreController('api::doctor.doctor', ({ strapi })
     const user = ctx.state.user;
     const isAdmin = user?.role?.type === 'admin' || user?.userRole === 'admin';
     const isDoctor = user?.role?.type === 'doctor' || user?.userRole === 'doctor';
+    const isStaff = ['manager', 'coordinator'].includes(user?.userRole);
     const doctor = (response as any)?.data;
 
-    if (!isAdmin && !isDoctor && doctor?.isActive === false) {
+    if (!isAdmin && !isDoctor && !isStaff && doctor?.isActive === false) {
       return ctx.notFound('Doctor not found');
     }
 

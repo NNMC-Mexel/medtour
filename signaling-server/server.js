@@ -46,8 +46,9 @@ app.use(express.json())
 // Startup validation — fail fast if required env vars are missing
 // =====================================================
 const REQUIRED_ENV_VARS = [
-  'STRAPI_API_URL', 'STRAPI_API_TOKEN',
+  'STRAPI_API_URL',
 ]
+const REQUIRED_STRAPI_TOKEN = process.env.NODE_ENV === 'production' || process.env.PAYMENTS_LIVE === 'true'
 const PAYMENT_ENV_VARS = [
   'EPAY_CLIENT_ID', 'EPAY_CLIENT_SECRET', 'EPAY_TERMINAL_ID',
   'EPAY_QR_CLIENT_ID', 'EPAY_QR_CLIENT_SECRET', 'EPAY_QR_TERMINAL_ID',
@@ -56,6 +57,13 @@ const missingRequired = REQUIRED_ENV_VARS.filter((v) => !process.env[v])
 if (missingRequired.length > 0) {
   console.error(`[STARTUP] Missing required environment variables: ${missingRequired.join(', ')}`)
   process.exit(1)
+}
+if (REQUIRED_STRAPI_TOKEN && !process.env.STRAPI_API_TOKEN) {
+  console.error('[STARTUP] STRAPI_API_TOKEN is required in production or when PAYMENTS_LIVE=true')
+  process.exit(1)
+}
+if (!process.env.STRAPI_API_TOKEN) {
+  console.warn('[STARTUP] STRAPI_API_TOKEN is not set; Strapi-backed room/payment operations may fail')
 }
 const missingPayment = PAYMENT_ENV_VARS.filter((v) => !process.env[v])
 if (missingPayment.length > 0) {
@@ -839,6 +847,55 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000)
 
+/**
+ * When the last participant leaves a room, revert the appointment status from
+ * in_progress back to confirmed — if the consultation window is still open.
+ * This lets either party rejoin after accidental disconnection.
+ *
+ * If the window has already passed, leave the status as-is (the no_show cron
+ * will clean it up on the next cycle).
+ */
+async function revertInProgressToConfirmed(roomId) {
+  if (!STRAPI_API_TOKEN) return
+  try {
+    // Fetch the appointment and check its current state + window
+    const url =
+      `${STRAPI_API_URL}/api/appointments` +
+      `?filters[roomId][$eq]=${encodeURIComponent(roomId)}` +
+      `&filters[statuse][$eq]=in_progress` +
+      `&populate[doctor][fields][0]=consultationDuration` +
+      `&fields[0]=documentId&fields[1]=dateTime&pagination[pageSize]=1`
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${STRAPI_API_TOKEN}` },
+    }).catch(() => null)
+    if (!res?.ok) return
+    const data = await res.json().catch(() => null)
+    const appt = data?.data?.[0]
+    if (!appt?.documentId) return
+
+    const dateTime = new Date(appt.dateTime)
+    const duration = Number(appt.doctor?.consultationDuration) || 30
+    const windowEnd = new Date(dateTime.getTime() + (duration + 5) * 60 * 1000)
+
+    if (Date.now() > windowEnd.getTime()) {
+      console.log(`[revert] Window closed for ${roomId} — leaving as in_progress`)
+      return
+    }
+
+    await fetch(`${STRAPI_API_URL}/api/appointments/${appt.documentId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${STRAPI_API_TOKEN}`,
+      },
+      body: JSON.stringify({ data: { statuse: 'confirmed' } }),
+    })
+    console.log(`[revert] ${roomId} reverted in_progress → confirmed (window still open)`)
+  } catch (err) {
+    console.error(`[revert] Failed for room ${roomId}:`, err.message)
+  }
+}
+
 // Auth middleware — rejects unauthenticated socket connections
 io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace('Bearer ', '')
@@ -1286,10 +1343,11 @@ io.on('connection', (socket) => {
         userName: participant?.name,
       })
       
-      // Удаляем пустую комнату
+      // When room is empty: delete it and revert appointment status if still in window
       if (room.participants.size === 0) {
         rooms.delete(roomId)
         console.log(`Room ${roomId} deleted (empty)`)
+        revertInProgressToConfirmed(roomId).catch(() => {})
       }
     }
   })
@@ -1324,9 +1382,10 @@ io.on('connection', (socket) => {
         
         if (room.participants.size === 0) {
           rooms.delete(roomId)
+          revertInProgressToConfirmed(roomId).catch(() => {})
         }
       }
-      
+
       socket.roomId = null
     }
   })

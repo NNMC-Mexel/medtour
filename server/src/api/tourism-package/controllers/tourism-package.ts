@@ -19,6 +19,25 @@ function pickAllowedFields(body: Record<string, any>, allowed: string[]) {
   return Object.fromEntries(Object.entries(body).filter(([key]) => allowed.includes(key)));
 }
 
+function getRelationRef(value: any) {
+  if (!value) return undefined;
+  return typeof value === 'object' ? value.documentId || value.id : value;
+}
+
+async function createTravelEvent(strapi: any, user: any, medicalCase: any, status: any) {
+  const medicalCaseRef = getRelationRef(medicalCase);
+  if (!medicalCaseRef) return;
+  await strapi.documents('api::case-event.case-event' as any).create({
+    data: {
+      medical_case: medicalCaseRef,
+      actor: user.documentId || user.id,
+      eventType: 'TRAVEL_UPDATED',
+      message: 'Tourism package updated',
+      metadata: { source: 'tourism_package_controller', status: status || null },
+    },
+  });
+}
+
 export default factories.createCoreController(UID, () => ({
   async find(ctx) {
     const user = ctx.state.user;
@@ -58,6 +77,7 @@ export default factories.createCoreController(UID, () => ({
       status: 'published',
       populate: '*',
     });
+    await createTravelEvent(strapi, user, body.medical_case, (item as any).status);
     return { data: item };
   },
 
@@ -70,21 +90,10 @@ export default factories.createCoreController(UID, () => ({
     if (!(await userCanAccessMedicalCase(strapi, user, (existing as any).medical_case))) return ctx.forbidden('Forbidden');
 
     const body = (ctx.request.body as any)?.data || ctx.request.body || {};
-    let data: Record<string, any>;
-    if (role === 'patient') {
-      if (!['ACCEPTED', 'DECLINED'].includes(body.status)) {
-        return ctx.badRequest('Patients can only accept or decline tourism packages');
-      }
-      if ((existing as any).status !== 'OFFERED') {
-        return ctx.badRequest('Only offered tourism packages can be accepted or declined');
-      }
-      data = { status: body.status };
-    } else if (STAFF_WRITER_ROLES.includes(role)) {
-      data = pickAllowedFields(body, STAFF_ALLOWED_FIELDS);
-      delete (data as any).medical_case;
-    } else {
-      return ctx.forbidden('Forbidden');
-    }
+    if (!STAFF_WRITER_ROLES.includes(role)) return ctx.forbidden('Only managers and admins can update tourism packages');
+
+    const data = pickAllowedFields(body, STAFF_ALLOWED_FIELDS);
+    delete (data as any).medical_case;
 
     const item = await strapi.documents(UID).update({
       documentId: ctx.params.id,
@@ -92,6 +101,7 @@ export default factories.createCoreController(UID, () => ({
       status: 'published',
       populate: '*',
     });
+    await createTravelEvent(strapi, user, (existing as any).medical_case, (item as any).status);
     return { data: item };
   },
 

@@ -350,10 +350,11 @@ function PatientAppointments() {
               const consultationDuration = appointment.doctor?.consultationDuration || 30
               const consultationEnd = new Date(appointmentDate.getTime() + (consultationDuration + 5) * 60 * 1000)
               const isPastAppointment = now > consultationEnd || appointment.status === 'completed'
-              const isUpcoming = ['confirmed', 'pending'].includes(appointment.status) && !isPastAppointment
+              const isUpcoming = ['confirmed', 'pending', 'in_progress'].includes(appointment.status) && !isPastAppointment
               const effectiveStatus = getEffectiveStatus(appointment)
               const fifteenMinBefore = new Date(appointmentDate.getTime() - 15 * 60 * 1000)
-              const canJoin = ['confirmed', 'pending'].includes(appointment.status) &&
+              // in_progress: the other party already joined — allow rejoin
+              const canJoin = ['confirmed', 'pending', 'in_progress'].includes(appointment.status) &&
                              now >= fifteenMinBefore &&
                              now <= consultationEnd
 

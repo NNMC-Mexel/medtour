@@ -22,7 +22,8 @@ import useDocumentStore from '../../stores/documentStore'
 import useChatStore from '../../stores/chatStore'
 import { formatRelativeDate } from '../../utils/helpers'
 import { getMediaUrl, getServerNow, medicalCasesAPI, normalizeResponse } from '../../services/api'
-import { formatCaseStatus } from '../../utils/medicalCaseWorkflow'
+import { formatCaseStatus, normalizeCaseStatus } from '../../utils/medicalCaseWorkflow'
+import CaseSlotPicker from '../../components/cases/CaseSlotPicker'
 
 function PatientDashboard() {
   const { t } = useTranslation()
@@ -32,6 +33,7 @@ function PatientDashboard() {
   const { conversations, fetchConversations, isLoading: chatsLoading } = useChatStore()
   const [medicalCases, setMedicalCases] = useState([])
   const [casesLoading, setCasesLoading] = useState(false)
+  const [slotPickerCase, setSlotPickerCase] = useState(null)
 
   const [stats, setStats] = useState({
     totalConsultations: 0,
@@ -98,6 +100,11 @@ function PatientDashboard() {
 
   const isLoading = appointmentsLoading || documentsLoading
 
+  const BOOKING_NEEDED_STATUSES = ['DOCTOR_ASSIGNED', 'WAITING_PATIENT_CONFIRMATION', 'UNDER_REVIEW', 'DOCUMENTS_UPLOADED']
+  const casesNeedingBooking = medicalCases.filter(item =>
+    !!item.doctor && BOOKING_NEEDED_STATUSES.includes(normalizeCaseStatus(item.status))
+  )
+
   const displayName = user?.fullName?.split(' ')[1] || user?.fullName?.split(' ')[0] || user?.username
 
   return (
@@ -119,6 +126,38 @@ function PatientDashboard() {
         </Link>
       </div>
 
+      {casesNeedingBooking.length > 0 && (
+        <div className="space-y-2">
+          {casesNeedingBooking.map(item => (
+            <div
+              key={item.documentId || item.id}
+              className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl"
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                  <Bell className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">
+                    {t('patient.book_slot_notice')}
+                  </p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    {item.caseNumber} · {t('patient.doctor_label')}: {item.doctor?.fullName}
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => setSlotPickerCase(item)}
+                leftIcon={<Calendar className="w-4 h-4" />}
+              >
+                {t('case_detail.book_consultation_btn')}
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <Card className="border-teal-100">
         <CardContent className="p-5 sm:p-6">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -127,27 +166,27 @@ function PatientDashboard() {
                 <Activity className="w-6 h-6 text-teal-600" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-teal-700">MedTour case</p>
+                <p className="text-sm font-semibold text-teal-700">{t('patient.case_label')}</p>
                 {casesLoading ? (
                   <div className="flex items-center gap-2 mt-1 text-slate-500">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm">Loading case status...</span>
+                    <span className="text-sm">{t('patient.case_loading')}</span>
                   </div>
                 ) : medicalCases.length > 0 ? (
                   <>
                     <h2 className="text-lg font-bold text-slate-900 mt-1">
-                      {medicalCases[0].caseNumber || medicalCases[0].title || 'Medical case'}
+                      {medicalCases[0].caseNumber || medicalCases[0].title || t('patient.case_label')}
                     </h2>
                     <p className="text-sm text-slate-600 mt-1">
-                      Status: {formatCaseStatus(medicalCases[0].status)}
-                      {medicalCases[0].manager?.fullName ? ` · Manager: ${medicalCases[0].manager.fullName}` : ''}
+                      {t('cases.col_status')}: {formatCaseStatus(medicalCases[0].status, t)}
+                      {medicalCases[0].manager?.fullName ? ` · ${t('cases.col_manager')}: ${medicalCases[0].manager.fullName}` : ''}
                     </p>
                   </>
                 ) : (
                   <>
-                    <h2 className="text-lg font-bold text-slate-900 mt-1">Start your medical treatment request</h2>
+                    <h2 className="text-lg font-bold text-slate-900 mt-1">{t('patient.case_start_title')}</h2>
                     <p className="text-sm text-slate-600 mt-1">
-                      Create a case, upload documents, and MedTour will coordinate clinic and doctor matching.
+                      {t('patient.case_start_desc')}
                     </p>
                   </>
                 )}
@@ -155,7 +194,7 @@ function PatientDashboard() {
             </div>
             <Link to="/patient/cases">
               <Button rightIcon={<ChevronRight className="w-4 h-4" />}>
-                {medicalCases.length > 0 ? 'Open case' : 'Start medical case'}
+                {medicalCases.length > 0 ? t('patient.case_open_btn') : t('patient.case_start_btn')}
               </Button>
             </Link>
           </div>
@@ -266,24 +305,25 @@ function PatientDashboard() {
 
                   const fifteenMinBefore = new Date(appointmentDate.getTime() - 15 * 60 * 1000)
                   const consultationEnd = new Date(appointmentDate.getTime() + (consultationDuration + bufferMinutes) * 60 * 1000)
-                  const canJoin = ['confirmed', 'pending'].includes(appointment.status) &&
+                  // in_progress: doctor already joined — patient must be able to rejoin
+                  const canJoin = ['confirmed', 'pending', 'in_progress'].includes(appointment.status) &&
                                   now >= fifteenMinBefore &&
                                   now <= consultationEnd
 
                   return (
                     <div
                       key={appointment.id}
-                      className="flex items-center justify-between p-4 bg-slate-50 rounded-xl"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 rounded-xl"
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
                         <Avatar
                           src={getMediaUrl(appointment.doctor?.photo)}
                           name={doctorName}
                           size="lg"
                         />
-                        <div>
-                          <h4 className="font-medium text-slate-900">{doctorName}</h4>
-                          <p className="text-sm text-slate-500">{specName}</p>
+                        <div className="min-w-0">
+                          <h4 className="font-medium text-slate-900 truncate">{doctorName}</h4>
+                          <p className="text-sm text-slate-500 truncate">{specName}</p>
                           <div className="flex items-center gap-2 mt-1">
                             <Clock className="w-3 h-3 text-slate-400" />
                             <span className="text-xs text-slate-600">
@@ -292,7 +332,7 @@ function PatientDashboard() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         <Badge variant={appointment.status === 'confirmed' ? 'primary' : 'default'}>
                           {appointment.type === 'video' ? t('patient.type_video') : t('patient.type_chat')}
                         </Badge>
@@ -386,6 +426,23 @@ function PatientDashboard() {
           </Card>
         </div>
       </div>
+
+      {slotPickerCase && (
+        <CaseSlotPicker
+          isOpen={!!slotPickerCase}
+          onClose={() => setSlotPickerCase(null)}
+          doctor={slotPickerCase.doctor}
+          caseDocId={slotPickerCase.documentId || slotPickerCase.id}
+          patientId={user?.id}
+          role="patient"
+          onBooked={() => {
+            setSlotPickerCase(null)
+            medicalCasesAPI.getAll()
+              .then(r => { const { data } = normalizeResponse(r); setMedicalCases(Array.isArray(data) ? data : []) })
+              .catch(() => {})
+          }}
+        />
+      )}
     </div>
   )
 }

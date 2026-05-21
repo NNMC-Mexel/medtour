@@ -112,19 +112,10 @@ const medTourStaffPermissions = [
   'api::treatment-plan.treatment-plan.delete',
   'api::trip-checklist.trip-checklist.find',
   'api::trip-checklist.trip-checklist.findOne',
-  'api::trip-checklist.trip-checklist.create',
-  'api::trip-checklist.trip-checklist.update',
-  'api::trip-checklist.trip-checklist.delete',
   'api::visa-request.visa-request.find',
   'api::visa-request.visa-request.findOne',
-  'api::visa-request.visa-request.create',
-  'api::visa-request.visa-request.update',
-  'api::visa-request.visa-request.delete',
   'api::tourism-package.tourism-package.find',
   'api::tourism-package.tourism-package.findOne',
-  'api::tourism-package.tourism-package.create',
-  'api::tourism-package.tourism-package.update',
-  'api::tourism-package.tourism-package.delete',
   'api::case-event.case-event.find',
   'api::case-event.case-event.findOne',
   'api::case-event.case-event.create',
@@ -134,6 +125,21 @@ const medTourStaffPermissions = [
   'api::finance-ledger.finance-ledger.findOne',
   'api::finance-ledger.finance-ledger.create',
   'api::finance-ledger.finance-ledger.update',
+];
+
+const medTourLogisticsWriterPermissions = [
+  'api::trip-checklist.trip-checklist.create',
+  'api::trip-checklist.trip-checklist.update',
+  'api::visa-request.visa-request.create',
+  'api::visa-request.visa-request.update',
+  'api::tourism-package.tourism-package.create',
+  'api::tourism-package.tourism-package.update',
+];
+
+const medTourLogisticsAdminPermissions = [
+  'api::trip-checklist.trip-checklist.delete',
+  'api::visa-request.visa-request.delete',
+  'api::tourism-package.tourism-package.delete',
 ];
 
 // Определение ролей и их permissions
@@ -251,6 +257,7 @@ const roleDefinitions = {
     description: 'Менеджер MedTour — ведёт заявки, коммуникацию и логистику своего пула',
     permissions: [
       ...medTourStaffPermissions,
+      ...medTourLogisticsWriterPermissions,
       'api::doctor.doctor.find',
       'api::doctor.doctor.findOne',
       'api::specialization.specialization.find',
@@ -341,6 +348,8 @@ const roleDefinitions = {
       'api::doctor.doctor.update',
       'api::doctor.doctor.delete',
       ...medTourStaffPermissions,
+      ...medTourLogisticsWriterPermissions,
+      ...medTourLogisticsAdminPermissions,
       'api::clinic.clinic.delete',
       // Specializations — полный CRUD
       'api::specialization.specialization.find',

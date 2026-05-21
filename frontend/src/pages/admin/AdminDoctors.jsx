@@ -55,7 +55,7 @@ function toPayload(form) {
   }
 }
 
-function AdminDoctors() {
+function AdminDoctors({ readonly = false }) {
   const { t } = useTranslation()
   const [doctors, setDoctors] = useState([])
   const [specializations, setSpecializations] = useState([])
@@ -410,9 +410,11 @@ function AdminDoctors() {
           <h1 className='text-2xl font-bold text-slate-900'>{t('admin_doc.title')}</h1>
           <p className='text-slate-600'>{t('admin_doc.subtitle')}</p>
         </div>
-        <Button leftIcon={<Plus className='w-4 h-4' />} onClick={openCreateModal}>
-          {t('admin_doc.add_btn')}
-        </Button>
+        {!readonly && (
+          <Button leftIcon={<Plus className='w-4 h-4' />} onClick={openCreateModal}>
+            {t('admin_doc.add_btn')}
+          </Button>
+        )}
       </div>
 
       <div className='grid md:grid-cols-2 gap-4'>
@@ -479,26 +481,28 @@ function AdminDoctors() {
                           {doctor.isActive === false ? t('admin_doc.inactive') : t('admin_doc.active')}
                         </Badge>
                       </td>
-                      <td className='py-4 px-6'>
-                        <div className='flex justify-end gap-2'>
-                          <Button
-                            size='icon'
-                            variant='secondary'
-                            onClick={() => openEditModal(doctor)}
-                            aria-label={t('admin_doc.edit_aria')}
-                          >
-                            <Pencil className='w-4 h-4' />
-                          </Button>
-                          <Button
-                            size='icon'
-                            variant='secondary'
-                            onClick={() => handleDelete(doctor)}
-                            aria-label={t('admin_doc.delete_aria')}
-                          >
-                            <Trash2 className='w-4 h-4 text-rose-600' />
-                          </Button>
-                        </div>
-                      </td>
+                      {!readonly && (
+                        <td className='py-4 px-6'>
+                          <div className='flex justify-end gap-2'>
+                            <Button
+                              size='icon'
+                              variant='secondary'
+                              onClick={() => openEditModal(doctor)}
+                              aria-label={t('admin_doc.edit_aria')}
+                            >
+                              <Pencil className='w-4 h-4' />
+                            </Button>
+                            <Button
+                              size='icon'
+                              variant='secondary'
+                              onClick={() => handleDelete(doctor)}
+                              aria-label={t('admin_doc.delete_aria')}
+                            >
+                              <Trash2 className='w-4 h-4 text-rose-600' />
+                            </Button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}

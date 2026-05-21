@@ -10,6 +10,7 @@ import {
   Settings,
   LogOut,
   LayoutDashboard,
+  ReceiptText,
   Stethoscope,
   Tags,
   Activity,
@@ -30,6 +31,7 @@ const iconMap = {
   settings: Settings,
   'layout-dashboard': LayoutDashboard,
   stethoscope: Stethoscope,
+  'receipt-text': ReceiptText,
   tags: Tags,
   activity: Activity,
 }

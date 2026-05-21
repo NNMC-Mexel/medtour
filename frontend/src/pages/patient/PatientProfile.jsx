@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Avatar from '../../components/ui/Avatar'
+import PriceListSection from '../../components/pricing/PriceListSection'
 import useAuthStore from '../../stores/authStore'
 import { formatDate, cn } from '../../utils/helpers'
 
@@ -160,6 +161,8 @@ function PatientProfile() {
           />
         </CardContent>
       </Card>
+
+      <PriceListSection compact limit={6} className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm" />
 
       {/* Settings */}
       <div className="grid sm:grid-cols-2 gap-6">

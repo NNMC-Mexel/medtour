@@ -1,11 +1,10 @@
 /**
- * Cron: mark appointments as no_show if nobody joined within the grace period.
- *
- * Runs every 5 minutes. Targets appointments with statuse confirmed/pending
- * whose dateTime is more than NO_SHOW_GRACE_MIN minutes in the past.
- * The signaling server sets statuse=in_progress as soon as the first participant
- * joins the room, so in_progress / completed / cancelled are never touched.
+ * Cron tasks:
+ *  1. markNoShowAppointments   — every 5 min, marks missed appointments
+ *  2. notifySlaOverdueCases    — every 30 min, in-app + email alerts for stalled cases
+ *  3. notifyDueCaseReminders   — every 5 min, fires reminders created by staff
  */
+import { sendSlaOverdueEmail } from '../src/utils/case-email';
 
 const NO_SHOW_GRACE_MIN = 15;
 const CASE_SLA_HOURS: Record<string, number> = {
@@ -54,6 +53,7 @@ export default {
       try {
         const cutoff = new Date(Date.now() - NO_SHOW_GRACE_MIN * 60 * 1000);
 
+        // 1. Mark pending/confirmed appointments that passed the grace window as no_show
         const overdue = await strapi.documents('api::appointment.appointment').findMany({
           filters: {
             statuse: { $in: ['pending', 'confirmed'] },
@@ -62,20 +62,51 @@ export default {
           fields: ['documentId'],
         });
 
-        if (overdue.length === 0) return;
+        if (overdue.length > 0) {
+          strapi.log.info(`[cron:no_show] Marking ${overdue.length} appointment(s) as no_show`);
+          await Promise.all(
+            overdue.map((appt: any) =>
+              strapi
+                .documents('api::appointment.appointment')
+                .update({ documentId: appt.documentId, data: { statuse: 'no_show' } })
+                .catch((err: any) =>
+                  strapi.log.error(`[cron:no_show] Failed ${appt.documentId}: ${err.message}`)
+                )
+            )
+          );
+        }
 
-        strapi.log.info(`[cron:no_show] Marking ${overdue.length} appointment(s) as no_show`);
+        // 2. Find in_progress appointments whose consultation window has closed
+        // (both parties left without completing). Revert to no_show so the slot
+        // is clearly closed and doesn't confuse staff dashboards.
+        const stuckInProgress = await strapi.documents('api::appointment.appointment').findMany({
+          filters: { statuse: 'in_progress' },
+          populate: { doctor: { fields: ['consultationDuration'] } },
+          fields: ['documentId', 'dateTime'],
+          limit: 500,
+        });
 
-        await Promise.all(
-          overdue.map((appt: any) =>
-            strapi
-              .documents('api::appointment.appointment')
-              .update({ documentId: appt.documentId, data: { statuse: 'no_show' } })
-              .catch((err: any) =>
-                strapi.log.error(`[cron:no_show] Failed ${appt.documentId}: ${err.message}`)
-              )
-          )
-        );
+        const now = Date.now();
+        const toClose: any[] = stuckInProgress.filter((appt: any) => {
+          if (!appt.dateTime) return false;
+          const duration = Number((appt.doctor as any)?.consultationDuration) || 30;
+          const windowEnd = new Date(appt.dateTime).getTime() + (duration + 5) * 60 * 1000;
+          return now > windowEnd;
+        });
+
+        if (toClose.length > 0) {
+          strapi.log.info(`[cron:no_show] Closing ${toClose.length} stuck in_progress appointment(s)`);
+          await Promise.all(
+            toClose.map((appt: any) =>
+              strapi
+                .documents('api::appointment.appointment')
+                .update({ documentId: appt.documentId, data: { statuse: 'no_show' } })
+                .catch((err: any) =>
+                  strapi.log.error(`[cron:no_show] Failed closing in_progress ${appt.documentId}: ${err.message}`)
+                )
+            )
+          );
+        }
       } catch (err: any) {
         strapi.log.error('[cron:no_show] Unexpected error:', err.message);
       }
@@ -132,6 +163,16 @@ export default {
             link: item.manager ? '/manager' : '/admin',
             metadata: { caseId: item.documentId, caseNumber: item.caseNumber, status },
           });
+
+          // Also send email alerts to manager + coordinator
+          const slaHours = CASE_SLA_HOURS[status] || 24;
+          const emailTargets: any[] = [item.manager, item.coordinator, ...admins].filter(Boolean);
+          const seen = new Set<string>();
+          for (const person of emailTargets) {
+            if (!person?.email || seen.has(person.email)) continue;
+            seen.add(person.email);
+            sendSlaOverdueEmail(strapi, person, item, status, slaHours).catch(() => {});
+          }
         }
       } catch (err: any) {
         strapi.log.error('[cron:sla_overdue] Unexpected error:', err.message);

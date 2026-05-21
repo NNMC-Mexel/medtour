@@ -30,6 +30,31 @@
     "description": {
       "type": "text"
     },
+    "reviewStatus": {
+      "type": "enumeration",
+      "default": "UPLOADED",
+      "enum": [
+        "REQUESTED",
+        "UPLOADED",
+        "IN_REVIEW",
+        "APPROVED",
+        "REJECTED",
+        "TRANSLATION_NEEDED",
+        "TRANSLATED"
+      ]
+    },
+    "reviewNotes": {
+      "type": "text"
+    },
+    "requestedLanguage": {
+      "type": "string"
+    },
+    "dueDate": {
+      "type": "date"
+    },
+    "reviewedAt": {
+      "type": "datetime"
+    },
     "file": {
       "type": "media",
       "multiple": false,
@@ -68,6 +93,16 @@
       "type": "relation",
       "relation": "manyToMany",
       "target": "api::doctor.doctor"
+    },
+    "requestedBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "reviewedBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
     }
   }
 }

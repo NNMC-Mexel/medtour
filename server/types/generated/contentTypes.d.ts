@@ -651,6 +651,13 @@ export interface ApiCaseEventCaseEvent extends Struct.CollectionTypeSchema {
         'PLAN_SENT',
         'PLAN_ACCEPTED',
         'TRAVEL_UPDATED',
+        'CHAT_MESSAGE_SENT',
+        'CHAT_READ',
+        'CHAT_TAKEOVER',
+        'CHAT_UPLOAD',
+        'DOCUMENT_REQUESTED',
+        'REMINDER_CREATED',
+        'SLA_OVERDUE',
         'NOTE',
       ]
     > &
@@ -773,15 +780,28 @@ export interface ApiConversationConversation
     draftAndPublish: true;
   };
   attributes: {
+    activeManager: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
     appointment: Schema.Attribute.Relation<
       'oneToOne',
       'api::appointment.appointment'
     >;
+    channel: Schema.Attribute.Enumeration<['case', 'appointment', 'support']> &
+      Schema.Attribute.DefaultTo<'case'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    doctorChatEnabled: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
     lastMessage: Schema.Attribute.Text;
     lastMessageAt: Schema.Attribute.DateTime;
+    lastReadBy: Schema.Attribute.JSON;
+    lifecycleStatus: Schema.Attribute.Enumeration<
+      ['open', 'pending', 'closed']
+    > &
+      Schema.Attribute.DefaultTo<'open'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -794,6 +814,9 @@ export interface ApiConversationConversation
     >;
     messages: Schema.Attribute.Relation<'oneToMany', 'api::message.message'>;
     publishedAt: Schema.Attribute.DateTime;
+    sharedQueue: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
+    takeoverAt: Schema.Attribute.DateTime;
+    unreadBy: Schema.Attribute.JSON;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1046,6 +1069,10 @@ export interface ApiMedicalCaseMedicalCase extends Struct.CollectionTypeSchema {
     hotelName: Schema.Attribute.String;
     internalNotes: Schema.Attribute.Text;
     language: Schema.Attribute.String & Schema.Attribute.DefaultTo<'en'>;
+    leadCampaign: Schema.Attribute.String;
+    leadMedium: Schema.Attribute.String;
+    leadReferrer: Schema.Attribute.Text;
+    leadSource: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -1143,6 +1170,7 @@ export interface ApiMedicalDocumentMedicalDocument
       Schema.Attribute.Private;
     description: Schema.Attribute.Text;
     doctor: Schema.Attribute.Relation<'manyToOne', 'api::doctor.doctor'>;
+    dueDate: Schema.Attribute.Date;
     file: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -1155,6 +1183,29 @@ export interface ApiMedicalDocumentMedicalDocument
       'api::medical-case.medical-case'
     >;
     publishedAt: Schema.Attribute.DateTime;
+    requestedBy: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    requestedLanguage: Schema.Attribute.String;
+    reviewedAt: Schema.Attribute.DateTime;
+    reviewedBy: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    reviewNotes: Schema.Attribute.Text;
+    reviewStatus: Schema.Attribute.Enumeration<
+      [
+        'REQUESTED',
+        'UPLOADED',
+        'IN_REVIEW',
+        'APPROVED',
+        'REJECTED',
+        'TRANSLATION_NEEDED',
+        'TRANSLATED',
+      ]
+    > &
+      Schema.Attribute.DefaultTo<'UPLOADED'>;
     sharedWithDoctors: Schema.Attribute.Relation<
       'manyToMany',
       'api::doctor.doctor'
@@ -1204,6 +1255,7 @@ export interface ApiMessageMessage extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    deliveredAt: Schema.Attribute.DateTime;
     isRead: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -1211,8 +1263,14 @@ export interface ApiMessageMessage extends Struct.CollectionTypeSchema {
       'api::message.message'
     > &
       Schema.Attribute.Private;
+    messageType: Schema.Attribute.Enumeration<
+      ['text', 'file', 'image', 'system']
+    > &
+      Schema.Attribute.DefaultTo<'text'>;
+    metadata: Schema.Attribute.JSON;
     publishedAt: Schema.Attribute.DateTime;
     readAt: Schema.Attribute.DateTime;
+    readBy: Schema.Attribute.JSON;
     sender: Schema.Attribute.Relation<
       'manyToOne',
       'plugin::users-permissions.user'
@@ -1261,6 +1319,56 @@ export interface ApiNotificationNotification
       'manyToOne',
       'plugin::users-permissions.user'
     >;
+  };
+}
+
+export interface ApiPriceItemPriceItem extends Struct.CollectionTypeSchema {
+  collectionName: 'price_items';
+  info: {
+    description: 'Editable services and prices for the public price list';
+    displayName: 'Price Item';
+    pluralName: 'price-items';
+    singularName: 'price-item';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    badge: Schema.Attribute.String;
+    category: Schema.Attribute.String & Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    currency: Schema.Attribute.Enumeration<['KZT', 'USD', 'EUR', 'RUB']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'KZT'>;
+    description: Schema.Attribute.Text;
+    i18n: Schema.Attribute.JSON;
+    isActive: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
+    isFeatured: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::price-item.price-item'
+    > &
+      Schema.Attribute.Private;
+    note: Schema.Attribute.Text;
+    price: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    publishedAt: Schema.Attribute.DateTime;
+    sortOrder: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
+    unit: Schema.Attribute.String &
+      Schema.Attribute.DefaultTo<'\u0443\u0441\u043B\u0443\u0433\u0430'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
   };
 }
 
@@ -2144,6 +2252,7 @@ declare module '@strapi/strapi' {
       'api::medical-document.medical-document': ApiMedicalDocumentMedicalDocument;
       'api::message.message': ApiMessageMessage;
       'api::notification.notification': ApiNotificationNotification;
+      'api::price-item.price-item': ApiPriceItemPriceItem;
       'api::review.review': ApiReviewReview;
       'api::specialization.specialization': ApiSpecializationSpecialization;
       'api::time-slot.time-slot': ApiTimeSlotTimeSlot;

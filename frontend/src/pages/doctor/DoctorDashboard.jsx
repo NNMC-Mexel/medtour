@@ -278,8 +278,9 @@ function DoctorDashboard() {
                                     const consultationEnd = new Date(
                                         aptTime.getTime() + (consultationDuration + bufferMinutes) * 60 * 1000,
                                     );
+                                    // in_progress: patient already joined — allow doctor to rejoin
                                     const canJoin =
-                                        ["confirmed", "pending"].includes(appointment.statuse || appointment.status) &&
+                                        ["confirmed", "pending", "in_progress"].includes(appointment.statuse || appointment.status) &&
                                         now >= fifteenMinBefore &&
                                         now <= consultationEnd;
 

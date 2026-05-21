@@ -101,6 +101,9 @@ const filterPastSlots = (slots, selectedDate) => {
     });
 };
 
+// Free consultations mode: skips payment entirely, books at price=0.
+const FREE_CONSULTATIONS = import.meta.env.VITE_FREE_CONSULTATIONS === "true";
+
 // Режим оплаты:
 // - VITE_PAYMENTS_LIVE=true → реальные платежи (Halyk, карта)
 // - Иначе → тестовая оплата (мгновенное подтверждение)
@@ -225,7 +228,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
                 const activeCases = (Array.isArray(data) ? data : [])
                     .filter((item) => !["COMPLETED", "CANCELLED"].includes(normalizeCaseStatus(item.status)));
                 setMedicalCases(activeCases);
-                if (activeCases[0]) setSelectedCaseId(activeCases[0].documentId || activeCases[0].id);
+                // Don't auto-select — let the user explicitly choose a case (or keep "No case")
             })
             .catch(() => {
                 if (!cancelled) setMedicalCases([]);
@@ -415,11 +418,15 @@ function BookingModal({ isOpen, onClose, doctor }) {
     const availableSlots = getAvailableSlots();
 
     const handleNext = () => {
-        if (step < 4) setStep(step + 1);
+        // In free mode skip the payment step (3) — go 2 → 4 directly.
+        const next = FREE_CONSULTATIONS && step === 2 ? 4 : step + 1;
+        if (next <= 4) setStep(next);
     };
 
     const handleBack = () => {
-        if (step > 1) setStep(step - 1);
+        // Mirror of handleNext: 4 → 2 when in free mode.
+        const prev = FREE_CONSULTATIONS && step === 4 ? 2 : step - 1;
+        if (prev >= 1) setStep(prev);
     };
 
     // Shared: fresh slot check (DB + socket reservation) + build dateTime
@@ -779,8 +786,52 @@ function BookingModal({ isOpen, onClose, doctor }) {
         }
     };
 
+    // Free booking — no payment, price=0, instantly confirmed.
+    const handleFreeBooking = async () => {
+        setIsProcessing(true);
+        setError(null);
+        try {
+            const dateTime = await verifySlotAndBuildDateTime();
+            if (!dateTime) return;
+
+            const result = await createAppointment({
+                patient: user.id,
+                doctor: doctor.id,
+                dateTime: dateTime.toISOString(),
+                type: consultationType,
+                language: consultationLanguage,
+                status: "confirmed",
+                price: 0,
+                paymentStatus: "paid",
+                medical_case: selectedCaseId || null,
+                roomId: `room-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            });
+
+            if (result.success) {
+                setBookedSlots((prev) => [...prev, selectedTime]);
+                broadcastSlotConfirmed();
+                setIsComplete(true);
+            } else {
+                const msg = result.error || t('booking.err_create');
+                toast.error(msg);
+                setError(msg);
+                if (msg.includes("забронировано") || msg.includes("занято")) {
+                    setBookedSlots((prev) => [...prev, selectedTime]);
+                    setSelectedTime(null);
+                    setStep(1);
+                }
+            }
+        } catch {
+            setError(t('booking.err_generic'));
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     const handleBook = () => {
-        if (paymentMethod === "test") {
+        if (FREE_CONSULTATIONS) {
+            handleFreeBooking();
+        } else if (paymentMethod === "test") {
             handleTestPayment();
         } else if (paymentMethod === "kaspi") {
             handleKaspiPayment();
@@ -824,7 +875,8 @@ function BookingModal({ isOpen, onClose, doctor }) {
             case 2:
                 return consultationType;
             case 3:
-                return paymentMethod;
+                // This step is skipped in FREE_CONSULTATIONS mode
+                return FREE_CONSULTATIONS || !!paymentMethod;
             default:
                 return true;
         }
@@ -856,8 +908,10 @@ function BookingModal({ isOpen, onClose, doctor }) {
                 <Button
                     onClick={handleBook}
                     isLoading={isProcessing}
-                    leftIcon={<CreditCard className='w-4 h-4' />}>
-                    {paymentMethod === "kaspi"
+                    leftIcon={FREE_CONSULTATIONS ? <Check className='w-4 h-4' /> : <CreditCard className='w-4 h-4' />}>
+                    {FREE_CONSULTATIONS
+                        ? t('booking.book_free')
+                        : paymentMethod === "kaspi"
                         ? t('booking.book_kaspi', { price: formatPrice(doctorPrice) })
                         : paymentMethod === "halyk"
                         ? isMobileDevice()
@@ -1071,12 +1125,20 @@ function BookingModal({ isOpen, onClose, doctor }) {
                 <>
                     {/* Progress Steps */}
                     <div className='flex items-center mb-6'>
-                        {[
-                            { num: 1, label: t('booking.step_date') },
-                            { num: 2, label: t('booking.step_type') },
-                            { num: 3, label: t('booking.step_payment') },
-                            { num: 4, label: t('booking.step_done') },
-                        ].flatMap((s, i) => {
+                        {(FREE_CONSULTATIONS
+                            ? [
+                                { num: 1, label: t('booking.step_date') },
+                                { num: 2, label: t('booking.step_type') },
+                                { num: 4, label: t('booking.step_done') },
+                              ]
+                            : [
+                                { num: 1, label: t('booking.step_date') },
+                                { num: 2, label: t('booking.step_type') },
+                                { num: 3, label: t('booking.step_payment') },
+                                { num: 4, label: t('booking.step_done') },
+                              ]
+                        ).flatMap((s, i, arr) => {
+                            const visNum = i + 1; // always 1, 2, 3[, 4] regardless of internal step num
                             const items = [
                                 <div key={s.num} className='flex flex-col items-center gap-1 shrink-0'>
                                     <div className={cn(
@@ -1085,7 +1147,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
                                             ? "bg-teal-600 text-white"
                                             : "bg-slate-200 text-slate-500"
                                     )}>
-                                        {step > s.num ? <Check className='w-4 h-4' /> : s.num}
+                                        {step > s.num ? <Check className='w-4 h-4' /> : visNum}
                                     </div>
                                     <span className={cn(
                                         "text-xs",
@@ -1095,7 +1157,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
                                     </span>
                                 </div>
                             ];
-                            if (i < 3) {
+                            if (i < arr.length - 1) {
                                 items.push(
                                     <div key={`line-${i}`} className={cn(
                                         "flex-1 h-0.5 mb-4 transition-colors",
@@ -1351,6 +1413,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
                                         onChange={(event) => setSelectedCaseId(event.target.value)}
                                         className='w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500'
                                     >
+                                        <option value="">— No case —</option>
                                         {medicalCases.map((item) => {
                                             const id = item.documentId || item.id;
                                             return (
@@ -1529,24 +1592,22 @@ function BookingModal({ isOpen, onClose, doctor }) {
                                         </span>
                                     </div>
                                 )}
-                                <div className='p-4 flex justify-between'>
-                                    <span className='text-slate-600'>
-                                        {t('booking.field_payment')}
-                                    </span>
-                                    <span className='font-medium text-slate-900'>
-                                        {
-                                            paymentMethods.find(
-                                                (m) => m.id === paymentMethod
-                                            )?.name
-                                        }
-                                    </span>
-                                </div>
+                                {!FREE_CONSULTATIONS && (
+                                    <div className='p-4 flex justify-between'>
+                                        <span className='text-slate-600'>
+                                            {t('booking.field_payment')}
+                                        </span>
+                                        <span className='font-medium text-slate-900'>
+                                            {paymentMethods.find((m) => m.id === paymentMethod)?.name}
+                                        </span>
+                                    </div>
+                                )}
                                 <div className='p-4 flex justify-between bg-teal-50'>
                                     <span className='font-semibold text-teal-700'>
                                         {t('booking.field_total')}
                                     </span>
                                     <span className='font-bold text-teal-700'>
-                                        {formatPrice(doctorPrice)}
+                                        {FREE_CONSULTATIONS ? t('booking.free') : formatPrice(doctorPrice)}
                                     </span>
                                 </div>
                             </div>

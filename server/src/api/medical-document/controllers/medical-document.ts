@@ -6,13 +6,51 @@
  */
 import { factories } from '@strapi/strapi';
 import { normalizeCaseStatus } from '../../../utils/medical-case-workflow';
+import {
+  getMedicalCaseAccessFilter,
+  getUserRole,
+  isAdminUser,
+  userCanAccessMedicalCase,
+} from '../../../utils/medtour-access';
+
+const DOCUMENT_REVIEW_STATUSES = [
+  'REQUESTED',
+  'UPLOADED',
+  'IN_REVIEW',
+  'APPROVED',
+  'REJECTED',
+  'TRANSLATION_NEEDED',
+  'TRANSLATED',
+];
+
+const PATIENT_UPDATE_FIELDS = ['title', 'type', 'description'];
+const STAFF_UPDATE_FIELDS = [
+  'title',
+  'type',
+  'description',
+  'reviewStatus',
+  'reviewNotes',
+  'requestedLanguage',
+  'dueDate',
+];
+const STAFF_CREATE_FIELDS = ['reviewStatus', 'reviewNotes', 'requestedLanguage', 'dueDate'];
+
+function pickFields(body: Record<string, any>, fields: string[]) {
+  return Object.fromEntries(Object.entries(body).filter(([key]) => fields.includes(key)));
+}
+
+function getRelationRef(value: any) {
+  if (!value) return undefined;
+  return typeof value === 'object' ? value.documentId || value.id : value;
+}
 
 export default factories.createCoreController('api::medical-document.medical-document', () => ({
   async find(ctx) {
     const user = ctx.state.user;
     if (!user) return ctx.forbidden('Not authenticated');
 
-    const isAdmin = user.role?.type === 'admin' || user.userRole === 'admin';
+    const role = getUserRole(user);
+    const isAdmin = isAdminUser(user);
     const populate = ['file', 'user', 'doctor', 'appointment', 'medical_case', 'sharedWithDoctors'] as any;
     const sort = (ctx.query?.sort as any) || ['createdAt:desc'];
 
@@ -26,7 +64,7 @@ export default factories.createCoreController('api::medical-document.medical-doc
     }
 
     if (!isAdmin) {
-      const isDoctor = user.role?.type === 'doctor' || user.userRole === 'doctor';
+      const isDoctor = role === 'doctor';
 
       if (isDoctor) {
         const doctorRecord = await strapi
@@ -88,6 +126,12 @@ export default factories.createCoreController('api::medical-document.medical-doc
             meta: { pagination: { page: 1, pageSize: data.length, pageCount: 1, total: data.length } },
           };
         }
+      } else if (['manager', 'coordinator'].includes(role)) {
+        const caseFilter = await getMedicalCaseAccessFilter(strapi, user);
+        if (caseFilter === null) {
+          return { data: [], meta: { pagination: { page: 1, pageSize: 0, pageCount: 0, total: 0 } } };
+        }
+        filters.medical_case = caseFilter;
       } else {
         // Patient sees only their own documents
         filters.user = { id: user.id };
@@ -121,12 +165,15 @@ export default factories.createCoreController('api::medical-document.medical-doc
 
     const body = (ctx.request.body as any)?.data || ctx.request.body || {};
 
-    const isAdmin = user.role?.type === 'admin' || user.userRole === 'admin';
-    const isDoctor = user.role?.type === 'doctor' || user.userRole === 'doctor';
+    const role = getUserRole(user);
+    const isAdmin = isAdminUser(user);
+    const isDoctor = role === 'doctor';
+    const isStaff = ['manager', 'coordinator'].includes(role);
+    const canSetReviewFields = isAdmin || isDoctor || isStaff;
 
     // Resolve user (patient) documentId
     let userDocId: string | undefined;
-    if (!isAdmin && !isDoctor) {
+    if (!isAdmin && !isDoctor && !isStaff) {
       userDocId = user.documentId;
     } else if (body.user) {
       if (typeof body.user === 'number') {
@@ -180,7 +227,7 @@ export default factories.createCoreController('api::medical-document.medical-doc
       }
 
       // If a patient is uploading, verify they are the patient in the linked appointment
-      if (!isDoctor && !isAdmin) {
+      if (!isDoctor && !isAdmin && !isStaff) {
         const aptWithPatient = await strapi.documents('api::appointment.appointment').findOne({
           documentId: appointmentDocId,
           populate: { patient: { fields: ['id'] } },
@@ -203,16 +250,23 @@ export default factories.createCoreController('api::medical-document.medical-doc
       } else {
         caseRecord = await strapi.documents('api::medical-case.medical-case' as any).findOne({
           documentId: body.medical_case,
-          populate: { patient: { fields: ['id'] }, doctor: { fields: ['id', 'documentId'] } },
+          populate: { patient: { fields: ['id', 'documentId'] }, doctor: { fields: ['id', 'documentId'] } },
         });
       }
 
       if (!caseRecord) return ctx.badRequest('Medical case not found');
       linkedCaseRecord = caseRecord;
       medicalCaseDocId = caseRecord.documentId;
+      if (isStaff && !userDocId && caseRecord.patient?.documentId) {
+        userDocId = caseRecord.patient.documentId;
+      }
 
-      if (!isDoctor && !isAdmin && caseRecord.patient?.id !== user.id) {
+      if (!isDoctor && !isAdmin && !isStaff && caseRecord.patient?.id !== user.id) {
         return ctx.forbidden('You can only upload documents for your own medical cases');
+      }
+
+      if (isStaff && !isAdmin && !(await userCanAccessMedicalCase(strapi, user, medicalCaseDocId))) {
+        return ctx.forbidden('You can only upload documents for assigned medical cases');
       }
 
       if (isDoctor && !isAdmin) {
@@ -240,12 +294,23 @@ export default factories.createCoreController('api::medical-document.medical-doc
       }
     }
 
+    const reviewData = canSetReviewFields ? pickFields(body, STAFF_CREATE_FIELDS) : {};
+    if (reviewData.reviewStatus && !DOCUMENT_REVIEW_STATUSES.includes(reviewData.reviewStatus)) {
+      return ctx.badRequest('Invalid document review status');
+    }
+    const reviewStatus = reviewData.reviewStatus || 'UPLOADED';
+
     const document = await strapi.documents('api::medical-document.medical-document').create({
       data: {
         title: body.title,
         type: body.type || 'other',
         description: body.description || '',
         file: body.file,
+        reviewStatus,
+        reviewNotes: reviewData.reviewNotes || '',
+        requestedLanguage: reviewData.requestedLanguage || '',
+        dueDate: reviewData.dueDate || null,
+        requestedBy: reviewStatus === 'REQUESTED' ? (user.documentId || user.id) : null,
         user: userDocId,
         doctor: doctorDocId,
         appointment: appointmentDocId,
@@ -286,6 +351,82 @@ export default factories.createCoreController('api::medical-document.medical-doc
     }
 
     return { data: document };
+  },
+
+  async update(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.forbidden('Not authenticated');
+
+    const role = getUserRole(user);
+    const body = (ctx.request.body as any)?.data || ctx.request.body || {};
+
+    const existing = await strapi.documents('api::medical-document.medical-document').findOne({
+      documentId: ctx.params.id,
+      populate: {
+        user: { fields: ['id', 'documentId'] },
+        doctor: { populate: { users_permissions_user: { fields: ['id'] } } },
+        medical_case: true,
+      },
+    });
+    if (!existing) return ctx.notFound('Document not found');
+
+    const medicalCaseRef = getRelationRef((existing as any).medical_case);
+    const isOwnerPatient = (existing as any).user?.id === user.id;
+    const isDoctorOwner = (existing as any).doctor?.users_permissions_user?.id === user.id;
+    const canAccessCase = medicalCaseRef
+      ? await userCanAccessMedicalCase(strapi, user, medicalCaseRef)
+      : false;
+
+    let data: Record<string, any> = {};
+    if (isAdminUser(user) || ['manager', 'coordinator'].includes(role) || isDoctorOwner || (role === 'doctor' && canAccessCase)) {
+      if (!isAdminUser(user) && !isDoctorOwner && !canAccessCase) {
+        return ctx.forbidden('Forbidden');
+      }
+      data = pickFields(body, STAFF_UPDATE_FIELDS);
+      if (data.reviewStatus && !DOCUMENT_REVIEW_STATUSES.includes(data.reviewStatus)) {
+        return ctx.badRequest('Invalid document review status');
+      }
+      if (data.reviewStatus && ['APPROVED', 'REJECTED', 'TRANSLATION_NEEDED', 'TRANSLATED'].includes(data.reviewStatus)) {
+        data.reviewedAt = new Date().toISOString();
+        data.reviewedBy = user.documentId || user.id;
+      }
+      if (data.reviewStatus === 'REQUESTED') {
+        data.requestedBy = user.documentId || user.id;
+      }
+    } else if (isOwnerPatient) {
+      data = pickFields(body, PATIENT_UPDATE_FIELDS);
+    } else {
+      return ctx.forbidden('Forbidden');
+    }
+
+    if (Object.keys(data).length === 0) {
+      return ctx.badRequest('No allowed fields to update');
+    }
+
+    const updated = await strapi.documents('api::medical-document.medical-document').update({
+      documentId: ctx.params.id,
+      data,
+      status: 'published',
+      populate: ['file', 'user', 'doctor', 'appointment', 'medical_case', 'sharedWithDoctors'] as any,
+    });
+
+    if (medicalCaseRef && data.reviewStatus) {
+      await strapi.documents('api::case-event.case-event' as any).create({
+        data: {
+          medical_case: medicalCaseRef,
+          actor: user.documentId || user.id,
+          eventType: data.reviewStatus === 'REQUESTED' ? 'DOCUMENT_REQUESTED' : 'NOTE',
+          message: `Document status changed to ${data.reviewStatus}`,
+          metadata: {
+            documentId: (updated as any).documentId || (updated as any).id,
+            reviewStatus: data.reviewStatus,
+            reviewNotes: data.reviewNotes || null,
+          },
+        },
+      });
+    }
+
+    return { data: updated };
   },
 
   /**

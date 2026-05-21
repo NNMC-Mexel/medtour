@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import Button from "../components/ui/Button";
 import { Card, CardContent } from "../components/ui/Card";
+import PriceListSection from "../components/pricing/PriceListSection";
 import {
     doctorsAPI,
     specializationsAPI,
@@ -737,6 +738,8 @@ function LandingPage() {
 
             {/* Top Doctors Carousel */}
             {doctors.length > 0 && <DoctorsCarousel doctors={doctors} />}
+
+            <PriceListSection featuredOnly showCta />
 
             {/* Testimonials */}
             <section className='py-24 bg-white'>

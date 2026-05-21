@@ -7,9 +7,12 @@ import {
   AlertCircle,
   Check,
   X,
+  UserPlus,
+  Pencil,
 } from 'lucide-react'
 import { Card, CardContent } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
+import Input from '../../components/ui/Input'
 import Avatar from '../../components/ui/Avatar'
 import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
@@ -20,6 +23,25 @@ const roleVariants = {
   patient: 'default',
   doctor: 'primary',
   admin: 'danger',
+  manager: 'warning',
+}
+
+const defaultCreateForm = {
+  fullName: '',
+  username: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+  userRole: 'admin',
+}
+
+const defaultEditForm = {
+  fullName: '',
+  username: '',
+  email: '',
+  phone: '',
+  password: '',
+  confirmPassword: '',
 }
 
 function AdminUsers() {
@@ -36,7 +58,17 @@ function AdminUsers() {
     patient: t('admin_users.role_patient'),
     doctor: t('admin_users.role_doctor'),
     admin: t('admin_users.role_admin'),
+    manager: t('admin_users.role_manager'),
   }
+
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [createForm, setCreateForm] = useState(defaultCreateForm)
+  const [isCreating, setIsCreating] = useState(false)
+
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState(null)
+  const [editForm, setEditForm] = useState(defaultEditForm)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
 
   useEffect(() => {
     fetchUsers()
@@ -84,6 +116,104 @@ function AdminUsers() {
     }
   }
 
+  const handleCreateStaff = async (e) => {
+    e.preventDefault()
+    if (!createForm.fullName.trim()) return alert(t('admin_users.err_name'))
+    if (!createForm.username.trim()) return alert(t('admin_users.err_login'))
+    if (!createForm.email.trim()) return alert(t('admin_users.err_email'))
+    if (!createForm.password) return alert(t('admin_users.err_password'))
+    if (createForm.password.length < 6) return alert(t('admin_users.err_short_password'))
+    if (createForm.password !== createForm.confirmPassword) return alert(t('admin_users.err_password_mismatch'))
+
+    setIsCreating(true)
+    try {
+      let roleId = null
+      try {
+        const rolesRes = await api.get('/api/users-permissions/roles')
+        const roleList = rolesRes?.data?.roles || rolesRes?.data || []
+        roleId =
+          roleList.find((r) => r?.type === createForm.userRole)?.id ||
+          roleList.find((r) => String(r?.name || '').toLowerCase() === createForm.userRole)?.id ||
+          roleList.find((r) => r?.type === 'authenticated')?.id ||
+          null
+      } catch {
+        /* ignore */
+      }
+
+      const payload = {
+        username: createForm.username.trim(),
+        email: createForm.email.trim().toLowerCase(),
+        password: createForm.password,
+        confirmed: true,
+        blocked: false,
+        userRole: createForm.userRole,
+        fullName: createForm.fullName.trim(),
+      }
+      if (roleId) payload.role = roleId
+
+      await api.post('/api/users', payload)
+      setIsCreateModalOpen(false)
+      setCreateForm(defaultCreateForm)
+      await fetchUsers()
+    } catch (error) {
+      const message = error?.response?.data?.error?.message || error?.message || t('admin_users.err_save')
+      alert(t('admin_users.err_save_msg', { message }))
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const openEditModal = (user) => {
+    setEditingUser(user)
+    setEditForm({
+      fullName: user.fullName || '',
+      username: user.username || '',
+      email: user.email || '',
+      phone: user.phone || '',
+      password: '',
+      confirmPassword: '',
+    })
+    setIsEditModalOpen(true)
+  }
+
+  const handleEditUser = async (e) => {
+    e.preventDefault()
+    if (!editingUser) return
+    if (!editForm.fullName.trim()) return alert(t('admin_users.err_name'))
+    if (!editForm.username.trim()) return alert(t('admin_users.err_login'))
+    if (!editForm.email.trim()) return alert(t('admin_users.err_email'))
+    if (editForm.password && editForm.password.length < 6) return alert(t('admin_users.err_short_password'))
+    if (editForm.password !== editForm.confirmPassword) return alert(t('admin_users.err_password_mismatch'))
+
+    setIsSavingEdit(true)
+    try {
+      const payload = {
+        fullName: editForm.fullName.trim(),
+        username: editForm.username.trim(),
+        email: editForm.email.trim().toLowerCase(),
+        phone: editForm.phone.trim() || null,
+      }
+      if (editForm.password) {
+        payload.password = editForm.password
+      }
+
+      await api.put(`/api/users/${editingUser.id}`, payload)
+      setUsers(prev => prev.map(u =>
+        u.id === editingUser.id
+          ? { ...u, fullName: payload.fullName, username: payload.username, email: payload.email, phone: payload.phone }
+          : u
+      ))
+      setIsEditModalOpen(false)
+      setEditingUser(null)
+      setEditForm(defaultEditForm)
+    } catch (error) {
+      const message = error?.response?.data?.error?.message || error?.message || t('admin_users.err_save')
+      alert(t('admin_users.err_save_msg', { message }))
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
   const handleBlockUser = async (userId, blocked) => {
     try {
       await api.put(`/api/users/${userId}`, { blocked })
@@ -115,6 +245,21 @@ function AdminUsers() {
           <h1 className="text-2xl font-bold text-slate-900">{t('admin_users.title')}</h1>
           <p className="text-slate-600">{t('admin_users.subtitle')}</p>
         </div>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            leftIcon={<UserPlus className="w-4 h-4" />}
+            onClick={() => { setCreateForm({ ...defaultCreateForm, userRole: 'admin' }); setIsCreateModalOpen(true) }}
+          >
+            {t('admin_users.add_admin_btn')}
+          </Button>
+          <Button
+            leftIcon={<UserPlus className="w-4 h-4" />}
+            onClick={() => { setCreateForm({ ...defaultCreateForm, userRole: 'manager' }); setIsCreateModalOpen(true) }}
+          >
+            {t('admin_users.add_manager_btn')}
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -129,12 +274,13 @@ function AdminUsers() {
             className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {[
             { value: 'all', label: t('admin_users.filter_all') },
             { value: 'patient', label: t('admin_users.filter_patient') },
             { value: 'doctor', label: t('admin_users.filter_doctor') },
             { value: 'admin', label: t('admin_users.filter_admin') },
+            { value: 'manager', label: t('admin_users.filter_manager') },
           ].map(({ value, label }) => (
             <button
               key={value}
@@ -170,7 +316,7 @@ function AdminUsers() {
                 {filteredUsers.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="text-center py-12 text-slate-500">
-                      {t('admin_users.filter_all')}
+                      {t('admin_users.no_users')}
                     </td>
                   </tr>
                 ) : (
@@ -213,6 +359,14 @@ function AdminUsers() {
                       </td>
                       <td className="py-4 px-6">
                         <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            onClick={() => openEditModal(user)}
+                            aria-label={t('admin_users.edit_aria')}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
                           {user.blocked ? (
                             <Button
                               variant="outline"
@@ -220,7 +374,7 @@ function AdminUsers() {
                               onClick={() => handleBlockUser(user.id, false)}
                             >
                               <Check className="w-4 h-4 mr-1" />
-                              {t('admin_users.active')}
+                              {t('admin_users.unblock')}
                             </Button>
                           ) : (
                             <Button
@@ -229,13 +383,14 @@ function AdminUsers() {
                               onClick={() => handleBlockUser(user.id, true)}
                             >
                               <X className="w-4 h-4 mr-1" />
-                              {t('admin_users.blocked')}
+                              {t('admin_users.block')}
                             </Button>
                           )}
                           <Button
                             variant="secondary"
                             size="icon"
                             onClick={() => openDeleteModal(user)}
+                            aria-label={t('admin_users.delete_aria')}
                           >
                             <Trash2 className="w-4 h-4 text-rose-600" />
                           </Button>
@@ -251,7 +406,7 @@ function AdminUsers() {
       </Card>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card>
           <CardContent className="text-center">
             <p className="text-3xl font-bold text-slate-900">
@@ -271,12 +426,177 @@ function AdminUsers() {
         <Card>
           <CardContent className="text-center">
             <p className="text-3xl font-bold text-slate-900">
+              {users.filter(u => u.userRole === 'admin' || u.userRole === 'manager').length}
+            </p>
+            <p className="text-slate-500">{t('admin_users.stat_staff')}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="text-center">
+            <p className="text-3xl font-bold text-slate-900">
               {users.filter(u => u.blocked).length}
             </p>
             <p className="text-slate-500">{t('admin_users.stat_blocked')}</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit User Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => { setIsEditModalOpen(false); setEditingUser(null); setEditForm(defaultEditForm) }}
+        title={t('admin_users.edit_title')}
+        size="md"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => { setIsEditModalOpen(false); setEditingUser(null); setEditForm(defaultEditForm) }}
+              disabled={isSavingEdit}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleEditUser} isLoading={isSavingEdit}>
+              {t('common.save')}
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleEditUser} className="space-y-4">
+          {editingUser && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+              <span className="text-sm text-slate-500">{t('admin_users.label_role')}:</span>
+              <Badge variant={roleVariants[editingUser.userRole] || 'default'}>
+                {roleLabels[editingUser.userRole] || editingUser.userRole}
+              </Badge>
+            </div>
+          )}
+
+          <Input
+            label={t('admin_users.label_name')}
+            required
+            value={editForm.fullName}
+            onChange={(e) => setEditForm(prev => ({ ...prev, fullName: e.target.value }))}
+            placeholder={t('admin_users.placeholder_name')}
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label={t('admin_users.label_login')}
+              required
+              value={editForm.username}
+              onChange={(e) => setEditForm(prev => ({ ...prev, username: e.target.value }))}
+              placeholder={t('admin_users.placeholder_login')}
+            />
+            <Input
+              label="Email"
+              type="email"
+              required
+              value={editForm.email}
+              onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+              placeholder="user@example.com"
+            />
+          </div>
+
+          <Input
+            label={t('admin_users.label_phone')}
+            type="tel"
+            value={editForm.phone}
+            onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+            placeholder="+7 700 000 0000"
+          />
+
+          <div className="border-t border-slate-200 pt-4">
+            <p className="text-sm font-medium text-slate-700 mb-3">{t('admin_users.section_password')}</p>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label={t('admin_users.label_new_password')}
+                type="password"
+                value={editForm.password}
+                onChange={(e) => setEditForm(prev => ({ ...prev, password: e.target.value }))}
+                placeholder="••••••"
+                hint={t('admin_users.hint_password')}
+              />
+              <Input
+                label={t('admin_users.label_confirm')}
+                type="password"
+                value={editForm.confirmPassword}
+                onChange={(e) => setEditForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                placeholder="••••••"
+              />
+            </div>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Create Staff Modal */}
+      <Modal
+        isOpen={isCreateModalOpen}
+        onClose={() => { setIsCreateModalOpen(false); setCreateForm(defaultCreateForm) }}
+        title={createForm.userRole === 'manager' ? t('admin_users.create_manager_title') : t('admin_users.create_admin_title')}
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setIsCreateModalOpen(false); setCreateForm(defaultCreateForm) }} disabled={isCreating}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={handleCreateStaff} isLoading={isCreating}>
+              {t('admin_users.create_btn')}
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleCreateStaff} className="space-y-4">
+          <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+            <span className="text-sm text-slate-500">{t('admin_users.label_role')}:</span>
+            <Badge variant={createForm.userRole === 'manager' ? 'warning' : 'danger'}>
+              {roleLabels[createForm.userRole]}
+            </Badge>
+          </div>
+          <Input
+            label={t('admin_users.label_name')}
+            required
+            value={createForm.fullName}
+            onChange={(e) => setCreateForm(prev => ({ ...prev, fullName: e.target.value }))}
+            placeholder={t('admin_users.placeholder_name')}
+          />
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label={t('admin_users.label_login')}
+              required
+              value={createForm.username}
+              onChange={(e) => setCreateForm(prev => ({ ...prev, username: e.target.value }))}
+              placeholder={t('admin_users.placeholder_login')}
+            />
+            <Input
+              label="Email"
+              type="email"
+              required
+              value={createForm.email}
+              onChange={(e) => setCreateForm(prev => ({ ...prev, email: e.target.value }))}
+              placeholder="admin@example.com"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label={t('admin_users.label_password')}
+              type="password"
+              required
+              value={createForm.password}
+              onChange={(e) => setCreateForm(prev => ({ ...prev, password: e.target.value }))}
+              placeholder="••••••"
+            />
+            <Input
+              label={t('admin_users.label_confirm')}
+              type="password"
+              required
+              value={createForm.confirmPassword}
+              onChange={(e) => setCreateForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+              placeholder="••••••"
+            />
+          </div>
+        </form>
+      </Modal>
 
       {/* Delete Modal */}
       <Modal

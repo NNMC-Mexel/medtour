@@ -3,20 +3,21 @@ import { Link } from 'react-router-dom'
 import {
   Users,
   Calendar,
-  Video,
+  Activity,
   DollarSign,
-  TrendingUp,
+  AlertTriangle,
   ArrowRight,
   Loader2,
   UserPlus,
   Star,
+  FileText,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Avatar from '../../components/ui/Avatar'
 import Badge from '../../components/ui/Badge'
 import { useTranslation } from 'react-i18next'
-import api, { normalizeResponse, getMediaUrl } from '../../services/api'
+import api, { normalizeResponse, getMediaUrl, medicalCasesAPI } from '../../services/api'
 import { formatPrice } from '../../utils/helpers'
 
 function AdminDashboard() {
@@ -26,6 +27,9 @@ function AdminDashboard() {
     totalDoctors: 0,
     totalAppointments: 0,
     totalRevenue: 0,
+    totalCases: 0,
+    activeCases: 0,
+    slaOverdueCases: 0,
   })
   const [recentUsers, setRecentUsers] = useState([])
   const [recentAppointments, setRecentAppointments] = useState([])
@@ -47,22 +51,40 @@ function AdminDashboard() {
       const doctorsRes = await api.get('/api/doctors?populate=*&sort=rating:desc&pagination[limit]=1000')
       const { data: doctorsData } = normalizeResponse(doctorsRes)
       
-      // Получаем записи
+      // Получаем записи (аппойнтменты)
       const appointmentsRes = await api.get('/api/appointments?populate=*&sort=createdAt:desc&pagination[limit]=10')
       const { data: appointmentsData } = normalizeResponse(appointmentsRes)
-      
-      // Получаем все завершённые записи для подсчёта дохода
-      const completedRes = await api.get('/api/appointments?filters[statuse][$eq]=completed&pagination[limit]=1000')
+
+      // Получаем все завершённые записи для подсчёта дохода (BA-008: исправлена опечатка statuse → status)
+      const completedRes = await api.get('/api/appointments?filters[status][$eq]=completed&pagination[limit]=1000')
       const { data: completedData } = normalizeResponse(completedRes)
-      
+
+      // Медицинские кейсы (BA-007)
+      const casesRes = await medicalCasesAPI.getAll({ pagination: { limit: 1000 } })
+      const { data: casesData } = normalizeResponse(casesRes)
+      const allCases = Array.isArray(casesData) ? casesData : []
+      const TERMINAL = ['COMPLETED', 'CANCELLED']
+      const activeCases = allCases.filter(c => !TERMINAL.includes(c.status?.toUpperCase?.() || c.status))
+      const slaOverdueCases = allCases.filter(c => {
+        if (TERMINAL.includes(c.status?.toUpperCase?.() || c.status)) return false
+        const SLA_HOURS = { NEW_LEAD: 2, REGISTERED: 4, WAITING_FOR_DOCUMENTS: 48, DOCUMENTS_UPLOADED: 4, UNDER_REVIEW: 24, DOCTOR_ASSIGNED: 24, WAITING_PATIENT_CONFIRMATION: 72, WAITING_PAYMENT: 1, CONSULTATION_BOOKED: 72, CONSULTATION_COMPLETED: 12 }
+        const hours = SLA_HOURS[c.status]
+        if (!hours) return false
+        const start = new Date(c.updatedAt || c.createdAt)
+        return new Date() > new Date(start.getTime() + hours * 3600000)
+      })
+
       // Подсчитываем статистику
       const totalRevenue = (completedData || []).reduce((sum, apt) => sum + (apt.price || 0), 0)
-      
+
       setStats({
         totalUsers: usersData.length,
         totalDoctors: (doctorsData || []).length,
         totalAppointments: (appointmentsData || []).length,
         totalRevenue,
+        totalCases: allCases.length,
+        activeCases: activeCases.length,
+        slaOverdueCases: slaOverdueCases.length,
       })
       
       // Последние пользователи
@@ -110,7 +132,7 @@ function AdminDashboard() {
         <p className="text-slate-600">{t('admin.dashboard_subtitle')}</p>
       </div>
 
-      {/* Stats */}
+      {/* Appointment stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent>
@@ -160,6 +182,54 @@ function AdminDashboard() {
               <div>
                 <p className="text-2xl font-bold text-slate-900">{formatPrice(stats.totalRevenue)}</p>
                 <p className="text-sm text-slate-500">{t('admin.stat_revenue')}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Medical cases stats (BA-007) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-11 h-11 bg-teal-500 rounded-xl flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{stats.totalCases}</p>
+                  <p className="text-sm text-slate-500">{t('admin.stat_total_cases')}</p>
+                </div>
+              </div>
+              <Link to="/admin/cases" className="text-sm text-teal-600 hover:text-teal-700 font-medium">
+                {t('admin.cases_link')}
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="w-11 h-11 bg-sky-500 rounded-xl flex items-center justify-center">
+                <Activity className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900">{stats.activeCases}</p>
+                <p className="text-sm text-slate-500">{t('admin.stat_active_cases')}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${stats.slaOverdueCases > 0 ? 'bg-rose-500' : 'bg-slate-300'}`}>
+                <AlertTriangle className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className={`text-2xl font-bold ${stats.slaOverdueCases > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{stats.slaOverdueCases}</p>
+                <p className="text-sm text-slate-500">{t('admin.stat_sla_overdue')}</p>
               </div>
             </div>
           </CardContent>

@@ -109,6 +109,18 @@
     "preferredContact": {
       "type": "string"
     },
+    "leadSource": {
+      "type": "string"
+    },
+    "leadMedium": {
+      "type": "string"
+    },
+    "leadCampaign": {
+      "type": "string"
+    },
+    "leadReferrer": {
+      "type": "text"
+    },
     "visaSupportNeeded": {
       "type": "boolean",
       "default": false

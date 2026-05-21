@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'
+import CaseCreatedGuide from '../../components/cases/CaseCreatedGuide'
 import {
   Activity,
   AlertCircle,
+  Bell,
+  Calendar,
   CheckCircle,
   Clock,
   FileText,
@@ -31,15 +35,16 @@ function roleBase(role) {
   return '/patient'
 }
 
-function formatStatus(status) {
-  return formatCaseStatus(status)
+function formatStatus(status, t) {
+  return formatCaseStatus(status, t)
 }
 
 function StatusBadge({ status }) {
+  const { t } = useTranslation()
   const normalizedStatus = normalizeCaseStatus(status)
   return (
     <Badge variant={STATUS_VARIANTS[normalizedStatus] || 'default'}>
-      {formatStatus(status)}
+      {formatStatus(status, t)}
     </Badge>
   )
 }
@@ -61,6 +66,7 @@ function StatCard({ icon: Icon, label, value, className }) {
 }
 
 function CreateCaseModal({ onClose, onCreated }) {
+  const { t } = useTranslation()
   const { user } = useAuthStore()
   const toast = useToast()
   const [isSaving, setIsSaving] = useState(false)
@@ -77,6 +83,8 @@ function CreateCaseModal({ onClose, onCreated }) {
     visaSupportNeeded: 'unknown',
     currentTreatment: '',
     tourismRequested: 'false',
+    leadSource: '',
+    leadCampaign: '',
   })
 
   const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
@@ -97,6 +105,9 @@ function CreateCaseModal({ onClose, onCreated }) {
         },
         budgetRange: form.budgetRange,
         preferredContact: form.preferredContact,
+        leadSource: form.leadSource,
+        leadCampaign: form.leadCampaign,
+        leadReferrer: typeof document !== 'undefined' ? document.referrer : '',
         visaSupportNeeded: form.visaSupportNeeded === 'true',
         currentTreatment: form.currentTreatment,
         tourismRequested: form.tourismRequested === 'true',
@@ -104,52 +115,52 @@ function CreateCaseModal({ onClose, onCreated }) {
         timezone: user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
       })
       const { data } = normalizeResponse(response)
-      toast.success('Medical case created')
+      toast.success(t('cases.toast_created'))
       onCreated(data)
       onClose()
     } catch (error) {
-      toast.error(error?.response?.data?.error?.message || 'Could not create medical case')
+      toast.error(error?.response?.data?.error?.message || t('cases.toast_create_error'))
     } finally {
       setIsSaving(false)
     }
   }
 
   return (
-    <Modal isOpen onClose={onClose} title="Start medical case" size="lg">
+    <Modal isOpen onClose={onClose} title={t('cases.modal_title')} size="lg">
       <form onSubmit={submit} className="space-y-4">
         <Input
-          label="Case title"
+          label={t('cases.case_title_label')}
           value={form.title}
           onChange={(e) => update('title', e.target.value)}
-          placeholder="Knee replacement, oncology review, cardiac surgery..."
+          placeholder={t('cases.case_title_placeholder')}
         />
         <div className="grid sm:grid-cols-2 gap-4">
           <Input
-            label="Country"
+            label={t('cases.country_label')}
             value={form.country}
             onChange={(e) => update('country', e.target.value)}
-            placeholder="United Kingdom"
+            placeholder={t('cases.country_placeholder')}
           />
           <Input
-            label="Treatment direction"
+            label={t('cases.treatment_dir_label')}
             value={form.treatmentCategory}
             onChange={(e) => update('treatmentCategory', e.target.value)}
-            placeholder="Cardiology, oncology, orthopedics..."
+            placeholder={t('cases.treatment_dir_placeholder')}
           />
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
           <Select
-            label="Urgency"
+            label={t('cases.urgency_label')}
             value={form.urgency}
             onChange={(e) => update('urgency', e.target.value)}
             options={[
-              { value: 'routine', label: 'Routine: can wait 1-3 months' },
-              { value: 'soon', label: 'Soon: within 2-4 weeks' },
-              { value: 'urgent', label: 'Urgent: as soon as possible' },
+              { value: 'routine', label: t('cases.urgency_routine') },
+              { value: 'soon', label: t('cases.urgency_soon') },
+              { value: 'urgent', label: t('cases.urgency_urgent') },
             ]}
           />
           <Input
-            label="Preferred arrival date"
+            label={t('cases.arrival_date_label')}
             type="date"
             value={form.preferredArrivalDate}
             onChange={(e) => update('preferredArrivalDate', e.target.value)}
@@ -157,61 +168,82 @@ function CreateCaseModal({ onClose, onCreated }) {
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
           <Input
-            label="Approximate budget"
+            label={t('cases.budget_label')}
             value={form.budgetRange}
             onChange={(e) => update('budgetRange', e.target.value)}
-            placeholder="Up to 10,000 USD, flexible..."
+            placeholder={t('cases.budget_placeholder')}
           />
           <Input
-            label="Preferred contact"
+            label={t('cases.contact_label')}
             value={form.preferredContact}
             onChange={(e) => update('preferredContact', e.target.value)}
-            placeholder="WhatsApp, Telegram, phone..."
+            placeholder={t('cases.contact_placeholder')}
           />
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
           <Select
-            label="Visa support"
+            label={t('cases.lead_source_label')}
+            value={form.leadSource}
+            onChange={(e) => update('leadSource', e.target.value)}
+            placeholder={t('cases.lead_source_placeholder')}
+            options={[
+              { value: 'google', label: t('cases.lead_source_google') },
+              { value: 'instagram', label: t('cases.lead_source_instagram') },
+              { value: 'referral', label: t('cases.lead_source_referral') },
+              { value: 'clinic', label: t('cases.lead_source_clinic') },
+              { value: 'other', label: t('cases.lead_source_other') },
+            ]}
+          />
+          <Input
+            label={t('cases.lead_campaign_label')}
+            value={form.leadCampaign}
+            onChange={(e) => update('leadCampaign', e.target.value)}
+            placeholder={t('cases.lead_campaign_placeholder')}
+          />
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Select
+            label={t('cases.visa_label')}
             value={form.visaSupportNeeded}
             onChange={(e) => update('visaSupportNeeded', e.target.value)}
             options={[
-              { value: 'unknown', label: 'Not sure yet' },
-              { value: 'true', label: 'Yes, visa support needed' },
-              { value: 'false', label: 'No visa support needed' },
+              { value: 'unknown', label: t('cases.visa_unknown') },
+              { value: 'true', label: t('cases.visa_yes') },
+              { value: 'false', label: t('cases.visa_no') },
             ]}
           />
           <Select
-            label="Tourism support"
+            label={t('cases.tourism_label')}
             value={form.tourismRequested}
             onChange={(e) => update('tourismRequested', e.target.value)}
             options={[
-              { value: 'false', label: 'Medical trip only' },
-              { value: 'true', label: 'Interested in tourism options' },
+              { value: 'false', label: t('cases.tourism_no') },
+              { value: 'true', label: t('cases.tourism_yes') },
             ]}
           />
         </div>
         <Textarea
-          label="Diagnosis or suspected diagnosis"
+          label={t('cases.diagnosis_label')}
           value={form.diagnosis}
           onChange={(e) => update('diagnosis', e.target.value)}
           rows={3}
         />
         <Textarea
-          label="Current treatment and important context"
+          label={t('cases.treatment_label')}
           value={form.currentTreatment}
           onChange={(e) => update('currentTreatment', e.target.value)}
           rows={3}
         />
         <Textarea
-          label="Symptoms and patient notes"
+          label={t('cases.symptoms_label')}
           value={form.symptoms}
           onChange={(e) => update('symptoms', e.target.value)}
           rows={4}
         />
         <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button type="button" variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
           <Button type="submit" disabled={isSaving} leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}>
-            Create case
+            {t('cases.create_btn')}
           </Button>
         </div>
       </form>
@@ -220,6 +252,7 @@ function CreateCaseModal({ onClose, onCreated }) {
 }
 
 function MedicalCasesPage() {
+  const { t } = useTranslation()
   const { user } = useAuthStore()
   const role = user?.userRole || 'patient'
   const location = useLocation()
@@ -229,6 +262,7 @@ function MedicalCasesPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [createdCase, setCreatedCase] = useState(null) // triggers onboarding guide
 
   const base = roleBase(role)
   const canCreate = role === 'patient'
@@ -240,7 +274,7 @@ function MedicalCasesPage() {
       const { data } = normalizeResponse(response)
       setCases(Array.isArray(data) ? data : [])
     } catch (error) {
-      toast.error(error?.response?.data?.error?.message || 'Could not load medical cases')
+      toast.error(error?.response?.data?.error?.message || t('cases.toast_load_error'))
     } finally {
       setIsLoading(false)
     }
@@ -264,10 +298,16 @@ function MedicalCasesPage() {
     ].filter(Boolean).some(value => String(value).toLowerCase().includes(term)))
   }, [cases, search])
 
+  const BOOKING_NEEDED_STATUSES = ['DOCTOR_ASSIGNED', 'WAITING_PATIENT_CONFIRMATION', 'UNDER_REVIEW', 'DOCUMENTS_UPLOADED']
+  const needsPatientBooking = (item) => {
+    const s = normalizeCaseStatus(item.status)
+    return !!item.doctor && BOOKING_NEEDED_STATUSES.includes(s)
+  }
+
   const stats = useMemo(() => ({
     total: cases.length,
     active: cases.filter(item => !['COMPLETED', 'CANCELLED'].includes(normalizeCaseStatus(item.status))).length,
-    planReady: cases.filter(item => normalizeCaseStatus(item.status) === 'WAITING_PATIENT_CONFIRMATION').length,
+    planReady: cases.filter(item => needsPatientBooking(item) || normalizeCaseStatus(item.status) === 'WAITING_PATIENT_CONFIRMATION').length,
     confirmed: cases.filter(item => ['TREATMENT_IN_KAZAKHSTAN', 'TRAVEL_PREPARATION', 'ARRIVED_TO_KAZAKHSTAN', 'IN_TREATMENT', 'RECOVERY'].includes(normalizeCaseStatus(item.status))).length,
     overdue: cases.filter(item => getCaseSla(item).overdue).length,
   }), [cases])
@@ -276,47 +316,45 @@ function MedicalCasesPage() {
     <div className="space-y-6 animate-fadeIn">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Medical cases</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('cases.page_title')}</h1>
           <p className="text-slate-600 mt-1">
-            {role === 'patient'
-              ? 'Track your treatment request, documents, consultation and plan.'
-              : 'Manage patient cases, assignments, clinic matching and treatment workflow.'}
+            {role === 'patient' ? t('cases.page_subtitle_patient') : t('cases.page_subtitle_staff')}
           </p>
         </div>
         {canCreate && (
           <Button onClick={() => setShowCreate(true)} leftIcon={<Plus className="w-4 h-4" />}>
-            Start medical case
+            {t('cases.start_case_btn')}
           </Button>
         )}
       </div>
 
       <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard icon={Activity} label="Total cases" value={stats.total} className="bg-teal-500" />
-        <StatCard icon={Clock} label="Active" value={stats.active} className="bg-sky-500" />
-        <StatCard icon={FileText} label="Awaiting patient" value={stats.planReady} className="bg-amber-500" />
-        <StatCard icon={stats.overdue > 0 ? AlertCircle : CheckCircle} label={stats.overdue > 0 ? 'SLA overdue' : 'Treatment+'} value={stats.overdue > 0 ? stats.overdue : stats.confirmed} className={stats.overdue > 0 ? 'bg-rose-500' : 'bg-emerald-500'} />
+        <StatCard icon={Activity} label={t('cases.stat_total')} value={stats.total} className="bg-teal-500" />
+        <StatCard icon={Clock} label={t('cases.stat_active')} value={stats.active} className="bg-sky-500" />
+        <StatCard icon={FileText} label={t('cases.stat_awaiting')} value={stats.planReady} className="bg-amber-500" />
+        <StatCard icon={stats.overdue > 0 ? AlertCircle : CheckCircle} label={stats.overdue > 0 ? t('cases.stat_overdue') : t('cases.stat_treatment')} value={stats.overdue > 0 ? stats.overdue : stats.confirmed} className={stats.overdue > 0 ? 'bg-rose-500' : 'bg-emerald-500'} />
       </div>
 
       <Card>
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <CardTitle>Cases</CardTitle>
+            <CardTitle>{t('cases.table_title')}</CardTitle>
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search cases..."
+                  placeholder={t('cases.search_placeholder')}
                   className="w-full sm:w-72 pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
               <Select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                placeholder="All statuses"
+                placeholder={t('cases.all_statuses')}
                 className="min-w-48"
-                options={MEDICAL_CASE_STATUSES.map(value => ({ value, label: formatStatus(value) }))}
+                options={MEDICAL_CASE_STATUSES.map(value => ({ value, label: formatStatus(value, t) }))}
               />
             </div>
           </div>
@@ -329,68 +367,128 @@ function MedicalCasesPage() {
           ) : filteredCases.length === 0 ? (
             <div className="text-center py-12">
               <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="font-medium text-slate-900">No cases found</p>
-              <p className="text-sm text-slate-500 mt-1">New patient cases will appear here.</p>
+              <p className="font-medium text-slate-900">{t('cases.empty_title')}</p>
+              <p className="text-sm text-slate-500 mt-1">{t('cases.empty_subtitle')}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[920px]">
-                <thead>
-                  <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <th className="py-3 px-4">Case</th>
-                    <th className="py-3 px-4">Patient</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4">Clinic / doctor</th>
-                    <th className="py-3 px-4">Manager</th>
-                    <th className="py-3 px-4">SLA</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCases.map(item => {
-                    const id = item.documentId || item.id
-                    return (
-                      <tr key={id} className="border-b border-slate-50 hover:bg-slate-50/70">
-                        <td className="py-4 px-4">
-                          <Link to={`${base}/cases/${id}`} state={{ from: location.pathname }} className="font-semibold text-slate-900 hover:text-teal-600">
+            <>
+              {/* ── Mobile: card list ── */}
+              <div className="md:hidden space-y-3">
+                {filteredCases.map(item => {
+                  const id = item.documentId || item.id
+                  const bookingNeeded = role === 'patient' && needsPatientBooking(item)
+                  const sla = getCaseSla(item)
+                  return (
+                    <Link
+                      key={id}
+                      to={`${base}/cases/${id}`}
+                      state={{ from: location.pathname }}
+                      className={`block rounded-xl border p-4 hover:shadow-md transition-all ${bookingNeeded ? 'border-amber-200 bg-amber-50/40' : 'border-slate-100 bg-white hover:border-teal-200'}`}
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900 truncate">
                             {item.caseNumber || `Case #${item.id}`}
-                          </Link>
-                          <p className="text-sm text-slate-500 line-clamp-1">{item.title || item.treatmentCategory || 'Medical treatment request'}</p>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-2">
-                            <UserRound className="w-4 h-4 text-slate-400" />
-                            <div>
-                              <p className="text-sm font-medium text-slate-900">{item.patient?.fullName || 'Patient'}</p>
-                              <p className="text-xs text-slate-500">{item.country || item.patient?.country || '—'}</p>
+                          </p>
+                          <p className="text-sm text-slate-500 line-clamp-1 mt-0.5">
+                            {item.title || item.treatmentCategory || t('cases.fallback_title')}
+                          </p>
+                        </div>
+                        <StatusBadge status={item.status} />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                        {item.patient?.fullName && (
+                          <span className="flex items-center gap-1">
+                            <UserRound className="w-3.5 h-3.5" />
+                            {item.patient.fullName}
+                          </span>
+                        )}
+                        {(item.clinic?.name || item.doctor?.fullName) && (
+                          <span>{item.clinic?.name || item.doctor?.fullName}</span>
+                        )}
+                        {sla.hours && (
+                          <span className={sla.overdue ? 'font-semibold text-rose-600' : ''}>
+                            {sla.overdue ? t('cases.sla_overdue') : t('cases.sla_left', { hours: sla.remainingHours })}
+                          </span>
+                        )}
+                      </div>
+                      {bookingNeeded && (
+                        <div className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                          <Bell className="w-3 h-3" />
+                          {t('cases.action_book_slot')}
+                        </div>
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
+
+              {/* ── Desktop: table ── */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full min-w-230">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="py-3 px-4">{t('cases.col_case')}</th>
+                      <th className="py-3 px-4">{t('cases.col_patient')}</th>
+                      <th className="py-3 px-4">{t('cases.col_status')}</th>
+                      <th className="py-3 px-4">{t('cases.col_clinic_doctor')}</th>
+                      <th className="py-3 px-4">{t('cases.col_manager')}</th>
+                      <th className="py-3 px-4">{t('cases.col_sla')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCases.map(item => {
+                      const id = item.documentId || item.id
+                      const bookingNeeded = role === 'patient' && needsPatientBooking(item)
+                      return (
+                        <tr key={id} className={`border-b border-slate-50 hover:bg-slate-50/70 ${bookingNeeded ? 'bg-amber-50/40' : ''}`}>
+                          <td className="py-4 px-4">
+                            <Link to={`${base}/cases/${id}`} state={{ from: location.pathname }} className="font-semibold text-slate-900 hover:text-teal-600">
+                              {item.caseNumber || `Case #${item.id}`}
+                            </Link>
+                            <p className="text-sm text-slate-500 line-clamp-1">{item.title || item.treatmentCategory || t('cases.fallback_title')}</p>
+                            {bookingNeeded && (
+                              <Link to={`${base}/cases/${id}`} state={{ from: location.pathname }} className="inline-flex items-center gap-1 mt-1 text-xs font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full hover:bg-amber-200 transition-colors">
+                                <Bell className="w-3 h-3" />
+                                {t('cases.action_book_slot')}
+                              </Link>
+                            )}
+                          </td>
+                          <td className="py-4 px-4">
+                            <div className="flex items-center gap-2">
+                              <UserRound className="w-4 h-4 text-slate-400" />
+                              <div>
+                                <p className="text-sm font-medium text-slate-900">{item.patient?.fullName || t('cases.patient_fallback')}</p>
+                                <p className="text-xs text-slate-500">{item.country || item.patient?.country || '—'}</p>
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4"><StatusBadge status={item.status} /></td>
-                        <td className="py-4 px-4">
-                          <p className="text-sm text-slate-900">{item.clinic?.name || 'Not assigned'}</p>
-                          <p className="text-xs text-slate-500">{item.doctor?.fullName || 'Doctor pending'}</p>
-                        </td>
-                        <td className="py-4 px-4">
-                          <p className="text-sm text-slate-700">{item.manager?.fullName || 'Unassigned'}</p>
-                          <p className="text-xs text-slate-500">{item.coordinator?.fullName || 'No coordinator'}</p>
-                        </td>
-                        <td className="py-4 px-4 text-sm text-slate-500">
-                          {(() => {
-                            const sla = getCaseSla(item)
-                            if (!sla.hours) return item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : '—'
-                            return (
-                              <span className={sla.overdue ? 'font-semibold text-rose-600' : 'text-slate-500'}>
-                                {sla.overdue ? 'Overdue' : `${sla.remainingHours}h left`}
-                              </span>
-                            )
-                          })()}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+                          <td className="py-4 px-4"><StatusBadge status={item.status} /></td>
+                          <td className="py-4 px-4">
+                            <p className="text-sm text-slate-900">{item.clinic?.name || t('cases.not_assigned')}</p>
+                            <p className="text-xs text-slate-500">{item.doctor?.fullName || t('cases.doctor_pending')}</p>
+                          </td>
+                          <td className="py-4 px-4">
+                            <p className="text-sm text-slate-700">{item.manager?.fullName || t('cases.unassigned')}</p>
+                          </td>
+                          <td className="py-4 px-4 text-sm text-slate-500">
+                            {(() => {
+                              const sla = getCaseSla(item)
+                              if (!sla.hours) return item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : '—'
+                              return (
+                                <span className={sla.overdue ? 'font-semibold text-rose-600' : 'text-slate-500'}>
+                                  {sla.overdue ? t('cases.sla_overdue') : t('cases.sla_left', { hours: sla.remainingHours })}
+                                </span>
+                              )
+                            })()}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -398,7 +496,19 @@ function MedicalCasesPage() {
       {showCreate && (
         <CreateCaseModal
           onClose={() => setShowCreate(false)}
-          onCreated={(created) => setCases(prev => [created, ...prev])}
+          onCreated={(created) => {
+            setCases(prev => [created, ...prev])
+            setCreatedCase(created)
+          }}
+        />
+      )}
+
+      {createdCase && (
+        <CaseCreatedGuide
+          isOpen={!!createdCase}
+          onClose={() => setCreatedCase(null)}
+          caseId={createdCase.documentId || createdCase.id}
+          caseNumber={createdCase.caseNumber}
         />
       )}
     </div>

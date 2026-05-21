@@ -14,6 +14,66 @@ const KZ_OFFSET_MIN = 5 * 60;
 // ── Slot mutex: prevents two concurrent creates for the same doctor+time ──
 const slotLocks = new Map<string, Promise<void>>();
 
+/**
+ * Strapi v5: creating a published appointment requires all relation targets to
+ * also have a published version.  Medical cases may have been created as drafts
+ * (e.g. via the admin panel) and therefore lack a published row.  This helper
+ * tries every available Document-Service method to create/promote the published
+ * version before the appointment is saved.
+ */
+async function ensureMedicalCasePublished(strapi: any, documentId: string): Promise<void> {
+  const uid = 'api::medical-case.medical-case';
+  try {
+    // Check whether a published version already exists
+    const published = await strapi.documents(uid).findOne({
+      documentId,
+      status: 'published',
+    });
+    if (published) return; // already published — nothing to do
+  } catch {
+    // findOne may not support status param in some Strapi versions; fall through
+  }
+
+  // Attempt 1: Document Service publish() — works when a draft exists
+  try {
+    await (strapi.documents(uid) as any).publish({ documentId });
+    strapi.log.info(`ensureMedicalCasePublished: published case ${documentId} via publish()`);
+    return;
+  } catch (e1: any) {
+    strapi.log.warn(`ensureMedicalCasePublished: publish() failed for ${documentId}: ${e1?.message}`);
+  }
+
+  // Attempt 2: update() with status:'published' — works when a published row exists
+  try {
+    await strapi.documents(uid).update({
+      documentId,
+      data: {},
+      status: 'published',
+    });
+    strapi.log.info(`ensureMedicalCasePublished: published case ${documentId} via update()`);
+    return;
+  } catch (e2: any) {
+    strapi.log.warn(`ensureMedicalCasePublished: update(published) failed for ${documentId}: ${e2?.message}`);
+  }
+
+  // Attempt 3: directly set publishedAt on the draft row via db.query
+  try {
+    const rows = await strapi.db.query(uid).findMany({
+      where: { documentId },
+      limit: 1,
+    });
+    if (rows.length > 0 && rows[0].publishedAt === null) {
+      await strapi.db.query(uid).update({
+        where: { documentId },
+        data: { publishedAt: new Date() },
+      });
+      strapi.log.info(`ensureMedicalCasePublished: published case ${documentId} via db.query`);
+    }
+  } catch (e3: any) {
+    strapi.log.warn(`ensureMedicalCasePublished: db.query fallback failed for ${documentId}: ${e3?.message}`);
+  }
+}
+
 function withSlotLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const prev = slotLocks.get(key) || Promise.resolve();
   const next = prev.then(fn, fn); // run fn after previous finishes (even if it threw)
@@ -173,9 +233,10 @@ export default factories.createCoreController('api::appointment.appointment', ()
     const isPatient = !isApiToken && (user.role?.type === 'patient' || user.userRole === 'patient');
     const isAdmin = isApiToken || user?.role?.type === 'admin' || user?.userRole === 'admin';
     const isHumanAdmin = user?.role?.type === 'admin' || user?.userRole === 'admin';
+    const isStaff = !isApiToken && (['manager', 'coordinator'].includes(user?.userRole) || ['manager', 'coordinator'].includes(user?.role?.type));
 
-    if (!isPatient && !isAdmin) {
-      return ctx.forbidden('Only patients can create appointments');
+    if (!isPatient && !isAdmin && !isStaff) {
+      return ctx.forbidden('Only patients or staff can create appointments');
     }
 
     const body = (ctx.request.body as any)?.data || ctx.request.body || {};
@@ -194,12 +255,20 @@ export default factories.createCoreController('api::appointment.appointment', ()
     if (!body.roomId || typeof body.roomId !== 'string' || body.roomId.length > 128) {
       return ctx.badRequest('roomId is required and must be a valid string');
     }
-    if (body.medical_case && !isApiToken && !(await userCanAccessMedicalCase(strapi, user, body.medical_case))) {
-      return ctx.forbidden('Medical case is not available for this appointment');
+    if (body.medical_case) {
+      if (!isApiToken && !(await userCanAccessMedicalCase(strapi, user, body.medical_case))) {
+        return ctx.forbidden('Medical case is not available for this appointment');
+      }
+      // In Strapi v5, relations in published documents require the related document
+      // to also be published. Ensure a published version of the medical case exists.
+      const caseDocId = typeof body.medical_case === 'string'
+        ? body.medical_case
+        : String(body.medical_case);
+      await ensureMedicalCasePublished(strapi, caseDocId);
     }
 
-    // --- Working hours validation (skip for admin) ---
-    if (!isAdmin) {
+    // --- Working hours validation (skip for admin and staff) ---
+    if (!isAdmin && !isStaff) {
       const drRef = body.doctor;
       const drForHours: any = typeof drRef === 'number'
         ? await strapi.query('api::doctor.doctor').findOne({ where: { id: drRef } })
@@ -239,7 +308,7 @@ export default factories.createCoreController('api::appointment.appointment', ()
 
     // --- Resolve patient documentId ---
     let patientDocId: string | undefined;
-    if (!isAdmin) {
+    if (!isAdmin && !isStaff) {
       // Force current user as patient
       patientDocId = user.documentId;
     } else if (body.patient) {
@@ -268,17 +337,27 @@ export default factories.createCoreController('api::appointment.appointment', ()
     if (!doctorRecord) {
       return ctx.badRequest('Doctor not found');
     }
-    const actualPrice = Number(doctorRecord.price);
-    const submittedPrice = Number(body.price);
-    if (!submittedPrice || submittedPrice !== actualPrice) {
-      return ctx.badRequest('Invalid appointment price');
+
+    const isFreeConsultation = process.env.FREE_CONSULTATIONS === 'true';
+    const isPaymentsLive = process.env.PAYMENTS_LIVE === 'true';
+
+    // When free-consultation mode is active, price is always 0 regardless of the doctor's rate.
+    // Price validation is also skipped for case-based and staff-created appointments.
+    const actualPrice = isFreeConsultation ? 0 : Number(doctorRecord.price);
+    const isCaseBased = !!body.medical_case;
+    if (!isFreeConsultation && !isCaseBased && !isStaff) {
+      const submittedPrice = Number(body.price);
+      if (!submittedPrice || submittedPrice !== actualPrice) {
+        return ctx.badRequest('Invalid appointment price');
+      }
     }
 
     // --- Restrict paymentStatus: only signaling server / admin may mark as paid ---
     const ALLOWED_STATUSES = ['pending', 'confirmed', 'cancelled', 'completed', 'in_progress'];
     const ALLOWED_PAYMENT_STATUSES = ['pending', 'paid', 'failed', 'refunded'];
     const requestedStatus = body.statuse || body.status || 'pending';
-    const requestedPaymentStatus = body.paymentStatus || 'pending';
+    // In free-consultation mode every appointment is automatically considered paid.
+    const requestedPaymentStatus = isFreeConsultation ? 'paid' : (body.paymentStatus || 'pending');
 
     if (!ALLOWED_STATUSES.includes(requestedStatus)) {
       return ctx.badRequest('Invalid status value');
@@ -286,29 +365,27 @@ export default factories.createCoreController('api::appointment.appointment', ()
     if (!ALLOWED_PAYMENT_STATUSES.includes(requestedPaymentStatus)) {
       return ctx.badRequest('Invalid paymentStatus value');
     }
-    // In live-payment mode, only the signaling server (api-token) or an admin
-    // may create an appointment with paymentStatus='paid'. A regular patient
-    // sending paymentStatus='paid' directly would bypass the payment gateway.
-    // In test mode (PAYMENTS_LIVE !== 'true') we allow it so the test-payment
-    // flow in the frontend works without a real payment provider.
-    const isPaymentsLive = process.env.PAYMENTS_LIVE === 'true';
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (isProduction && !isPaymentsLive && (isApiToken || isPatient)) {
-      return ctx.badRequest('Live payments must be enabled before appointments can be created in production');
-    }
 
-    if (!isHumanAdmin && !isApiToken && isPatient && isPaymentsLive) {
-      return ctx.badRequest('Appointments must be created through the payment gateway');
-    }
-
-    if (isPaymentsLive && !isAdmin && requestedPaymentStatus === 'paid') {
-      return ctx.badRequest('Payment must be confirmed through the payment gateway');
+    // Payment gateway checks are bypassed in free-consultation mode.
+    if (!isFreeConsultation) {
+      const isProduction = process.env.NODE_ENV === 'production';
+      if (isProduction && !isPaymentsLive && (isApiToken || isPatient)) {
+        return ctx.badRequest('Live payments must be enabled before appointments can be created in production');
+      }
+      if (!isHumanAdmin && !isApiToken && isPatient && isPaymentsLive) {
+        return ctx.badRequest('Appointments must be created through the payment gateway');
+      }
+      if (isPaymentsLive && !isAdmin && requestedPaymentStatus === 'paid') {
+        return ctx.badRequest('Payment must be confirmed through the payment gateway');
+      }
     }
 
     // --- Atomic check + create using mutex (prevents race condition) ---
     const lockKey = `${doctorDocId}:${body.dateTime}`;
 
-    const result = await withSlotLock(lockKey, async () => {
+    let result: any;
+    try {
+      result = await withSlotLock(lockKey, async () => {
       if (body.dateTime && doctorDocId) {
         const requestedTime = new Date(body.dateTime);
 
@@ -344,27 +421,57 @@ export default factories.createCoreController('api::appointment.appointment', ()
       }
 
       // Create appointment inside the lock — no one else can create for same slot
-      const appointment = await strapi.documents('api::appointment.appointment').create({
-        data: {
-          dateTime: body.dateTime,
-          type: body.type || 'video',
-          statuse: requestedStatus,
-          price: actualPrice,
-          roomId: body.roomId,
-          paymentStatus: requestedPaymentStatus,
-          patient: patientDocId,
-          doctor: doctorDocId,
-          medical_case: body.medical_case || body.medicalCase || null,
-        },
+      const appointmentData: any = {
+        dateTime: body.dateTime,
+        type: body.type || 'video',
+        statuse: requestedStatus,
+        price: actualPrice,
+        roomId: body.roomId,
+        paymentStatus: requestedPaymentStatus,
+        patient: patientDocId,
+        doctor: doctorDocId,
+        medical_case: body.medical_case || body.medicalCase || null,
+      };
+      const createOpts: any = {
+        data: appointmentData,
         status: 'published',
         populate: {
           doctor: { populate: ['specialization', 'photo'] },
           patient: { fields: ['id', 'fullName', 'email', 'phone'] },
         },
-      });
+      };
+
+      let appointment: any;
+      try {
+        appointment = await strapi.documents('api::appointment.appointment').create(createOpts);
+      } catch (innerErr: any) {
+        const msg = innerErr?.message || '';
+        const isMedicalCaseErr =
+          (innerErr?.name === 'YupValidationError' || innerErr?.name === 'ValidationError') &&
+          (msg.includes('medical-case') || msg.includes('medical_case'));
+
+        if (isMedicalCaseErr && appointmentData.medical_case) {
+          // The case couldn't be linked (e.g. Strapi validation race). Retry without it.
+          strapi.log.warn(`appointment.create: medical_case ${appointmentData.medical_case} validation failed, retrying without it`);
+          appointment = await strapi.documents('api::appointment.appointment').create({
+            ...createOpts,
+            data: { ...appointmentData, medical_case: null },
+          });
+        } else {
+          throw innerErr;
+        }
+      }
 
       return { conflict: false, appointment };
     });
+    } catch (err: any) {
+      const message = err?.message || '';
+      if (message.includes('do not exist') || err?.name === 'YupValidationError' || err?.name === 'ValidationError') {
+        return ctx.badRequest(message || 'Validation error while creating appointment');
+      }
+      strapi.log.error('Appointment create failed:', err);
+      return ctx.internalServerError('Failed to create appointment');
+    }
 
     if (result.conflict) {
       return ctx.badRequest('This time slot was just booked by another patient. Please choose a different time.');
@@ -383,6 +490,30 @@ export default factories.createCoreController('api::appointment.appointment', ()
       ip: ctx.request.ip,
       ts: new Date().toISOString(),
     }));
+
+    // When the appointment is linked to a medical case, advance the case status
+    // server-side so the patient doesn't need a separate permission-restricted call.
+    const linkedCase = body.medical_case || body.medicalCase;
+    if (linkedCase) {
+      const caseDocId = typeof linkedCase === 'string' ? linkedCase : String(linkedCase);
+      try {
+        await strapi.documents('api::medical-case.medical-case' as any).update({
+          documentId: caseDocId,
+          data: { status: 'CONSULTATION_BOOKED' } as any,
+          status: 'published',
+        });
+      } catch {
+        // If published update fails, try draft-only update
+        try {
+          await strapi.documents('api::medical-case.medical-case' as any).update({
+            documentId: caseDocId,
+            data: { status: 'CONSULTATION_BOOKED' } as any,
+          });
+        } catch (err: any) {
+          strapi.log.warn(`Could not set CONSULTATION_BOOKED on case ${caseDocId}: ${err?.message}`);
+        }
+      }
+    }
 
     return { data: result.appointment };
   },

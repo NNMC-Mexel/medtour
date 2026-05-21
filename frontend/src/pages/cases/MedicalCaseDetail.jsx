@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -13,6 +14,7 @@ import {
   Save,
   Stethoscope,
   UserRound,
+  Info,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -22,6 +24,7 @@ import Textarea from '../../components/ui/Textarea'
 import Input from '../../components/ui/Input'
 import { useToast } from '../../components/ui/Toast'
 import useAuthStore from '../../stores/authStore'
+import CaseSlotPicker from '../../components/cases/CaseSlotPicker'
 import {
   documentsAPI,
   clinicsAPI,
@@ -46,8 +49,8 @@ import {
   STATUS_VARIANTS,
 } from '../../utils/medicalCaseWorkflow'
 
-function formatStatus(status) {
-  return formatCaseStatus(status)
+function formatStatus(status, t) {
+  return formatCaseStatus(status, t)
 }
 
 function roleBase(role) {
@@ -78,6 +81,7 @@ function DetailRow({ label, value }) {
 }
 
 function TimelineItem({ icon: Icon, title, value, muted }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-start gap-3">
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${muted ? 'bg-slate-100 text-slate-400' : 'bg-teal-100 text-teal-600'}`}>
@@ -85,27 +89,86 @@ function TimelineItem({ icon: Icon, title, value, muted }) {
       </div>
       <div>
         <p className="text-sm font-medium text-slate-900">{title}</p>
-        <p className="text-sm text-slate-500">{value || 'Pending'}</p>
+        <p className="text-sm text-slate-500">{value || t('case_detail.not_assigned_placeholder')}</p>
       </div>
     </div>
   )
 }
 
+const NEXT_STEP_STYLES = {
+  NEW_LEAD: 'bg-sky-50 border-sky-200 text-sky-800',
+  REGISTERED: 'bg-amber-50 border-amber-200 text-amber-800',
+  WAITING_FOR_DOCUMENTS: 'bg-amber-50 border-amber-200 text-amber-800',
+  DOCUMENTS_UPLOADED: 'bg-sky-50 border-sky-200 text-sky-800',
+  UNDER_REVIEW: 'bg-sky-50 border-sky-200 text-sky-800',
+  DOCTOR_ASSIGNED: 'bg-sky-50 border-sky-200 text-sky-800',
+  WAITING_PATIENT_CONFIRMATION: 'bg-violet-50 border-violet-200 text-violet-800',
+  WAITING_PAYMENT: 'bg-amber-50 border-amber-200 text-amber-800',
+  CONSULTATION_BOOKED: 'bg-teal-50 border-teal-200 text-teal-800',
+  CONSULTATION_COMPLETED: 'bg-sky-50 border-sky-200 text-sky-800',
+  LOCAL_TREATMENT: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+  TREATMENT_IN_KAZAKHSTAN: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+  TRAVEL_PREPARATION: 'bg-sky-50 border-sky-200 text-sky-800',
+  ARRIVED_TO_KAZAKHSTAN: 'bg-teal-50 border-teal-200 text-teal-800',
+  IN_TREATMENT: 'bg-teal-50 border-teal-200 text-teal-800',
+  RECOVERY: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+  COMPLETED: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+  CANCELLED: 'bg-slate-50 border-slate-200 text-slate-600',
+}
+
+const DOCUMENT_REVIEW_STATUSES = [
+  'REQUESTED',
+  'UPLOADED',
+  'IN_REVIEW',
+  'APPROVED',
+  'REJECTED',
+  'TRANSLATION_NEEDED',
+  'TRANSLATED',
+]
+
+const DOCUMENT_STATUS_VARIANTS = {
+  REQUESTED: 'warning',
+  UPLOADED: 'primary',
+  IN_REVIEW: 'secondary',
+  APPROVED: 'success',
+  REJECTED: 'danger',
+  TRANSLATION_NEEDED: 'warning',
+  TRANSLATED: 'success',
+}
+
+function PatientNextStep({ status }) {
+  const { t } = useTranslation()
+  const normalized = normalizeCaseStatus(status)
+  const message = t(`case_next_step.${normalized}`, { defaultValue: '' })
+  if (!message) return null
+  const style = NEXT_STEP_STYLES[normalized] || 'bg-sky-50 border-sky-200 text-sky-800'
+  return (
+    <div className={`flex items-start gap-3 rounded-xl border p-4 ${style}`}>
+      <Info className="w-5 h-5 mt-0.5 shrink-0" />
+      <p className="text-sm leading-relaxed">{message}</p>
+    </div>
+  )
+}
+
 function CaseDocumentsPanel({ medicalCase, onUploaded }) {
+  const { t } = useTranslation()
   const toast = useToast()
   const { user } = useAuthStore()
+  const role = user?.userRole || 'patient'
+  const canReview = ['admin', 'manager', 'coordinator', 'doctor'].includes(role)
   const [file, setFile] = useState(null)
   const [title, setTitle] = useState('')
   const [type, setType] = useState('other')
   const [description, setDescription] = useState('')
   const [isUploading, setIsUploading] = useState(false)
+  const [savingDocId, setSavingDocId] = useState(null)
 
   const docs = medicalCase.medical_documents || []
 
   const submit = async (event) => {
     event.preventDefault()
     if (!file) {
-      toast.warning('Choose a file first')
+      toast.warning(t('case_detail.toast_doc_choose'))
       return
     }
     setIsUploading(true)
@@ -119,47 +182,61 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
         user: medicalCase.patient?.documentId || medicalCase.patient?.id || user?.documentId || user?.id,
         medical_case: medicalCase.documentId || medicalCase.id,
       })
-      toast.success('Document uploaded')
+      toast.success(t('case_detail.toast_doc_uploaded'))
       setFile(null)
       setTitle('')
       setDescription('')
       setType('other')
       onUploaded?.()
     } catch (error) {
-      toast.error(error?.response?.data?.error?.message || error.message || 'Could not upload document')
+      toast.error(error?.response?.data?.error?.message || error.message || t('case_detail.toast_doc_error'))
     } finally {
       setIsUploading(false)
+    }
+  }
+
+  const updateDocumentReview = async (doc, patch) => {
+    const docId = doc.documentId || doc.id
+    setSavingDocId(docId)
+    try {
+      await documentsAPI.update(docId, patch)
+      toast.success(t('case_detail.toast_doc_review_saved'))
+      onUploaded?.()
+    } catch (error) {
+      toast.error(error?.response?.data?.error?.message || t('case_detail.toast_doc_review_error'))
+    } finally {
+      setSavingDocId(null)
     }
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Case documents</CardTitle>
+        <CardTitle>{t('case_detail.section_docs')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
         <form onSubmit={submit} className="grid lg:grid-cols-4 gap-3 items-end">
           <Input
-            label="Title"
+            label={t('documents.doc_name_label')}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Blood test, MRI, discharge summary..."
+            placeholder={t('case_detail.doc_name_placeholder')}
           />
           <Select
-            label="Type"
+            label={t('documents.doc_type_label')}
             value={type}
             onChange={(e) => setType(e.target.value)}
             options={[
-              { value: 'analysis', label: 'Analysis' },
-              { value: 'certificate', label: 'Report / certificate' },
-              { value: 'mrt', label: 'MRI' },
-              { value: 'xray', label: 'X-ray' },
-              { value: 'ultrasound', label: 'Ultrasound' },
-              { value: 'other', label: 'Other' },
+              { value: 'analysis', label: t('documents.type_analysis') },
+              { value: 'certificate', label: t('documents.type_certificate') },
+              { value: 'mrt', label: t('documents.type_mrt') },
+              { value: 'xray', label: t('documents.type_xray') },
+              { value: 'ultrasound', label: t('documents.type_ultrasound') },
+              { value: 'other', label: t('documents.type_other') },
             ]}
           />
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">File</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('documents.file_label')}</label>
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp,application/pdf"
@@ -172,11 +249,11 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
             />
           </div>
           <Button type="submit" disabled={isUploading} leftIcon={isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}>
-            Upload
+            {t('documents.upload_action')}
           </Button>
           <Textarea
             containerClassName="lg:col-span-4"
-            label="Description"
+            label={t('documents.description')}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
@@ -185,25 +262,60 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
 
         {docs.length === 0 ? (
           <div className="text-sm text-slate-500 bg-slate-50 rounded-xl p-4">
-            No documents uploaded for this case yet.
+            {t('documents.empty_all')}
           </div>
         ) : (
           <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
             {docs.map(doc => {
               const url = getMediaUrl(doc.file)
+              const reviewStatus = doc.reviewStatus || 'UPLOADED'
+              const docId = doc.documentId || doc.id
               return (
-                <div key={doc.documentId || doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
+                <div key={docId} className="flex flex-col gap-3 p-4">
                   <div className="flex items-start gap-3">
                     <FileText className="w-5 h-5 text-teal-600 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-slate-900">{doc.title}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-slate-900">{doc.title}</p>
+                        <Badge variant={DOCUMENT_STATUS_VARIANTS[reviewStatus] || 'default'}>
+                          {t(`case_detail.doc_status_${reviewStatus.toLowerCase()}`, { defaultValue: reviewStatus })}
+                        </Badge>
+                      </div>
                       <p className="text-xs text-slate-500">{doc.type || 'other'}{doc.description ? ` · ${doc.description}` : ''}</p>
+                      {doc.reviewNotes && <p className="text-xs text-slate-600 mt-1">{doc.reviewNotes}</p>}
+                      {doc.dueDate && <p className="text-xs text-amber-700 mt-1">{t('case_detail.doc_due_date')}: {doc.dueDate}</p>}
                     </div>
+                    {url && (
+                      <a href={url} target="_blank" rel="noreferrer" className="shrink-0">
+                        <Button size="sm" variant="outline">{t('case_detail.doc_open_btn')}</Button>
+                      </a>
+                    )}
                   </div>
-                  {url && (
-                    <a href={url} target="_blank" rel="noreferrer">
-                      <Button size="sm" variant="outline">Open</Button>
-                    </a>
+                  {canReview && (
+                    <div className="grid md:grid-cols-[220px_1fr_160px_auto] gap-3 items-end">
+                      <Select
+                        label={t('case_detail.doc_review_status')}
+                        value={reviewStatus}
+                        onChange={(e) => updateDocumentReview(doc, { reviewStatus: e.target.value })}
+                        options={DOCUMENT_REVIEW_STATUSES.map(value => ({
+                          value,
+                          label: t(`case_detail.doc_status_${value.toLowerCase()}`, { defaultValue: value }),
+                        }))}
+                      />
+                      <Input
+                        label={t('case_detail.doc_review_notes')}
+                        defaultValue={doc.reviewNotes || ''}
+                        onBlur={(e) => e.target.value !== (doc.reviewNotes || '') && updateDocumentReview(doc, { reviewNotes: e.target.value })}
+                        placeholder={t('case_detail.doc_review_notes_placeholder')}
+                      />
+                      <Input
+                        label={t('case_detail.doc_due_date')}
+                        type="date"
+                        defaultValue={doc.dueDate || ''}
+                        onBlur={(e) => e.target.value !== (doc.dueDate || '') && updateDocumentReview(doc, { dueDate: e.target.value || null })}
+                      />
+                      {savingDocId === docId && <Loader2 className="w-5 h-5 animate-spin text-teal-600 mb-3" />}
+                    </div>
                   )}
                 </div>
               )
@@ -216,6 +328,7 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
 }
 
 function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged }) {
+  const { t } = useTranslation()
   const toast = useToast()
   const currentPlan = plans[0] || null
   const [isSaving, setIsSaving] = useState(false)
@@ -290,34 +403,50 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
         })
       }
 
-      toast.success('Treatment plan saved')
+      toast.success(t('case_detail.toast_plan_saved'))
       onChanged?.()
     } catch (error) {
-      toast.error(error?.response?.data?.error?.message || 'Could not save treatment plan')
+      toast.error(error?.response?.data?.error?.message || t('case_detail.toast_plan_error'))
     } finally {
       setIsSaving(false)
     }
   }
 
-  const patientDecision = async (status) => {
+  const patientDecision = async (planStatus) => {
     if (!currentPlan) return
     setIsSaving(true)
     try {
-      await treatmentPlansAPI.update(currentPlan.documentId || currentPlan.id, { status })
-      if (status === 'ACCEPTED') {
+      await treatmentPlansAPI.update(currentPlan.documentId || currentPlan.id, { status: planStatus })
+
+      const caseId = medicalCase.documentId || medicalCase.id
+      const currentCaseStatus = normalizeCaseStatus(medicalCase.status)
+
+      if (planStatus === 'ACCEPTED' && currentCaseStatus === 'WAITING_PATIENT_CONFIRMATION') {
+        await medicalCasesAPI.update(caseId, { status: 'WAITING_PAYMENT' })
         await caseEventsAPI.create({
-          medical_case: medicalCase.documentId || medicalCase.id,
+          medical_case: caseId,
           eventType: 'PLAN_ACCEPTED',
           fromStatus: medicalCase.status,
-          toStatus: 'TRAVEL_PREPARATION',
+          toStatus: 'WAITING_PAYMENT',
           message: 'Patient accepted the treatment plan.',
           metadata: { planId: currentPlan.documentId || currentPlan.id },
         })
+      } else if (planStatus === 'DECLINED' && currentCaseStatus === 'WAITING_PATIENT_CONFIRMATION') {
+        await medicalCasesAPI.update(caseId, { status: 'DOCTOR_ASSIGNED' })
+        await caseEventsAPI.create({
+          medical_case: caseId,
+          eventType: 'PLAN_DECLINED',
+          fromStatus: medicalCase.status,
+          toStatus: 'DOCTOR_ASSIGNED',
+          message: 'Patient declined the treatment plan.',
+          metadata: { planId: currentPlan.documentId || currentPlan.id },
+        })
       }
-      toast.success(status === 'ACCEPTED' ? 'Treatment plan accepted' : 'Treatment plan declined')
+
+      toast.success(planStatus === 'ACCEPTED' ? t('case_detail.toast_plan_accepted') : t('case_detail.toast_plan_declined'))
       onChanged?.()
     } catch (error) {
-      toast.error(error?.response?.data?.error?.message || 'Could not save patient decision')
+      toast.error(error?.response?.data?.error?.message || t('case_detail.toast_plan_decision_error'))
     } finally {
       setIsSaving(false)
     }
@@ -326,9 +455,9 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
   if (!canEdit && !currentPlan) {
     return (
       <Card>
-        <CardHeader><CardTitle>Treatment plan</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t('case_detail.section_treatment_plan')}</CardTitle></CardHeader>
         <CardContent>
-          <p className="text-sm text-slate-500">Treatment plan is not ready yet.</p>
+          <p className="text-sm text-slate-500">{t('appointment_detail.no_docs')}</p>
         </CardContent>
       </Card>
     )
@@ -338,8 +467,8 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
-          <CardTitle>Treatment plan</CardTitle>
-          {currentPlan && <Badge variant={currentPlan.status === 'ACCEPTED' ? 'success' : currentPlan.status === 'SENT' ? 'primary' : 'warning'}>{currentPlan.status}</Badge>}
+          <CardTitle>{t('case_detail.section_treatment_plan')}</CardTitle>
+          {currentPlan && <Badge variant={currentPlan.status === 'ACCEPTED' ? 'success' : currentPlan.status === 'SENT' ? 'primary' : 'warning'}>{t(`case_detail.plan_status_${currentPlan.status.toLowerCase()}`, { defaultValue: currentPlan.status })}</Badge>}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -347,43 +476,43 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
           <>
             <div className="grid md:grid-cols-3 gap-4">
               <Select
-                label="Plan status"
+                label={t('case_detail.plan_status_label')}
                 value={form.status}
                 onChange={(e) => update('status', e.target.value)}
-                options={['DRAFT', 'SENT', 'ACCEPTED', 'DECLINED', 'EXPIRED'].map(value => ({ value, label: value }))}
+                options={['DRAFT', 'SENT', 'ACCEPTED', 'DECLINED', 'EXPIRED'].map(value => ({ value, label: t(`case_detail.plan_status_${value.toLowerCase()}`, { defaultValue: value }) }))}
               />
               <Input
-                label="Duration days"
+                label={t('case_detail.plan_duration_label')}
                 type="number"
                 value={form.estimatedDurationDays}
                 onChange={(e) => update('estimatedDurationDays', e.target.value)}
               />
               <div className="grid grid-cols-2 gap-3">
-                <Input label="Total cost" type="number" value={form.totalCost} onChange={(e) => update('totalCost', e.target.value)} />
-                <Select label="Currency" value={form.currency} onChange={(e) => update('currency', e.target.value)} options={['USD', 'EUR', 'GBP', 'KZT'].map(value => ({ value, label: value }))} />
+                <Input label={t('case_detail.plan_cost_label')} type="number" value={form.totalCost} onChange={(e) => update('totalCost', e.target.value)} />
+                <Select label={t('case_detail.plan_currency_label')} value={form.currency} onChange={(e) => update('currency', e.target.value)} options={['USD', 'EUR', 'GBP', 'KZT'].map(value => ({ value, label: value }))} />
               </div>
             </div>
-            <Textarea label="Diagnosis summary" value={form.diagnosisSummary} onChange={(e) => update('diagnosisSummary', e.target.value)} rows={3} />
-            <Textarea label="Doctor decision notes" value={form.doctorDecisionNotes} onChange={(e) => update('doctorDecisionNotes', e.target.value)} rows={3} />
-            <Textarea label="Procedures, one per line" value={form.proceduresText} onChange={(e) => update('proceduresText', e.target.value)} rows={4} />
-            <Textarea label="Recommendations" value={form.recommendations} onChange={(e) => update('recommendations', e.target.value)} rows={3} />
+            <Textarea label={t('case_detail.plan_diagnosis_summary')} value={form.diagnosisSummary} onChange={(e) => update('diagnosisSummary', e.target.value)} rows={3} />
+            <Textarea label={t('case_detail.plan_doctor_notes')} value={form.doctorDecisionNotes} onChange={(e) => update('doctorDecisionNotes', e.target.value)} rows={3} />
+            <Textarea label={t('case_detail.plan_procedures')} value={form.proceduresText} onChange={(e) => update('proceduresText', e.target.value)} rows={4} />
+            <Textarea label={t('case_detail.plan_recommendations')} value={form.recommendations} onChange={(e) => update('recommendations', e.target.value)} rows={3} />
             <div className="flex justify-end">
               <Button onClick={save} disabled={isSaving} leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}>
-                Save treatment plan
+                {t('common.save')}
               </Button>
             </div>
           </>
         ) : (
           <div className="space-y-4">
-            <DetailRow label="Status" value={currentPlan.status} />
-            <DetailRow label="Cost" value={currentPlan.totalCost ? `${currentPlan.totalCost} ${currentPlan.currency || ''}` : '—'} />
-            <DetailRow label="Duration" value={currentPlan.estimatedDurationDays ? `${currentPlan.estimatedDurationDays} days` : '—'} />
+            <DetailRow label={t('case_detail.label_plan_status')} value={t(`case_detail.plan_status_${currentPlan.status?.toLowerCase()}`, { defaultValue: currentPlan.status })} />
+            <DetailRow label={t('case_detail.label_plan_cost')} value={currentPlan.totalCost ? `${currentPlan.totalCost} ${currentPlan.currency || ''}` : '—'} />
+            <DetailRow label={t('case_detail.label_plan_duration')} value={currentPlan.estimatedDurationDays ? t('case_detail.label_plan_days', { days: currentPlan.estimatedDurationDays }) : '—'} />
             <div>
-              <p className="text-sm font-medium text-slate-900 mb-1">Diagnosis summary</p>
+              <p className="text-sm font-medium text-slate-900 mb-1">{t('case_detail.plan_diagnosis_summary')}</p>
               <p className="text-sm text-slate-600 whitespace-pre-wrap">{currentPlan.diagnosisSummary || '—'}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-900 mb-1">Procedures</p>
+              <p className="text-sm font-medium text-slate-900 mb-1">{t('case_detail.section_procedures')}</p>
               {Array.isArray(currentPlan.procedures) && currentPlan.procedures.length > 0 ? (
                 <ul className="list-disc pl-5 text-sm text-slate-600 space-y-1">
                   {currentPlan.procedures.map((item, index) => <li key={index}>{item?.name || item?.procedure || String(item)}</li>)}
@@ -391,16 +520,16 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
               ) : <p className="text-sm text-slate-500">—</p>}
             </div>
             <div>
-              <p className="text-sm font-medium text-slate-900 mb-1">Recommendations</p>
+              <p className="text-sm font-medium text-slate-900 mb-1">{t('case_detail.plan_recommendations')}</p>
               <p className="text-sm text-slate-600 whitespace-pre-wrap">{currentPlan.recommendations || '—'}</p>
             </div>
             {canApprove && currentPlan.status === 'SENT' && (
               <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
                 <Button variant="outline" onClick={() => patientDecision('DECLINED')} disabled={isSaving}>
-                  Decline plan
+                  {t('case_detail.plan_decline_btn')}
                 </Button>
                 <Button onClick={() => patientDecision('ACCEPTED')} disabled={isSaving}>
-                  Accept treatment plan
+                  {t('case_detail.plan_accept_btn')}
                 </Button>
               </div>
             )}
@@ -411,7 +540,276 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
   )
 }
 
+function jsonArrayToLines(value, key = 'label') {
+  if (!Array.isArray(value)) return ''
+  return value.map(item => {
+    if (typeof item === 'string') return item
+    return item?.[key] || item?.title || item?.name || ''
+  }).filter(Boolean).join('\n')
+}
+
+function linesToChecklist(value) {
+  return String(value || '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(label => ({ label, done: false }))
+}
+
+function linesToRequiredDocs(value) {
+  return String(value || '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+}
+
+function LogisticsWorkspace({ medicalCase, checklists, visas, tourism, canEdit, onChanged }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [isSaving, setIsSaving] = useState(false)
+  const currentChecklist = checklists[0] || null
+  const currentVisa = visas[0] || null
+  const currentTourism = tourism[0] || null
+
+  const [tripForm, setTripForm] = useState({
+    status: currentChecklist?.status || 'OPEN',
+    itemsText: jsonArrayToLines(currentChecklist?.items),
+    managerNotes: currentChecklist?.managerNotes || '',
+  })
+  const [visaForm, setVisaForm] = useState({
+    country: currentVisa?.country || medicalCase.country || '',
+    visaType: currentVisa?.visaType || '',
+    status: currentVisa?.status || 'NOT_STARTED',
+    requiredDocsText: Array.isArray(currentVisa?.requiredDocs) ? currentVisa.requiredDocs.join('\n') : '',
+    notes: currentVisa?.notes || '',
+  })
+  const [tourismForm, setTourismForm] = useState({
+    title: currentTourism?.title || '',
+    city: currentTourism?.city || 'Astana',
+    status: currentTourism?.status || 'DRAFT',
+    totalCost: currentTourism?.totalCost || '',
+    currency: currentTourism?.currency || 'USD',
+    description: currentTourism?.description || '',
+    notes: currentTourism?.notes || '',
+  })
+
+  useEffect(() => {
+    setTripForm({
+      status: currentChecklist?.status || 'OPEN',
+      itemsText: jsonArrayToLines(currentChecklist?.items),
+      managerNotes: currentChecklist?.managerNotes || '',
+    })
+  }, [currentChecklist?.documentId, currentChecklist?.id])
+
+  useEffect(() => {
+    setVisaForm({
+      country: currentVisa?.country || medicalCase.country || '',
+      visaType: currentVisa?.visaType || '',
+      status: currentVisa?.status || 'NOT_STARTED',
+      requiredDocsText: Array.isArray(currentVisa?.requiredDocs) ? currentVisa.requiredDocs.join('\n') : '',
+      notes: currentVisa?.notes || '',
+    })
+  }, [currentVisa?.documentId, currentVisa?.id, medicalCase.country])
+
+  useEffect(() => {
+    setTourismForm({
+      title: currentTourism?.title || '',
+      city: currentTourism?.city || 'Astana',
+      status: currentTourism?.status || 'DRAFT',
+      totalCost: currentTourism?.totalCost || '',
+      currency: currentTourism?.currency || 'USD',
+      description: currentTourism?.description || '',
+      notes: currentTourism?.notes || '',
+    })
+  }, [currentTourism?.documentId, currentTourism?.id])
+
+  const caseId = medicalCase.documentId || medicalCase.id
+
+  const saveTrip = async () => {
+    setIsSaving(true)
+    try {
+      const payload = {
+        medical_case: caseId,
+        status: tripForm.status,
+        items: linesToChecklist(tripForm.itemsText),
+        managerNotes: tripForm.managerNotes,
+      }
+      if (currentChecklist) {
+        await tripChecklistsAPI.update(currentChecklist.documentId || currentChecklist.id, payload)
+      } else {
+        await tripChecklistsAPI.create(payload)
+      }
+      toast.success(t('case_detail.toast_logistics_saved'))
+      onChanged?.()
+    } catch (error) {
+      toast.error(error?.response?.data?.error?.message || t('case_detail.toast_logistics_error'))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const saveVisa = async () => {
+    setIsSaving(true)
+    try {
+      const payload = {
+        medical_case: caseId,
+        country: visaForm.country,
+        visaType: visaForm.visaType,
+        status: visaForm.status,
+        requiredDocs: linesToRequiredDocs(visaForm.requiredDocsText),
+        notes: visaForm.notes,
+      }
+      if (currentVisa) {
+        await visaRequestsAPI.update(currentVisa.documentId || currentVisa.id, payload)
+      } else {
+        await visaRequestsAPI.create(payload)
+      }
+      toast.success(t('case_detail.toast_logistics_saved'))
+      onChanged?.()
+    } catch (error) {
+      toast.error(error?.response?.data?.error?.message || t('case_detail.toast_logistics_error'))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const saveTourism = async () => {
+    setIsSaving(true)
+    try {
+      const payload = {
+        medical_case: caseId,
+        title: tourismForm.title,
+        city: tourismForm.city,
+        status: tourismForm.status,
+        totalCost: tourismForm.totalCost ? Number(tourismForm.totalCost) : null,
+        currency: tourismForm.currency,
+        description: tourismForm.description,
+        notes: tourismForm.notes,
+      }
+      if (currentTourism) {
+        await tourismPackagesAPI.update(currentTourism.documentId || currentTourism.id, payload)
+      } else {
+        await tourismPackagesAPI.create(payload)
+      }
+      toast.success(t('case_detail.toast_logistics_saved'))
+      onChanged?.()
+    } catch (error) {
+      toast.error(error?.response?.data?.error?.message || t('case_detail.toast_logistics_error'))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (!canEdit) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('case_detail.section_travel')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <TimelineItem icon={FileText} title={t('case_detail.trip_checklist')} value={currentChecklist?.status ? t(`case_detail.logistics_${currentChecklist.status.toLowerCase()}`, { defaultValue: currentChecklist.status }) : undefined} muted={!currentChecklist} />
+          <TimelineItem icon={Plane} title={t('case_detail.visa_request')} value={currentVisa?.status ? t(`case_detail.logistics_${currentVisa.status.toLowerCase()}`, { defaultValue: currentVisa.status }) : undefined} muted={!currentVisa} />
+          <TimelineItem icon={Calendar} title={t('case_detail.tourism_package')} value={currentTourism?.status ? t(`case_detail.logistics_${currentTourism.status.toLowerCase()}`, { defaultValue: currentTourism.status }) : undefined} muted={!currentTourism} />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('case_detail.section_travel')}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 font-semibold text-slate-900">
+            <FileText className="w-4 h-4 text-teal-600" />
+            {t('case_detail.trip_checklist')}
+          </div>
+          <Select
+            label={t('case_detail.logistics_status_label')}
+            value={tripForm.status}
+            onChange={(e) => setTripForm(prev => ({ ...prev, status: e.target.value }))}
+            options={['OPEN', 'IN_PROGRESS', 'COMPLETED'].map(value => ({ value, label: t(`case_detail.logistics_${value.toLowerCase()}`, { defaultValue: value }) }))}
+          />
+          <Textarea
+            label={t('case_detail.trip_items_label')}
+            value={tripForm.itemsText}
+            onChange={(e) => setTripForm(prev => ({ ...prev, itemsText: e.target.value }))}
+            rows={4}
+            placeholder={t('case_detail.trip_items_placeholder')}
+          />
+          <Textarea
+            label={t('case_detail.logistics_notes_label')}
+            value={tripForm.managerNotes}
+            onChange={(e) => setTripForm(prev => ({ ...prev, managerNotes: e.target.value }))}
+            rows={2}
+          />
+          <Button size="sm" onClick={saveTrip} disabled={isSaving} leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}>
+            {t('case_detail.save_trip_btn')}
+          </Button>
+        </div>
+
+        <div className="border-t border-slate-100 pt-5 space-y-3">
+          <div className="flex items-center gap-2 font-semibold text-slate-900">
+            <Plane className="w-4 h-4 text-teal-600" />
+            {t('case_detail.visa_request')}
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Input label={t('case_detail.visa_country_label')} value={visaForm.country} onChange={(e) => setVisaForm(prev => ({ ...prev, country: e.target.value }))} />
+            <Input label={t('case_detail.visa_type_label')} value={visaForm.visaType} onChange={(e) => setVisaForm(prev => ({ ...prev, visaType: e.target.value }))} />
+          </div>
+          <Select
+            label={t('case_detail.logistics_status_label')}
+            value={visaForm.status}
+            onChange={(e) => setVisaForm(prev => ({ ...prev, status: e.target.value }))}
+            options={['NOT_STARTED', 'DOCS_REQUESTED', 'DOCS_RECEIVED', 'INVITATION_PREPARING', 'INVITATION_SENT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'NOT_REQUIRED'].map(value => ({ value, label: t(`case_detail.visa_status_${value.toLowerCase()}`, { defaultValue: value }) }))}
+          />
+          <Textarea
+            label={t('case_detail.visa_required_docs_label')}
+            value={visaForm.requiredDocsText}
+            onChange={(e) => setVisaForm(prev => ({ ...prev, requiredDocsText: e.target.value }))}
+            rows={3}
+            placeholder={t('case_detail.visa_required_docs_placeholder')}
+          />
+          <Textarea label={t('case_detail.logistics_notes_label')} value={visaForm.notes} onChange={(e) => setVisaForm(prev => ({ ...prev, notes: e.target.value }))} rows={2} />
+          <Button size="sm" onClick={saveVisa} disabled={isSaving} leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}>
+            {t('case_detail.save_visa_btn')}
+          </Button>
+        </div>
+
+        <div className="border-t border-slate-100 pt-5 space-y-3">
+          <div className="flex items-center gap-2 font-semibold text-slate-900">
+            <Calendar className="w-4 h-4 text-teal-600" />
+            {t('case_detail.tourism_package')}
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <Input label={t('case_detail.tourism_title_label')} value={tourismForm.title} onChange={(e) => setTourismForm(prev => ({ ...prev, title: e.target.value }))} />
+            <Input label={t('case_detail.tourism_city_label')} value={tourismForm.city} onChange={(e) => setTourismForm(prev => ({ ...prev, city: e.target.value }))} />
+          </div>
+          <div className="grid sm:grid-cols-3 gap-3">
+            <Select
+              label={t('case_detail.logistics_status_label')}
+              value={tourismForm.status}
+              onChange={(e) => setTourismForm(prev => ({ ...prev, status: e.target.value }))}
+              options={['DRAFT', 'OFFERED', 'ACCEPTED', 'DECLINED', 'BOOKED', 'COMPLETED', 'CANCELLED'].map(value => ({ value, label: t(`case_detail.tourism_status_${value.toLowerCase()}`, { defaultValue: value }) }))}
+            />
+            <Input label={t('case_detail.plan_cost_label')} type="number" value={tourismForm.totalCost} onChange={(e) => setTourismForm(prev => ({ ...prev, totalCost: e.target.value }))} />
+            <Select label={t('case_detail.plan_currency_label')} value={tourismForm.currency} onChange={(e) => setTourismForm(prev => ({ ...prev, currency: e.target.value }))} options={['USD', 'EUR', 'GBP', 'KZT'].map(value => ({ value, label: value }))} />
+          </div>
+          <Textarea label={t('case_detail.tourism_desc_label')} value={tourismForm.description} onChange={(e) => setTourismForm(prev => ({ ...prev, description: e.target.value }))} rows={3} />
+          <Textarea label={t('case_detail.logistics_notes_label')} value={tourismForm.notes} onChange={(e) => setTourismForm(prev => ({ ...prev, notes: e.target.value }))} rows={2} />
+          <Button size="sm" onClick={saveTourism} disabled={isSaving} leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}>
+            {t('case_detail.save_tourism_btn')}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function MedicalCaseDetail() {
+  const { t } = useTranslation()
   const { id } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
@@ -434,6 +832,7 @@ function MedicalCaseDetail() {
   const [events, setEvents] = useState([])
   const [ledger, setLedger] = useState([])
   const [form, setForm] = useState({})
+  const [showSlotPicker, setShowSlotPicker] = useState(false)
 
   const loadCase = async () => {
     setIsLoading(true)
@@ -451,7 +850,7 @@ function MedicalCaseDetail() {
         tourismNotes: data?.tourismNotes || '',
       })
     } catch (error) {
-      toast.error(error?.response?.data?.error?.message || 'Could not load medical case')
+      toast.error(error?.response?.data?.error?.message || t('case_detail.toast_load_error'))
     } finally {
       setIsLoading(false)
     }
@@ -516,11 +915,18 @@ function MedicalCaseDetail() {
         payload.coordinator = form.coordinator || null
       }
 
+      // Auto-advance to DOCTOR_ASSIGNED when a doctor is first assigned
+      const prevDoctorRef = getRef(medicalCase?.doctor)
+      const PRE_ASSIGNMENT_STATUSES = ['NEW_LEAD', 'REGISTERED', 'WAITING_FOR_DOCUMENTS', 'DOCUMENTS_UPLOADED', 'UNDER_REVIEW']
+      if (form.doctor && !prevDoctorRef && PRE_ASSIGNMENT_STATUSES.includes(normalizeCaseStatus(form.status))) {
+        payload.status = 'DOCTOR_ASSIGNED'
+      }
+
       await medicalCasesAPI.update(id, payload)
-      toast.success('Medical case updated')
+      toast.success(t('case_detail.toast_case_updated'))
       await loadCase()
     } catch (error) {
-      toast.error(error?.response?.data?.error?.message || 'Could not update case')
+      toast.error(error?.response?.data?.error?.message || t('case_detail.toast_case_error'))
     } finally {
       setIsSaving(false)
     }
@@ -535,11 +941,11 @@ function MedicalCaseDetail() {
         ? { manager: user?.documentId || user?.id, status: nextStatus }
         : { coordinator: user?.documentId || user?.id, status: nextStatus }
       await medicalCasesAPI.update(id, payload)
-      toast.success(role === 'manager' ? 'Case assigned to you as manager' : 'Case assigned to you as coordinator')
+      toast.success(role === 'manager' ? t('case_detail.toast_claimed_manager') : t('case_detail.toast_claimed_coordinator'))
       await loadCase()
       await loadReferenceData()
     } catch (error) {
-      toast.error(error?.response?.data?.error?.message || 'Could not claim case')
+      toast.error(error?.response?.data?.error?.message || t('case_detail.toast_claim_error'))
     } finally {
       setIsSaving(false)
     }
@@ -547,7 +953,7 @@ function MedicalCaseDetail() {
 
   const submitDoctorDecision = async (decision) => {
     if (!form.internalNotes?.trim()) {
-      toast.warning('Decision notes are required')
+      toast.warning(t('case_detail.toast_notes_required'))
       return
     }
 
@@ -578,11 +984,11 @@ function MedicalCaseDetail() {
         message,
         metadata: { decision },
       })
-      toast.success('Doctor decision saved')
+      toast.success(t('case_detail.toast_doctor_saved'))
       await loadCase()
       await loadReferenceData()
     } catch (error) {
-      toast.error(error?.response?.data?.error?.message || 'Could not save doctor decision')
+      toast.error(error?.response?.data?.error?.message || t('case_detail.toast_doctor_error'))
     } finally {
       setIsSaving(false)
     }
@@ -590,7 +996,8 @@ function MedicalCaseDetail() {
 
   const selectedClinicDoctors = useMemo(() => {
     if (!form.clinic) return doctors
-    return doctors.filter(doctor => getRef(doctor.clinic) === form.clinic)
+    const linked = doctors.filter(doctor => getRef(doctor.clinic) === form.clinic)
+    return linked.length > 0 ? linked : doctors
   }, [doctors, form.clinic])
 
   const canDoctorDecide = ['doctor', 'admin', 'coordinator'].includes(role)
@@ -602,6 +1009,18 @@ function MedicalCaseDetail() {
       .filter((value, index, values) => values.indexOf(value) === index)
   }, [medicalCase?.status, role])
   const caseSla = getCaseSla(medicalCase)
+
+  const assignedDoctor = useMemo(() => {
+    const docRef = getRef(medicalCase?.doctor)
+    if (!docRef) return null
+    return doctors.find(d => getRef(d) === docRef) || medicalCase?.doctor || null
+  }, [doctors, medicalCase?.doctor])
+
+  const caseStatus = normalizeCaseStatus(medicalCase?.status)
+  const BOOKING_STATUSES = ['DOCTOR_ASSIGNED', 'WAITING_PATIENT_CONFIRMATION', 'UNDER_REVIEW', 'DOCUMENTS_UPLOADED']
+  const canBookSlot = assignedDoctor && BOOKING_STATUSES.includes(caseStatus)
+  const canBookAsStaff = canManage && canBookSlot
+  const canBookAsPatient = role === 'patient' && !!assignedDoctor && BOOKING_STATUSES.includes(caseStatus)
 
   if (isLoading) {
     return (
@@ -615,8 +1034,8 @@ function MedicalCaseDetail() {
     return (
       <Card>
         <CardContent className="p-10 text-center">
-          <p className="font-medium text-slate-900">Medical case not found</p>
-          <Button className="mt-4" onClick={() => navigate(`${base}/cases`)}>Back to cases</Button>
+          <p className="font-medium text-slate-900">{t('case_detail.not_found')}</p>
+          <Button className="mt-4" onClick={() => navigate(`${base}/cases`)}>{t('case_detail.back_to_cases')}</Button>
         </CardContent>
       </Card>
     )
@@ -628,66 +1047,81 @@ function MedicalCaseDetail() {
         <div>
           <Link to={`${base}/cases`} className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 mb-3">
             <ArrowLeft className="w-4 h-4" />
-            Back to cases
+            {t('case_detail.back_to_cases')}
           </Link>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold text-slate-900">{medicalCase.caseNumber || `Case #${medicalCase.id}`}</h1>
-            <Badge variant={STATUS_VARIANTS[normalizeCaseStatus(medicalCase.status)] || 'default'}>{formatStatus(medicalCase.status)}</Badge>
+            <Badge variant={STATUS_VARIANTS[normalizeCaseStatus(medicalCase.status)] || 'default'}>{formatStatus(medicalCase.status, t)}</Badge>
             {caseSla.hours && (
               <Badge variant={caseSla.overdue ? 'danger' : 'secondary'}>
-                {caseSla.overdue ? 'SLA overdue' : `${caseSla.remainingHours}h SLA left`}
+                {caseSla.overdue ? t('case_detail.sla_overdue_badge') : t('case_detail.sla_left_badge', { hours: caseSla.remainingHours })}
               </Badge>
             )}
           </div>
-          <p className="text-slate-600 mt-1">{medicalCase.title || medicalCase.treatmentCategory || 'Medical treatment request'}</p>
+          <p className="text-slate-600 mt-1">{medicalCase.title || medicalCase.treatmentCategory || t('cases.fallback_title')}</p>
         </div>
         {canManage && (
           <div className="flex flex-wrap gap-3">
             {role === 'manager' && !medicalCase.manager && (
               <Button variant="outline" onClick={claimCase} disabled={isSaving}>
-                Claim as manager
+                {t('case_detail.claim_manager')}
               </Button>
             )}
-            {role === 'coordinator' && !medicalCase.coordinator && (
-              <Button variant="outline" onClick={claimCase} disabled={isSaving}>
-                Claim as coordinator
+            {canBookAsStaff && (
+              <Button variant="outline" onClick={() => setShowSlotPicker(true)} leftIcon={<Calendar className="w-4 h-4" />}>
+                {t('case_detail.book_consultation_btn')}
               </Button>
             )}
             <Button onClick={save} disabled={isSaving} leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}>
-              Save changes
+              {t('case_detail.save_changes')}
             </Button>
           </div>
         )}
       </div>
 
+      {role === 'patient' && (
+        <PatientNextStep status={medicalCase.status} />
+      )}
+
+      {canBookAsPatient && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-teal-50 border border-teal-200 rounded-xl">
+          <p className="text-sm text-teal-800">{t('case_detail.patient_book_prompt')}</p>
+          <Button onClick={() => setShowSlotPicker(true)} leftIcon={<Calendar className="w-4 h-4" />} className="shrink-0 w-full sm:w-auto">
+            {t('case_detail.book_consultation_btn')}
+          </Button>
+        </div>
+      )}
+
       <div className="grid xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Patient request</CardTitle>
+              <CardTitle>{t('case_detail.section_patient_request')}</CardTitle>
             </CardHeader>
             <CardContent className="grid md:grid-cols-2 gap-6">
               <div>
-                <h3 className="font-semibold text-slate-900 mb-3">Patient</h3>
-                <DetailRow label="Name" value={medicalCase.patient?.fullName} />
-                <DetailRow label="Email" value={medicalCase.patient?.email} />
-                <DetailRow label="Phone" value={medicalCase.patient?.phone} />
-                <DetailRow label="Country" value={medicalCase.country || medicalCase.patient?.country} />
-                <DetailRow label="Language" value={medicalCase.language || medicalCase.patient?.language} />
-                <DetailRow label="Timezone" value={medicalCase.timezone || medicalCase.patient?.timezone} />
-                <DetailRow label="Preferred contact" value={medicalCase.preferredContact} />
+                <h3 className="font-semibold text-slate-900 mb-3">{t('cases.patient_fallback')}</h3>
+                <DetailRow label={t('case_detail.label_name')} value={medicalCase.patient?.fullName} />
+                <DetailRow label={t('case_detail.label_email')} value={medicalCase.patient?.email} />
+                <DetailRow label={t('case_detail.label_phone')} value={medicalCase.patient?.phone} />
+                <DetailRow label={t('case_detail.label_country')} value={medicalCase.country || medicalCase.patient?.country} />
+                <DetailRow label={t('case_detail.label_language')} value={medicalCase.language || medicalCase.patient?.language} />
+                <DetailRow label={t('case_detail.label_timezone')} value={medicalCase.timezone || medicalCase.patient?.timezone} />
+                <DetailRow label={t('case_detail.label_contact')} value={medicalCase.preferredContact} />
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900 mb-3">Medical info</h3>
-                <DetailRow label="Direction" value={medicalCase.treatmentCategory} />
-                <DetailRow label="Urgency" value={medicalCase.urgency} />
-                <DetailRow label="Preferred arrival" value={formatDesiredDate(medicalCase.desiredDates)} />
-                <DetailRow label="Budget" value={medicalCase.budgetRange} />
-                <DetailRow label="Visa support" value={medicalCase.visaSupportNeeded ? 'Needed' : 'Not requested'} />
-                <DetailRow label="Diagnosis" value={medicalCase.diagnosis} />
-                <DetailRow label="Symptoms" value={medicalCase.symptoms} />
-                <DetailRow label="Current treatment" value={medicalCase.currentTreatment} />
-                <DetailRow label="Tourism" value={medicalCase.tourismRequested ? 'Requested' : 'Not requested'} />
+                <h3 className="font-semibold text-slate-900 mb-3">{t('cases.treatment_dir_label')}</h3>
+                <DetailRow label={t('case_detail.label_direction')} value={medicalCase.treatmentCategory} />
+                <DetailRow label={t('case_detail.label_urgency')} value={medicalCase.urgency ? t(`urgency.${medicalCase.urgency}`) : '—'} />
+                <DetailRow label={t('case_detail.label_arrival')} value={formatDesiredDate(medicalCase.desiredDates)} />
+                <DetailRow label={t('case_detail.label_budget')} value={medicalCase.budgetRange} />
+                <DetailRow label={t('case_detail.label_lead_source')} value={medicalCase.leadSource} />
+                <DetailRow label={t('case_detail.label_lead_campaign')} value={medicalCase.leadCampaign} />
+                <DetailRow label={t('case_detail.label_visa')} value={medicalCase.visaSupportNeeded ? t('case_detail.label_visa_needed') : t('case_detail.label_visa_not')} />
+                <DetailRow label={t('case_detail.label_diagnosis')} value={medicalCase.diagnosis} />
+                <DetailRow label={t('case_detail.label_symptoms')} value={medicalCase.symptoms} />
+                <DetailRow label={t('case_detail.label_current_treatment')} value={medicalCase.currentTreatment} />
+                <DetailRow label={t('case_detail.label_tourism')} value={medicalCase.tourismRequested ? t('case_detail.label_tourism_requested') : t('case_detail.label_tourism_not')} />
               </div>
             </CardContent>
           </Card>
@@ -695,60 +1129,51 @@ function MedicalCaseDetail() {
           {canManage && (
             <Card>
               <CardHeader>
-                <CardTitle>Case management</CardTitle>
+                <CardTitle>{t('case_detail.section_case_mgmt')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="grid md:grid-cols-2 gap-4">
                   <Select
-                    label="Status"
+                    label={t('cases.col_status')}
                     value={form.status}
                     onChange={(e) => update('status', e.target.value)}
-                    options={allowedStatusOptions.map(value => ({ value, label: formatStatus(value) }))}
+                    options={allowedStatusOptions.map(value => ({ value, label: formatStatus(value, t) }))}
                   />
                   <Select
-                    label="Clinic"
+                    label={t('common.clinic')}
                     value={form.clinic}
                     onChange={(e) => {
                       update('clinic', e.target.value)
                       update('doctor', '')
                     }}
-                    placeholder="Not assigned"
+                    placeholder={t('case_detail.not_assigned_placeholder')}
                     options={clinics.map(clinic => ({ value: getRef(clinic), label: clinic.name }))}
                   />
                   <Select
-                    label="Doctor"
+                    label={t('admin_apt.col_doctor')}
                     value={form.doctor}
                     onChange={(e) => update('doctor', e.target.value)}
-                    placeholder="Not assigned"
+                    placeholder={t('case_detail.not_assigned_placeholder')}
                     options={selectedClinicDoctors.map(doctor => ({ value: getRef(doctor), label: doctor.fullName }))}
                   />
                   {role === 'admin' && (
                     <Select
-                      label="Manager"
+                      label={t('cases.col_manager')}
                       value={form.manager}
                       onChange={(e) => update('manager', e.target.value)}
-                      placeholder="Not assigned"
+                      placeholder={t('case_detail.not_assigned_placeholder')}
                       options={managers.map(manager => ({ value: getRef(manager), label: manager.fullName || manager.email }))}
-                    />
-                  )}
-                  {role === 'admin' && (
-                    <Select
-                      label="Coordinator"
-                      value={form.coordinator}
-                      onChange={(e) => update('coordinator', e.target.value)}
-                      placeholder="Not assigned"
-                      options={coordinators.map(coordinator => ({ value: getRef(coordinator), label: coordinator.fullName || coordinator.email }))}
                     />
                   )}
                 </div>
                 <Textarea
-                  label="Internal notes"
+                  label={t('case_detail.label_internal_notes')}
                   value={form.internalNotes}
                   onChange={(e) => update('internalNotes', e.target.value)}
                   rows={4}
                 />
                 <Textarea
-                  label="Tourism notes"
+                  label={t('case_detail.label_tourism_notes')}
                   value={form.tourismNotes}
                   onChange={(e) => update('tourismNotes', e.target.value)}
                   rows={3}
@@ -793,7 +1218,7 @@ function MedicalCaseDetail() {
                     disabled={isSaving}
                     leftIcon={<FileText className="w-4 h-4" />}
                   >
-                    Need more documents
+                    {t('case_detail.need_more_docs')}
                   </Button>
                 </div>
               </CardContent>
@@ -815,20 +1240,20 @@ function MedicalCaseDetail() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Documents and plans</CardTitle>
+              <CardTitle>{t('case_detail.docs_and_plans')}</CardTitle>
             </CardHeader>
             <CardContent className="grid md:grid-cols-2 gap-4">
               <div className="p-4 rounded-xl bg-slate-50">
                 <div className="flex items-center gap-2 mb-2">
                   <FileText className="w-4 h-4 text-teal-600" />
-                  <p className="font-medium text-slate-900">Medical documents</p>
+                  <p className="font-medium text-slate-900">{t('case_detail.medical_docs_count')}</p>
                 </div>
                 <p className="text-2xl font-bold text-slate-900">{medicalCase.medical_documents?.length || 0}</p>
               </div>
               <div className="p-4 rounded-xl bg-slate-50">
                 <div className="flex items-center gap-2 mb-2">
                   <CheckCircle className="w-4 h-4 text-emerald-600" />
-                  <p className="font-medium text-slate-900">Treatment plans</p>
+                  <p className="font-medium text-slate-900">{t('case_detail.treatment_plans_count')}</p>
                 </div>
                 <p className="text-2xl font-bold text-slate-900">{plans.length}</p>
               </div>
@@ -839,35 +1264,35 @@ function MedicalCaseDetail() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Assignments</CardTitle>
+              <CardTitle>{t('case_detail.section_assignments')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <TimelineItem icon={UserRound} title="Manager" value={medicalCase.manager?.fullName} muted={!medicalCase.manager} />
-              <TimelineItem icon={UserRound} title="Coordinator" value={medicalCase.coordinator?.fullName} muted={!medicalCase.coordinator} />
-              <TimelineItem icon={Building2} title="Clinic" value={medicalCase.clinic?.name} muted={!medicalCase.clinic} />
-              <TimelineItem icon={Stethoscope} title="Doctor" value={medicalCase.doctor?.fullName} muted={!medicalCase.doctor} />
+              <TimelineItem icon={UserRound} title={t('case_detail.manager_label')} value={medicalCase.manager?.fullName} muted={!medicalCase.manager} />
+              <TimelineItem icon={Building2} title={t('case_detail.clinic_label')} value={medicalCase.clinic?.name} muted={!medicalCase.clinic} />
+              <TimelineItem icon={Stethoscope} title={t('case_detail.doctor_label')} value={medicalCase.doctor?.fullName} muted={!medicalCase.doctor} />
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Travel workflow</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <TimelineItem icon={FileText} title="Trip checklist" value={checklists[0]?.status} muted={!checklists.length} />
-              <TimelineItem icon={Plane} title="Visa request" value={visas[0]?.status} muted={!visas.length} />
-              <TimelineItem icon={Calendar} title="Tourism package" value={tourism[0]?.status} muted={!tourism.length} />
-            </CardContent>
-          </Card>
+          <LogisticsWorkspace
+            medicalCase={medicalCase}
+            checklists={checklists}
+            visas={visas}
+            tourism={tourism}
+            canEdit={['admin', 'manager'].includes(role)}
+            onChanged={async () => {
+              await loadCase()
+              await loadReferenceData()
+            }}
+          />
 
           {canManage && (
             <Card>
               <CardHeader>
-                <CardTitle>Finance ledger</CardTitle>
+                <CardTitle>{t('case_detail.section_finance')}</CardTitle>
               </CardHeader>
               <CardContent>
                 {ledger.length === 0 ? (
-                  <p className="text-sm text-slate-500">No payment or refund ledger entries yet.</p>
+                  <p className="text-sm text-slate-500">{t('case_detail.no_finance_entries')}</p>
                 ) : (
                   <div className="space-y-3">
                     {ledger.slice(0, 6).map(entry => (
@@ -891,11 +1316,11 @@ function MedicalCaseDetail() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Activity</CardTitle>
+              <CardTitle>{t('case_detail.section_activity')}</CardTitle>
             </CardHeader>
             <CardContent>
               {events.length === 0 ? (
-                <p className="text-sm text-slate-500">No activity yet.</p>
+                <p className="text-sm text-slate-500">{t('case_detail.no_activity')}</p>
               ) : (
                 <div className="space-y-3">
                   {events.slice(-6).map(event => (
@@ -910,6 +1335,16 @@ function MedicalCaseDetail() {
           </Card>
         </div>
       </div>
+
+      <CaseSlotPicker
+        isOpen={showSlotPicker}
+        onClose={() => setShowSlotPicker(false)}
+        doctor={assignedDoctor}
+        caseDocId={medicalCase?.documentId || medicalCase?.id}
+        patientId={medicalCase?.patient?.id}
+        role={role}
+        onBooked={() => { loadCase(); loadReferenceData() }}
+      />
     </div>
   )
 }

@@ -36,6 +36,7 @@ import AdminUsers from './pages/admin/AdminUsers'
 import AdminDoctors from './pages/admin/AdminDoctors'
 import AdminAppointments from './pages/admin/AdminAppointments'
 import AdminSpecializations from './pages/admin/AdminSpecializations'
+import AdminPriceList from './pages/admin/AdminPriceList'
 import AdminContent from './pages/admin/AdminContent'
 import MedicalCasesPage from './pages/cases/MedicalCasesPage'
 import MedicalCaseDetail from './pages/cases/MedicalCaseDetail'
@@ -220,6 +221,7 @@ function App() {
           <Route path="doctors" element={<AdminDoctors />} />
           <Route path="appointments" element={<AdminAppointments />} />
           <Route path="specializations" element={<AdminSpecializations />} />
+          <Route path="prices" element={<AdminPriceList />} />
           <Route path="settings" element={<AdminContent />} />
           <Route path="cases" element={<MedicalCasesPage />} />
           <Route path="cases/:id" element={<MedicalCaseDetail />} />
@@ -254,7 +256,7 @@ function App() {
           <Route path="cases" element={<MedicalCasesPage />} />
           <Route path="cases/:id" element={<MedicalCaseDetail />} />
           <Route path="chat" element={<PatientChat />} />
-          <Route path="doctors" element={<AdminDoctors />} />
+          <Route path="doctors" element={<AdminDoctors readonly />} />
           <Route path="documents" element={<PatientDocuments />} />
         </Route>
 

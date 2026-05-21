@@ -472,6 +472,52 @@ export const contentAPI = {
 };
 
 // ===========================================
+// API для прайскуранта
+// ===========================================
+
+export const priceItemsAPI = {
+    getAll: (params = {}) => {
+        const query = new URLSearchParams();
+        query.append("sort", "sortOrder:asc,title:asc");
+        query.append("pagination[limit]", LARGE_COLLECTION_LIMIT);
+
+        if (!params.includeInactive) {
+            query.append("filters[isActive][$eq]", "true");
+        }
+        if (params.featuredOnly) {
+            query.append("filters[isFeatured][$eq]", "true");
+        }
+        if (params.category) {
+            query.append("filters[category][$eq]", params.category);
+        }
+
+        return api.get(`/api/price-items?${query}`);
+    },
+
+    getOne: (id) => api.get(`/api/price-items/${id}`),
+
+    create: async (data) => {
+        try {
+            return await api.post("/api/price-items?status=published", { data });
+        } catch (error) {
+            if (error?.response?.status === 400 || error?.response?.status === 404) {
+                return api.post("/api/price-items", {
+                    data: {
+                        ...data,
+                        publishedAt: new Date().toISOString(),
+                    },
+                });
+            }
+            throw error;
+        }
+    },
+
+    update: (id, data) => api.put(`/api/price-items/${id}`, { data }),
+
+    delete: (id) => api.delete(`/api/price-items/${id}`),
+};
+
+// ===========================================
 // API для записей на приём
 // ===========================================
 export const appointmentsAPI = {
