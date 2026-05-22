@@ -28,6 +28,11 @@ export default defineConfig(({ mode }) => {
 
   const TURN_CREDENTIAL = env.VITE_TURN_CREDENTIAL || ''
 
+  const productionFrontendHosts = (env.VITE_PRODUCTION_FRONTEND_HOSTS || 'medtour.nnmc.kz,www.medtour.nnmc.kz')
+    .split(',')
+    .map((host) => host.trim())
+    .filter(Boolean)
+
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -44,6 +49,15 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
         },
       },
+    },
+    preview: {
+      host: '0.0.0.0',
+      port: Number(env.PORT) || 1342,
+      allowedHosts: [
+        ...productionFrontendHosts,
+        'localhost',
+        '127.0.0.1',
+      ],
     },
     define: {
       'import.meta.env.VITE_API_URL': JSON.stringify(API_URL),
