@@ -6,7 +6,7 @@ import Button from '../ui/Button'
 import { Card, CardContent } from '../ui/Card'
 import { normalizeResponse, priceItemsAPI } from '../../services/api'
 import { cn } from '../../utils/helpers'
-import { formatPrice, priceListFallbackItems } from '../../utils/pricing'
+import { formatPrice } from '../../utils/pricing'
 
 function getLocalizedField(item, field, lang) {
   return item?.i18n?.[lang]?.[field] || item?.[field] || ''
@@ -68,6 +68,9 @@ function PriceListSection({
   limit,
   featuredOnly = false,
   showCta = false,
+  ctaTo = '/register',
+  ctaLabel,
+  ctaVariant,
   className,
 }) {
   const { t, i18n } = useTranslation()
@@ -106,7 +109,7 @@ function PriceListSection({
   }, [featuredOnly])
 
   const visibleItems = useMemo(() => {
-    const source = loadFailed ? priceListFallbackItems : items
+    const source = loadFailed ? [] : items
     return [...source]
       .filter((item) => item.isActive !== false)
       .sort((a, b) => {
@@ -124,7 +127,7 @@ function PriceListSection({
   )
 
   return (
-    <section className={cn(compact ? 'space-y-4' : 'py-24 bg-slate-50', className)}>
+    <section id={compact ? undefined : 'prices'} className={cn(compact ? 'space-y-4' : 'py-24 bg-slate-50', className)}>
       <div className={compact ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
         <div className={compact ? 'flex items-start justify-between gap-4' : 'text-center mb-12'}>
           <div>
@@ -148,7 +151,11 @@ function PriceListSection({
           </div>
         ) : (
           <div className={cn('space-y-8', compact && 'space-y-5')}>
-            {Object.entries(groupedItems).map(([category, categoryItems]) => (
+            {Object.entries(groupedItems).length === 0 ? (
+              <div className='rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500'>
+                {t('pricing.empty')}
+              </div>
+            ) : Object.entries(groupedItems).map(([category, categoryItems]) => (
               <div key={category}>
                 <div className={cn('mb-4 flex items-center gap-3', compact && 'mb-3')}>
                   <h3 className={cn('font-semibold text-slate-900', compact ? 'text-base' : 'text-xl')}>
@@ -173,9 +180,9 @@ function PriceListSection({
 
         {showCta && (
           <div className='mt-10 flex justify-center'>
-            <Link to='/register'>
-              <Button size='lg' rightIcon={<ArrowRight className='h-5 w-5' />}>
-                {t('pricing.cta')}
+            <Link to={ctaTo}>
+              <Button size='lg' variant={ctaVariant} rightIcon={<ArrowRight className='h-5 w-5' />}>
+                {ctaLabel || t('pricing.cta')}
               </Button>
             </Link>
           </div>

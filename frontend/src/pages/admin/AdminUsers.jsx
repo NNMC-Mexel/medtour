@@ -16,6 +16,7 @@ import Input from '../../components/ui/Input'
 import Avatar from '../../components/ui/Avatar'
 import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
+import { useToast } from '../../components/ui/Toast'
 import api, { getMediaUrl } from '../../services/api'
 import { formatDate } from '../../utils/helpers'
 
@@ -46,6 +47,7 @@ const defaultEditForm = {
 
 function AdminUsers() {
   const { t } = useTranslation()
+  const toast = useToast()
   const [users, setUsers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -118,12 +120,12 @@ function AdminUsers() {
 
   const handleCreateStaff = async (e) => {
     e.preventDefault()
-    if (!createForm.fullName.trim()) return alert(t('admin_users.err_name'))
-    if (!createForm.username.trim()) return alert(t('admin_users.err_login'))
-    if (!createForm.email.trim()) return alert(t('admin_users.err_email'))
-    if (!createForm.password) return alert(t('admin_users.err_password'))
-    if (createForm.password.length < 6) return alert(t('admin_users.err_short_password'))
-    if (createForm.password !== createForm.confirmPassword) return alert(t('admin_users.err_password_mismatch'))
+    if (!createForm.fullName.trim()) return toast.warning(t('admin_users.err_name'))
+    if (!createForm.username.trim()) return toast.warning(t('admin_users.err_login'))
+    if (!createForm.email.trim()) return toast.warning(t('admin_users.err_email'))
+    if (!createForm.password) return toast.warning(t('admin_users.err_password'))
+    if (createForm.password.length < 6) return toast.warning(t('admin_users.err_short_password'))
+    if (createForm.password !== createForm.confirmPassword) return toast.warning(t('admin_users.err_password_mismatch'))
 
     setIsCreating(true)
     try {
@@ -157,7 +159,7 @@ function AdminUsers() {
       await fetchUsers()
     } catch (error) {
       const message = error?.response?.data?.error?.message || error?.message || t('admin_users.err_save')
-      alert(t('admin_users.err_save_msg', { message }))
+      toast.error(t('admin_users.err_save_msg', { message }))
     } finally {
       setIsCreating(false)
     }
@@ -179,11 +181,11 @@ function AdminUsers() {
   const handleEditUser = async (e) => {
     e.preventDefault()
     if (!editingUser) return
-    if (!editForm.fullName.trim()) return alert(t('admin_users.err_name'))
-    if (!editForm.username.trim()) return alert(t('admin_users.err_login'))
-    if (!editForm.email.trim()) return alert(t('admin_users.err_email'))
-    if (editForm.password && editForm.password.length < 6) return alert(t('admin_users.err_short_password'))
-    if (editForm.password !== editForm.confirmPassword) return alert(t('admin_users.err_password_mismatch'))
+    if (!editForm.fullName.trim()) return toast.warning(t('admin_users.err_name'))
+    if (!editForm.username.trim()) return toast.warning(t('admin_users.err_login'))
+    if (!editForm.email.trim()) return toast.warning(t('admin_users.err_email'))
+    if (editForm.password && editForm.password.length < 6) return toast.warning(t('admin_users.err_short_password'))
+    if (editForm.password !== editForm.confirmPassword) return toast.warning(t('admin_users.err_password_mismatch'))
 
     setIsSavingEdit(true)
     try {
@@ -208,7 +210,7 @@ function AdminUsers() {
       setEditForm(defaultEditForm)
     } catch (error) {
       const message = error?.response?.data?.error?.message || error?.message || t('admin_users.err_save')
-      alert(t('admin_users.err_save_msg', { message }))
+      toast.error(t('admin_users.err_save_msg', { message }))
     } finally {
       setIsSavingEdit(false)
     }

@@ -5,7 +5,7 @@ import axios from "axios";
 // =====================================================
 // Frontend:        https://medtour.nnmc.kz
 // Strapi API:      https://medtourserver.nnmc.kz
-// Signaling:       https://medtourrtc.nnmc.kz
+// Signaling:       https://medtoursignaling.nnmc.kz
 // =====================================================
 
 // URL для Strapi API
@@ -13,7 +13,7 @@ const PRODUCTION_API_URL = import.meta.env.VITE_PRODUCTION_API_URL || "https://m
 const DEVELOPMENT_API_URL = "http://localhost:1340";
 
 // URL для Signaling Server
-const PRODUCTION_SIGNALING_URL = import.meta.env.VITE_PRODUCTION_SIGNALING_URL || "https://medtourrtc.nnmc.kz";
+const PRODUCTION_SIGNALING_URL = import.meta.env.VITE_PRODUCTION_SIGNALING_URL || "https://medtoursignaling.nnmc.kz";
 const DEVELOPMENT_SIGNALING_URL = "http://localhost:1341";
 const PRODUCTION_FRONTEND_HOSTS = import.meta.env.VITE_PRODUCTION_FRONTEND_HOSTS
   ? import.meta.env.VITE_PRODUCTION_FRONTEND_HOSTS.split(',').map(h => h.trim())
@@ -363,6 +363,22 @@ export const usersAPI = {
     },
 };
 
+const updatePublishedDocument = async (path, data) => {
+    try {
+        return await api.put(`${path}?status=published`, { data });
+    } catch (error) {
+        if (error?.response?.status === 400 || error?.response?.status === 404) {
+            return api.put(path, {
+                data: {
+                    ...data,
+                    publishedAt: new Date().toISOString(),
+                },
+            });
+        }
+        throw error;
+    }
+};
+
 // ===========================================
 // API для врачей
 // ===========================================
@@ -418,7 +434,7 @@ export const doctorsAPI = {
     },
     
     // Обновление профиля врача (включая настройки расписания)
-    update: (id, data) => api.put(`/api/doctors/${id}`, { data }),
+    update: (id, data) => updatePublishedDocument(`/api/doctors/${id}`, data),
 
     delete: (id) => api.delete(`/api/doctors/${id}`),
     
@@ -455,7 +471,7 @@ export const specializationsAPI = {
         }
     },
 
-    update: (id, data) => api.put(`/api/specializations/${id}`, { data }),
+    update: (id, data) => updatePublishedDocument(`/api/specializations/${id}`, data),
 
     delete: (id) => api.delete(`/api/specializations/${id}`),
 };
@@ -512,7 +528,7 @@ export const priceItemsAPI = {
         }
     },
 
-    update: (id, data) => api.put(`/api/price-items/${id}`, { data }),
+    update: (id, data) => updatePublishedDocument(`/api/price-items/${id}`, data),
 
     delete: (id) => api.delete(`/api/price-items/${id}`),
 };
@@ -626,14 +642,12 @@ export const getBookedSlots = async (doctorId, date) => {
 // ===========================================
 
 export const conversationsAPI = {
-    getAll: (userId) => {
+    getAll: () => {
         const query = new URLSearchParams();
         query.append("populate[users_permissions_users][populate]", "*");
+        query.append("populate[medical_case][populate]", "*");
+        query.append("populate[activeManager][populate]", "*");
         query.append("sort", "updatedAt:desc");
-
-        if (userId) {
-            query.append("filters[users_permissions_users][id][$eq]", userId);
-        }
 
         return api.get(`/api/conversations?${query}`);
     },

@@ -118,6 +118,46 @@ async function createCaseEvent(strapi: any, payload: Record<string, any>) {
   }
 }
 
+async function connectConversationMembers(strapi: any, conversationId: number, participants: any[]) {
+  const ids = participants.map((participant) => participant?.id).filter(Boolean);
+  for (const participantId of ids) {
+    await strapi.query('plugin::users-permissions.user').update({
+      where: { id: participantId },
+      data: { conversations: { connect: [conversationId] } } as any,
+    });
+  }
+}
+
+async function ensureCaseConversation(strapi: any, medicalCase: any) {
+  if (!medicalCase?.documentId && !medicalCase?.id) return null;
+
+  const existing = await strapi.documents('api::conversation.conversation' as any).findMany({
+    filters: { medical_case: { documentId: medicalCase.documentId } },
+    limit: 1,
+  });
+  if (existing[0]) return existing[0];
+
+  const created = await strapi.documents('api::conversation.conversation' as any).create({
+    data: {
+      channel: 'case',
+      lifecycleStatus: 'open',
+      sharedQueue: true,
+      doctorChatEnabled: false,
+      medical_case: medicalCase.documentId || medicalCase.id,
+      lastMessageAt: new Date().toISOString(),
+    },
+    status: 'published',
+  });
+
+  await connectConversationMembers(strapi, created.id, [
+    medicalCase.patient,
+    medicalCase.manager,
+    medicalCase.coordinator,
+  ]);
+
+  return created;
+}
+
 export default factories.createCoreController('api::medical-case.medical-case' as any, () => ({
   async find(ctx) {
     const user = ctx.state.user;
@@ -203,6 +243,12 @@ export default factories.createCoreController('api::medical-case.medical-case' a
       message: 'Medical case created',
       metadata: { role },
     });
+
+    try {
+      await ensureCaseConversation(strapi, created);
+    } catch (error) {
+      strapi.log.error('medical-case conversation create failed:', error);
+    }
 
     // Notify staff about the new lead (async — don't block response)
     sendNewLeadEmailToStaff(strapi, created as any).catch(() => {});

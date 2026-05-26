@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ToastProvider } from './components/ui/Toast'
@@ -14,6 +14,8 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import TourismPage from './pages/TourismPage'
+import PriceListPage from './pages/PriceListPage'
 
 // Patient Pages
 import PatientDashboard from './pages/patient/PatientDashboard'
@@ -120,6 +122,24 @@ function PublicRoute({ children }) {
   return children
 }
 
+function ScrollRestoration() {
+  const location = useLocation()
+
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.slice(1)
+      window.requestAnimationFrame(() => {
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+      })
+      return
+    }
+
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [location.pathname, location.hash])
+
+  return null
+}
+
 function App() {
   const { fetchUser, token, _hasHydrated } = useAuthStore()
 
@@ -132,6 +152,7 @@ function App() {
   return (
     <ToastProvider>
     <BrowserRouter>
+      <ScrollRestoration />
       <Routes>
         {/* Public Routes */}
         <Route element={<PublicLayout />}>
@@ -139,6 +160,8 @@ function App() {
           <Route path="/doctors" element={<DoctorsPage />} />
           <Route path="/doctors/:id" element={<DoctorProfilePage />} />
           <Route path="/specializations" element={<DoctorsPage />} />
+          <Route path="/tourism" element={<TourismPage />} />
+          <Route path="/prices" element={<PriceListPage />} />
           <Route path="/about" element={<LandingPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
@@ -225,6 +248,7 @@ function App() {
           <Route path="settings" element={<AdminContent />} />
           <Route path="cases" element={<MedicalCasesPage />} />
           <Route path="cases/:id" element={<MedicalCaseDetail />} />
+          <Route path="chat" element={<PatientChat />} />
         </Route>
 
         {/* Manager Routes */}

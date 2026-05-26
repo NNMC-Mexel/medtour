@@ -53,6 +53,12 @@ const medTourReadPermissions = [
   'api::medical-case.medical-case.findOne',
   'api::clinic.clinic.find',
   'api::clinic.clinic.findOne',
+  'api::global.global.find',
+  'api::global.global.findOne',
+  'api::about.about.find',
+  'api::about.about.findOne',
+  'api::price-item.price-item.find',
+  'api::price-item.price-item.findOne',
 ];
 
 const medTourPatientPermissions = [
@@ -357,6 +363,10 @@ const roleDefinitions = {
       'api::specialization.specialization.create',
       'api::specialization.specialization.update',
       'api::specialization.specialization.delete',
+      // Price list — полный CRUD
+      'api::price-item.price-item.create',
+      'api::price-item.price-item.update',
+      'api::price-item.price-item.delete',
       // Appointments — полный CRUD
       'api::appointment.appointment.find',
       'api::appointment.appointment.findOne',
@@ -560,6 +570,12 @@ async function seedRolesAndPermissions(strapi: Core.Strapi) {
       'api::specialization.specialization.findOne',
       'api::clinic.clinic.find',
       'api::clinic.clinic.findOne',
+      'api::global.global.find',
+      'api::global.global.findOne',
+      'api::about.about.find',
+      'api::about.about.findOne',
+      'api::price-item.price-item.find',
+      'api::price-item.price-item.findOne',
       'api::review.review.find',
       'api::time-slot.time-slot.find',
       'api::time-slot.time-slot.findOne',
@@ -591,6 +607,42 @@ async function seedRolesAndPermissions(strapi: Core.Strapi) {
       }
     }
     console.log('  Authenticated role stripped to read-only public data.');
+  }
+
+  const publicRole = await strapi
+    .query('plugin::users-permissions.role')
+    .findOne({ where: { type: 'public' } });
+
+  if (publicRole) {
+    const allowedForPublic = [
+      'api::doctor.doctor.find',
+      'api::doctor.doctor.findOne',
+      'api::specialization.specialization.find',
+      'api::specialization.specialization.findOne',
+      'api::clinic.clinic.find',
+      'api::clinic.clinic.findOne',
+      'api::global.global.find',
+      'api::global.global.findOne',
+      'api::about.about.find',
+      'api::about.about.findOne',
+      'api::price-item.price-item.find',
+      'api::price-item.price-item.findOne',
+      'api::review.review.find',
+      'api::time-slot.time-slot.find',
+      'api::time-slot.time-slot.findOne',
+    ];
+
+    for (const action of allowedForPublic) {
+      const existing = await strapi
+        .query('plugin::users-permissions.permission')
+        .findOne({ where: { action, role: publicRole.id } });
+      if (!existing) {
+        await strapi.query('plugin::users-permissions.permission').create({
+          data: { action, role: publicRole.id },
+        });
+      }
+    }
+    console.log('  Public role granted landing read access.');
   }
 
   console.log('Roles and permissions setup complete.');

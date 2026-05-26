@@ -46,7 +46,7 @@ function PatientDashboard() {
     if (user?.id) {
       fetchAppointments()
       fetchDocuments({ user: user.id })
-      fetchConversations(user.id)
+      fetchConversations()
       setCasesLoading(true)
       medicalCasesAPI.getAll()
         .then((response) => {

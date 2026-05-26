@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
     : env.VITE_API_URL || 'http://localhost:1340'
 
   const SIGNALING_SERVER = isProduction
-    ? productionValue(env.VITE_PRODUCTION_SIGNALING_URL) || 'https://medtourrtc.nnmc.kz'
+    ? productionValue(env.VITE_PRODUCTION_SIGNALING_URL) || 'https://medtoursignaling.nnmc.kz'
     : env.VITE_SIGNALING_SERVER || 'http://localhost:1341'
 
   const TURN_URL = isProduction

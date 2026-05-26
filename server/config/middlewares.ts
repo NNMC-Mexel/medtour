@@ -3,6 +3,8 @@ export default ({ env }) => {
   const productionOrigins = env.array('FRONTEND_URLS', [
     env('FRONTEND_URL', 'https://medtour.nnmc.kz'),
     'https://www.medtour.nnmc.kz',
+    'https://medtourserver.nnmc.kz',
+    'https://medtoursignaling.nnmc.kz',
   ]);
   
   return [

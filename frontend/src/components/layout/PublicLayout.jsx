@@ -41,7 +41,7 @@ function PublicLayout() {
             document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const isDarkHeaderPage = location.pathname === "/";
+    const isDarkHeaderPage = location.pathname === "/" || location.pathname === "/tourism";
     const showDarkHeader = isDarkHeaderPage && !isScrolled;
 
     useEffect(() => {
@@ -69,8 +69,10 @@ function PublicLayout() {
 
     const navLinks = [
         { href: "/", label: t("nav.home") },
+        { href: "/tourism", label: t("nav.tourism") },
         { href: "#specializations", label: t("nav.treatments"), isAnchor: true },
         { href: "#process", label: t("nav.process"), isAnchor: true },
+        { href: "/prices", label: t("nav.prices") },
         { href: "#about", label: t("nav.about"), isAnchor: true },
         { href: "#contact", label: t("nav.contacts"), isAnchor: true },
     ];
@@ -223,7 +225,7 @@ function PublicLayout() {
                         </Link>
 
                         {/* Desktop Navigation */}
-                        <nav className='hidden lg:flex items-center gap-8'>
+                        <nav className='hidden lg:flex items-center gap-6'>
                             {navLinks.map((link) => (
                                 <Link
                                     key={link.href}
@@ -382,6 +384,11 @@ function PublicLayout() {
                                     </Link>
                                 </li>
                                 <li>
+                                    <Link to='/tourism' className='text-slate-400 hover:text-white transition-colors text-sm'>
+                                        {t("nav.tourism")}
+                                    </Link>
+                                </li>
+                                <li>
                                     <a href='/#specializations' className='text-slate-400 hover:text-white transition-colors text-sm'>
                                         {t("nav.treatments")}
                                     </a>
@@ -390,6 +397,11 @@ function PublicLayout() {
                                     <a href='/#process' className='text-slate-400 hover:text-white transition-colors text-sm'>
                                         {t("nav.process")}
                                     </a>
+                                </li>
+                                <li>
+                                    <Link to='/prices' className='text-slate-400 hover:text-white transition-colors text-sm'>
+                                        {t("nav.prices")}
+                                    </Link>
                                 </li>
                                 <li>
                                     <Link to='/register' className='text-slate-400 hover:text-white transition-colors text-sm'>

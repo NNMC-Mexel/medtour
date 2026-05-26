@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Eye, FileText, Globe2, LayoutTemplate, Loader2, RefreshCcw, Save } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Textarea from '../../components/ui/Textarea'
+import { useToast } from '../../components/ui/Toast'
 import { contentAPI, normalizeResponse } from '../../services/api'
+import { DEFAULT_CONTENT_LOCALE, SUPPORTED_LOCALES } from '../../utils/locales'
 
 const defaultLandingConfig = {
   hero: {
@@ -132,6 +134,103 @@ const defaultLandingConfig = {
   },
 }
 
+function getDefaultLandingConfigForLocale(i18n, locale) {
+  if (locale === DEFAULT_CONTENT_LOCALE) return defaultLandingConfig
+
+  const lt = i18n.getFixedT(locale)
+  return {
+    hero: {
+      badge: lt('landing.hero.badge'),
+      titlePrefix: lt('landing.hero.title_prefix'),
+      titleHighlight: lt('landing.hero.title_highlight'),
+      description: lt('landing.hero.description'),
+      primaryButtonLabel: lt('landing.hero.find_doctor'),
+      secondaryButtonLabel: lt('landing.hero.register'),
+    },
+    heroCard: {
+      title: lt('landing.hero_card.title'),
+      subtitle: lt('landing.hero_card.subtitle'),
+      items: [
+        { title: lt('landing.hero_card.item_0_title'), description: lt('landing.hero_card.item_0_desc') },
+        { title: lt('landing.hero_card.item_1_title'), description: lt('landing.hero_card.item_1_desc') },
+        { title: lt('landing.hero_card.item_2_title'), description: lt('landing.hero_card.item_2_desc') },
+      ],
+      buttonLabel: lt('landing.hero_card.book_now'),
+    },
+    stats: [
+      { value: '1100+', label: lt('landing.stats.consultations') },
+      { value: '3', label: lt('landing.stats.doctors') },
+      { value: '<2h', label: lt('landing.stats.avg_rating') },
+      { value: '24/7', label: lt('landing.stats.satisfaction') },
+    ],
+    featuresSection: {
+      badge: lt('landing.features.badge'),
+      title: lt('landing.features.title'),
+      subtitle: lt('landing.features.subtitle'),
+      cards: [
+        { title: lt('landing.features.card_0_title'), description: lt('landing.features.card_0_desc') },
+        { title: lt('landing.features.card_1_title'), description: lt('landing.features.card_1_desc') },
+        { title: lt('landing.features.card_2_title'), description: lt('landing.features.card_2_desc') },
+        { title: lt('landing.features.card_3_title'), description: lt('landing.features.card_3_desc') },
+      ],
+    },
+    stepsSection: {
+      badge: lt('landing.steps.badge'),
+      title: lt('landing.steps.title'),
+      subtitle: lt('landing.steps.subtitle'),
+      steps: [
+        { title: lt('landing.steps.step_0_title'), description: lt('landing.steps.step_0_desc') },
+        { title: lt('landing.steps.step_1_title'), description: lt('landing.steps.step_1_desc') },
+        { title: lt('landing.steps.step_2_title'), description: lt('landing.steps.step_2_desc') },
+        { title: lt('landing.steps.step_3_title'), description: lt('landing.steps.step_3_desc') },
+      ],
+    },
+    aboutSection: {
+      badge: lt('landing.about.badge'),
+      title: lt('landing.about.title'),
+      description: lt('landing.about.description'),
+      bullets: [
+        lt('landing.about.bullet_0'),
+        lt('landing.about.bullet_1'),
+        lt('landing.about.bullet_2'),
+        lt('landing.about.bullet_3'),
+      ],
+      buttonLabel: lt('landing.about.join'),
+    },
+    contactSection: {
+      badge: lt('landing.contact.badge'),
+      title: lt('landing.contact.title'),
+      subtitle: lt('landing.contact.subtitle'),
+      phone: {
+        title: lt('landing.contact.phone_title'),
+        note: lt('landing.contact.phone_note'),
+        value: '+7 (717) 270-12-34',
+      },
+      email: {
+        title: lt('landing.contact.email_title'),
+        note: lt('landing.contact.email_note'),
+        value: 'info@medtour.kz',
+      },
+      address: {
+        title: lt('landing.contact.address_title'),
+        note: lt('landing.contact.address_note'),
+        value: lt('footer.address'),
+      },
+      quickCard: {
+        title: lt('landing.contact.quick_title'),
+        description: lt('landing.contact.quick_desc'),
+        bullets: [
+          lt('landing.contact.quick_bullet_0'),
+          lt('landing.contact.quick_bullet_1'),
+          lt('landing.contact.quick_bullet_2'),
+        ],
+        buttonLabel: lt('landing.contact.quick_button'),
+      },
+      mapEmbedUrl: defaultLandingConfig.contactSection.mapEmbedUrl,
+    },
+  }
+}
+
 function mergeConfig(base, incoming) {
   return {
     ...base,
@@ -196,7 +295,8 @@ function arrayToLines(value) {
 }
 
 function AdminContent() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const toast = useToast()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -204,7 +304,19 @@ function AdminContent() {
   const [siteDescription, setSiteDescription] = useState('')
   const [seoMetaTitle, setSeoMetaTitle] = useState('')
   const [seoMetaDescription, setSeoMetaDescription] = useState('')
-  const [landingConfig, setLandingConfig] = useState(defaultLandingConfig)
+  const [activeContentLocale, setActiveContentLocale] = useState(DEFAULT_CONTENT_LOCALE)
+  const [landingConfigs, setLandingConfigs] = useState({})
+
+  const defaultLandingConfigs = useMemo(
+    () =>
+      SUPPORTED_LOCALES.reduce((acc, locale) => {
+        acc[locale.code] = getDefaultLandingConfigForLocale(i18n, locale.code)
+        return acc
+      }, {}),
+    [i18n],
+  )
+
+  const landingConfig = landingConfigs[activeContentLocale] || defaultLandingConfigs[activeContentLocale] || defaultLandingConfig
 
   const heroCardItemsText = useMemo(
     () => landingConfig.heroCard.items.map((item) => `${item.title} | ${item.description}`).join('\n'),
@@ -219,17 +331,27 @@ function AdminContent() {
     [landingConfig.stepsSection.steps],
   )
 
-  const loadContent = async () => {
+  const loadContent = useCallback(async () => {
     setIsLoading(true)
     try {
       const globalRes = await contentAPI.getGlobal()
       const { data: globalData } = normalizeResponse(globalRes)
 
-      const mergedConfig = mergeConfig(defaultLandingConfig, globalData?.landingConfig || {})
-      setLandingConfig(mergedConfig)
+      const incomingConfig = globalData?.landingConfig || {}
+      const nextConfigs = SUPPORTED_LOCALES.reduce((acc, locale) => {
+        const localeDefault = defaultLandingConfigs[locale.code] || defaultLandingConfig
+        const localizedIncoming =
+          incomingConfig?.i18n?.[locale.code] ||
+          (locale.code === DEFAULT_CONTENT_LOCALE && incomingConfig?.hero ? incomingConfig : null)
+
+        acc[locale.code] = mergeConfig(localeDefault, localizedIncoming || {})
+        return acc
+      }, {})
+
+      setLandingConfigs(nextConfigs)
 
       setSiteName(globalData?.siteName || 'MedTour')
-      setSiteDescription(globalData?.siteDescription || mergedConfig.hero.description)
+      setSiteDescription(globalData?.siteDescription || nextConfigs[DEFAULT_CONTENT_LOCALE]?.hero?.description || defaultLandingConfig.hero.description)
       setSeoMetaTitle(globalData?.defaultSeo?.metaTitle || 'MedTour — лечение в Казахстане под ключ')
       setSeoMetaDescription(
         globalData?.defaultSeo?.metaDescription ||
@@ -240,16 +362,18 @@ function AdminContent() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [defaultLandingConfigs])
 
   useEffect(() => {
     loadContent()
-  }, [])
+  }, [loadContent])
 
   const setConfigValue = (path, value) => {
-    setLandingConfig((prev) => {
-      const next = structuredClone(prev)
-      let ref = next
+    setLandingConfigs((prev) => {
+      const baseConfig = prev[activeContentLocale] || defaultLandingConfigs[activeContentLocale] || defaultLandingConfig
+      const nextLocaleConfig = structuredClone(baseConfig)
+      const next = { ...prev, [activeContentLocale]: nextLocaleConfig }
+      let ref = nextLocaleConfig
       for (let i = 0; i < path.length - 1; i += 1) {
         ref = ref[path[i]]
       }
@@ -271,29 +395,38 @@ function AdminContent() {
 
   const handleSave = async () => {
     if (!siteName.trim()) {
-      alert(t('admin_content.err_name'))
+      toast.warning(t('admin_content.err_name'))
       return
     }
 
     setIsSaving(true)
     try {
+      const configsToSave = SUPPORTED_LOCALES.reduce((acc, locale) => {
+        const localeDefault = defaultLandingConfigs[locale.code] || defaultLandingConfig
+        acc[locale.code] = mergeConfig(localeDefault, landingConfigs[locale.code] || {})
+        return acc
+      }, {})
+
       await contentAPI.updateGlobal({
         siteName: siteName.trim(),
-        siteDescription: siteDescription.trim() || landingConfig.hero.description,
+        siteDescription: siteDescription.trim() || configsToSave[DEFAULT_CONTENT_LOCALE].hero.description,
         defaultSeo: {
           metaTitle: seoMetaTitle.trim() || 'MedTour — лечение в Казахстане под ключ',
           metaDescription:
             seoMetaDescription.trim() ||
             'MedTour помогает иностранным пациентам пройти лечение в Казахстане: медицинская заявка, документы, клиника, врач, поездка и сопровождение.',
         },
-        landingConfig,
+        landingConfig: {
+          ...configsToSave[DEFAULT_CONTENT_LOCALE],
+          i18n: configsToSave,
+        },
       })
 
       await loadContent()
-      alert(t('admin_content.saved'))
+      toast.success(t('admin_content.saved'))
     } catch (error) {
       console.error('Error saving content:', error)
-      alert(t('admin_content.err_save'))
+      toast.error(t('admin_content.err_save'))
     } finally {
       setIsSaving(false)
     }
@@ -322,6 +455,23 @@ function AdminContent() {
             {t('admin_content.save')}
           </Button>
         </div>
+      </div>
+
+      <div className='flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm'>
+        {SUPPORTED_LOCALES.map((locale) => (
+          <button
+            key={locale.code}
+            type='button'
+            onClick={() => setActiveContentLocale(locale.code)}
+            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+              activeContentLocale === locale.code
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            {locale.label}
+          </button>
+        ))}
       </div>
 
       <Card>

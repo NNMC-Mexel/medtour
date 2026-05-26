@@ -37,12 +37,14 @@ import Button from "../components/ui/Button";
 import { Card, CardContent } from "../components/ui/Card";
 import PriceListSection from "../components/pricing/PriceListSection";
 import {
+    contentAPI,
     doctorsAPI,
     specializationsAPI,
     getMediaUrl,
     normalizeResponse,
 } from "../services/api";
 import { cn, getInitials, isDoctorOnline, getSpecName } from "../utils/helpers";
+import { DEFAULT_CONTENT_LOCALE } from "../utils/locales";
 
 const doctorCardColors = [
     "bg-gradient-to-br from-teal-400 to-teal-600",
@@ -67,6 +69,58 @@ const specializationIcons = {
     Эндокринолог: Pill,
     default: Stethoscope,
 };
+
+function mergeLandingConfig(base, incoming) {
+    return {
+        ...base,
+        ...(incoming || {}),
+        hero: { ...base.hero, ...(incoming?.hero || {}) },
+        heroCard: {
+            ...base.heroCard,
+            ...(incoming?.heroCard || {}),
+            items: Array.isArray(incoming?.heroCard?.items) && incoming.heroCard.items.length > 0
+                ? incoming.heroCard.items
+                : base.heroCard.items,
+        },
+        stats: Array.isArray(incoming?.stats) && incoming.stats.length > 0 ? incoming.stats : base.stats,
+        featuresSection: {
+            ...base.featuresSection,
+            ...(incoming?.featuresSection || {}),
+            cards: Array.isArray(incoming?.featuresSection?.cards) && incoming.featuresSection.cards.length > 0
+                ? incoming.featuresSection.cards
+                : base.featuresSection.cards,
+        },
+        stepsSection: {
+            ...base.stepsSection,
+            ...(incoming?.stepsSection || {}),
+            steps: Array.isArray(incoming?.stepsSection?.steps) && incoming.stepsSection.steps.length > 0
+                ? incoming.stepsSection.steps
+                : base.stepsSection.steps,
+        },
+        aboutSection: {
+            ...base.aboutSection,
+            ...(incoming?.aboutSection || {}),
+            bullets: Array.isArray(incoming?.aboutSection?.bullets) && incoming.aboutSection.bullets.length > 0
+                ? incoming.aboutSection.bullets
+                : base.aboutSection.bullets,
+        },
+        contactSection: {
+            ...base.contactSection,
+            ...(incoming?.contactSection || {}),
+            phone: { ...base.contactSection.phone, ...(incoming?.contactSection?.phone || {}) },
+            email: { ...base.contactSection.email, ...(incoming?.contactSection?.email || {}) },
+            address: { ...base.contactSection.address, ...(incoming?.contactSection?.address || {}) },
+            quickCard: {
+                ...base.contactSection.quickCard,
+                ...(incoming?.contactSection?.quickCard || {}),
+                bullets:
+                    Array.isArray(incoming?.contactSection?.quickCard?.bullets) && incoming.contactSection.quickCard.bullets.length > 0
+                        ? incoming.contactSection.quickCard.bullets
+                        : base.contactSection.quickCard.bullets,
+            },
+        },
+    };
+}
 
 // Doctors Carousel Component
 function DoctorsCarousel({ doctors }) {
@@ -330,6 +384,7 @@ function LandingPage() {
     const [doctors, setDoctors] = useState([]);
     const [specializations, setSpecializations] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [storedLandingConfig, setStoredLandingConfig] = useState(null);
 
     const cardRef = useRef(null);
     const [cardTransform, setCardTransform] = useState({
@@ -466,6 +521,15 @@ function LandingPage() {
 
                 setDoctors(doctorsData?.slice(0, 8) || []);
                 setSpecializations(specsData?.slice(0, 6) || []);
+
+                try {
+                    const globalRes = await contentAPI.getGlobal();
+                    const { data: globalData } = normalizeResponse(globalRes);
+                    setStoredLandingConfig(globalData?.landingConfig || null);
+                } catch (contentError) {
+                    console.error("Error fetching landing content:", contentError);
+                    setStoredLandingConfig(null);
+                }
             } catch (error) {
                 console.error("Error fetching landing data:", error);
             } finally {
@@ -476,7 +540,14 @@ function LandingPage() {
         fetchData();
     }, []);
 
-    const config = defaultLandingConfig;
+    const config = useMemo(() => {
+        const localizedConfig =
+            storedLandingConfig?.i18n?.[i18n.language] ||
+            storedLandingConfig?.i18n?.[DEFAULT_CONTENT_LOCALE] ||
+            (storedLandingConfig?.hero ? storedLandingConfig : null);
+
+        return mergeLandingConfig(defaultLandingConfig, localizedConfig);
+    }, [defaultLandingConfig, storedLandingConfig, i18n.language]);
 
     return (
         <div className='overflow-hidden'>
@@ -739,7 +810,13 @@ function LandingPage() {
             {/* Top Doctors Carousel */}
             {doctors.length > 0 && <DoctorsCarousel doctors={doctors} />}
 
-            <PriceListSection featuredOnly showCta />
+            <PriceListSection
+                featuredOnly
+                limit={6}
+                showCta
+                ctaTo='/prices'
+                ctaLabel={t('pricing.view_all')}
+            />
 
             {/* Testimonials */}
             <section className='py-24 bg-white'>

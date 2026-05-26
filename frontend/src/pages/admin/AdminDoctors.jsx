@@ -9,6 +9,7 @@ import Textarea from '../../components/ui/Textarea'
 import Modal from '../../components/ui/Modal'
 import Badge from '../../components/ui/Badge'
 import ImageCropModal from '../../components/ui/ImageCropModal'
+import { useToast } from '../../components/ui/Toast'
 import api, { doctorsAPI, getMediaUrl, normalizeResponse, specializationsAPI, uploadFile } from '../../services/api'
 
 const defaultForm = {
@@ -57,6 +58,7 @@ function toPayload(form) {
 
 function AdminDoctors({ readonly = false }) {
   const { t } = useTranslation()
+  const toast = useToast()
   const [doctors, setDoctors] = useState([])
   const [specializations, setSpecializations] = useState([])
   const [search, setSearch] = useState('')
@@ -239,12 +241,12 @@ function AdminDoctors({ readonly = false }) {
     if (!file) return
 
     if (!file.type.startsWith('image/')) {
-      alert(t('admin_doc.err_image_only'))
+      toast.warning(t('admin_doc.err_image_only'))
       return
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert(t('admin_doc.err_size'))
+      toast.warning(t('admin_doc.err_size'))
       return
     }
 
@@ -273,47 +275,47 @@ function AdminDoctors({ readonly = false }) {
     e.preventDefault()
 
     if (!form.username.trim()) {
-      alert(t('admin_doc.err_login'))
+      toast.warning(t('admin_doc.err_login'))
       return
     }
 
     if (!form.email.trim()) {
-      alert(t('admin_doc.err_email'))
+      toast.warning(t('admin_doc.err_email'))
       return
     }
 
     if (!form.fullName.trim()) {
-      alert(t('admin_doc.err_name'))
+      toast.warning(t('admin_doc.err_name'))
       return
     }
 
     if (!form.price || Number(form.price) < 0) {
-      alert(t('admin_doc.err_price'))
+      toast.warning(t('admin_doc.err_price'))
       return
     }
 
     if (!form.licenseNumber.trim()) {
-      alert(t('admin_doc.err_license'))
+      toast.warning(t('admin_doc.err_license'))
       return
     }
 
     if ((!editingDoctor || !(extractUser(editingDoctor.users_permissions_user)?.id)) && !form.password) {
-      alert(t('admin_doc.err_password'))
+      toast.warning(t('admin_doc.err_password'))
       return
     }
 
     if (!doctorRoleId && (!editingDoctor || !(extractUser(editingDoctor.users_permissions_user)?.id))) {
-      alert(t('admin_doc.err_no_role'))
+      toast.error(t('admin_doc.err_no_role'))
       return
     }
 
     if (form.password && form.password.length < 6) {
-      alert(t('admin_doc.err_short_password'))
+      toast.warning(t('admin_doc.err_short_password'))
       return
     }
 
     if (form.password !== form.confirmPassword) {
-      alert(t('admin_doc.err_password_mismatch'))
+      toast.warning(t('admin_doc.err_password_mismatch'))
       return
     }
 
@@ -374,7 +376,7 @@ function AdminDoctors({ readonly = false }) {
     } catch (error) {
       console.error('Error saving doctor:', error)
       const message = error?.response?.data?.error?.message || error?.message || t('admin_doc.err_save')
-      alert(t('admin_doc.err_save_msg', { message }))
+      toast.error(t('admin_doc.err_save_msg', { message }))
     } finally {
       setIsSaving(false)
     }
@@ -391,7 +393,7 @@ function AdminDoctors({ readonly = false }) {
       await loadData()
     } catch (error) {
       console.error('Error deleting doctor:', error)
-      alert(t('admin_doc.err_delete'))
+      toast.error(t('admin_doc.err_delete'))
     }
   }
 

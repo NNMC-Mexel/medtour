@@ -93,6 +93,7 @@ export const ADMIN_NAV_ITEMS = [
   { path: '/admin/users', label: 'nav.admin_users', icon: 'users' },
   { path: '/admin/doctors', label: 'nav.doctors', icon: 'stethoscope' },
   { path: '/admin/appointments', label: 'nav.admin_appointments', icon: 'calendar' },
+  { path: '/admin/chat', label: 'nav.chat', icon: 'message-circle' },
   { path: '/admin/specializations', label: 'nav.admin_specializations', icon: 'tags' },
   { path: '/admin/prices', label: 'nav.admin_prices', icon: 'receipt-text' },
   { path: '/admin/settings', label: 'nav.admin_settings', icon: 'settings' },

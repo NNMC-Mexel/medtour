@@ -63,13 +63,17 @@
     "subtitle": "Sample pricing for consultations and support services. The clinic calculates the final treatment plan after document review.",
     "patient_title": "Price list",
     "patient_subtitle": "Current prices for consultations and support services.",
-    "cta": "Submit a request"
+    "empty": "The price list has not been filled yet.",
+    "cta": "Submit a request",
+    "view_all": "View all"
   },
   "nav": {
     "home": "Home",
     "doctors": "Doctors",
+    "tourism": "Tourism",
     "treatments": "Treatments",
     "process": "Process",
+    "prices": "Price list",
     "specializations": "Specializations",
     "about": "About Us",
     "contacts": "Contacts",
@@ -1446,6 +1450,9 @@
     "err_price": "Enter a valid price",
     "err_save": "Failed to save price",
     "err_delete": "Failed to delete price",
+    "saved": "Price saved",
+    "created": "Price created",
+    "deleted": "Price deleted",
     "not_found": "No price items found",
     "confirm_delete": "Delete price \"{{title}}\"?"
   },

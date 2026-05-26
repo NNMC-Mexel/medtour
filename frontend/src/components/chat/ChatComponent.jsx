@@ -6,7 +6,34 @@ import Button from '../ui/Button'
 import { cn, formatTimeAgo, getSpecName } from '../../utils/helpers'
 import useChatStore from '../../stores/chatStore'
 import useAuthStore from '../../stores/authStore'
-import { getMediaUrl, appointmentsAPI, openMediaInNewTab } from '../../services/api'
+import { getMediaUrl, appointmentsAPI, conversationsAPI, medicalCasesAPI, normalizeResponse, openMediaInNewTab } from '../../services/api'
+
+const ACTIVE_CASE_STATUSES = new Set([
+  'NEW_LEAD',
+  'REGISTERED',
+  'WAITING_FOR_DOCUMENTS',
+  'DOCUMENTS_UPLOADED',
+  'UNDER_REVIEW',
+  'DOCTOR_ASSIGNED',
+  'WAITING_PATIENT_CONFIRMATION',
+  'WAITING_PAYMENT',
+  'CONSULTATION_BOOKED',
+  'CONSULTATION_COMPLETED',
+  'LOCAL_TREATMENT',
+  'TREATMENT_IN_KAZAKHSTAN',
+  'TRAVEL_PREPARATION',
+  'ARRIVED_TO_KAZAKHSTAN',
+  'IN_TREATMENT',
+  'RECOVERY',
+])
+
+const getCaseId = (medicalCase) => medicalCase?.documentId || medicalCase?.id
+
+function conversationCaseId(conversation) {
+  const medicalCase = conversation?.medical_case
+  if (!medicalCase) return null
+  return medicalCase.documentId || medicalCase.id || medicalCase
+}
 
 function ChatComponent({ userRole = 'patient' }) {
   const { t, i18n } = useTranslation()
@@ -41,12 +68,71 @@ function ChatComponent({ userRole = 'patient' }) {
   // Past consultation chats (from appointment.chatLog)
   const [consultationChats, setConsultationChats] = useState([])
   const [selectedConsultation, setSelectedConsultation] = useState(null)
+  const [isBootstrappingCases, setIsBootstrappingCases] = useState(false)
 
   useEffect(() => {
-    if (user?.id) {
-      fetchConversations(user.id)
+    let isMounted = true
+
+    const loadChatIndex = async () => {
+      const existingConversations = await fetchConversations()
+
+      try {
+        setIsBootstrappingCases(true)
+        const response = await medicalCasesAPI.getAll({ sort: 'updatedAt:desc' })
+        const { data } = normalizeResponse(response)
+        const cases = Array.isArray(data) ? data : []
+        const activeCases = cases.filter((item) => ACTIVE_CASE_STATUSES.has(item.status))
+        const relevantCases = activeCases.length > 0 ? activeCases : cases
+
+        if (userRole === 'patient') {
+          const firstCase = relevantCases[0]
+          const hasConversation = firstCase?.conversation || existingConversations.some((conversation) => (
+            String(conversationCaseId(conversation)) === String(getCaseId(firstCase))
+          ))
+          if (firstCase && !hasConversation && isMounted) {
+            const conversation = await conversationsAPI.getForCase(getCaseId(firstCase))
+            const { data: createdConversation } = normalizeResponse(conversation)
+            if (createdConversation && isMounted) {
+              setCurrentConversation(createdConversation)
+              await fetchConversations()
+            }
+          }
+          return
+        }
+
+        if (['manager', 'coordinator', 'admin'].includes(userRole)) {
+          const knownCaseIds = new Set(existingConversations.map((conversation) => String(conversationCaseId(conversation))).filter(Boolean))
+          const casesWithoutConversation = relevantCases
+            .filter((item) => !item.conversation && !knownCaseIds.has(String(getCaseId(item))))
+            .slice(0, 50)
+
+          if (casesWithoutConversation.length > 0) {
+            await Promise.all(
+              casesWithoutConversation.map((item) => (
+                conversationsAPI.getForCase(getCaseId(item)).catch((error) => {
+                  console.error('Error ensuring case conversation:', error)
+                  return null
+                })
+              )),
+            )
+            if (isMounted) await fetchConversations()
+          }
+        }
+      } catch (error) {
+        console.error('Error bootstrapping case conversations:', error)
+      } finally {
+        if (isMounted) setIsBootstrappingCases(false)
+      }
     }
-  }, [user?.id])
+
+    if (user?.id) {
+      loadChatIndex()
+    }
+
+    return () => {
+      isMounted = false
+    }
+  }, [user?.id, userRole])
 
   useEffect(() => {
     if (currentConversation?.id) {
@@ -164,7 +250,7 @@ function ChatComponent({ userRole = 'patient' }) {
 
         {/* Conversations */}
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {isLoading ? (
+          {isLoading || isBootstrappingCases ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
             </div>

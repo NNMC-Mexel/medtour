@@ -10,7 +10,7 @@ const app = express()
 const server = http.createServer(app)
 
 // CORS настройки
-// Production: medtour.nnmc.kz (frontend) — set CORS_ORIGINS env var
+// Production: set CORS_ORIGINS env var for deployed frontend/API/signaling domains
 // Development: localhost ports
 const getCorsOrigin = () => {
   if (process.env.NODE_ENV === 'production') {
@@ -21,6 +21,8 @@ const getCorsOrigin = () => {
     return [
       'https://medtour.nnmc.kz',
       'https://www.medtour.nnmc.kz',
+      'https://medtourserver.nnmc.kz',
+      'https://medtoursignaling.nnmc.kz',
     ];
   }
   // In development allow any localhost origin (Vite may use any port)
@@ -118,7 +120,7 @@ const STRAPI_API_URL = process.env.STRAPI_API_URL
 
 // Public URL of this server — used as ePay callback base (must be reachable by ePay servers)
 const SIGNALING_PUBLIC_URL = process.env.SIGNALING_PUBLIC_URL || (
-  IS_EPAY_TEST ? 'http://localhost:1341' : 'https://medtourrtc.nnmc.kz'
+  IS_EPAY_TEST ? 'http://localhost:1341' : 'https://medtoursignaling.nnmc.kz'
 )
 
 // =====================================================
@@ -1397,7 +1399,7 @@ app.get('/health', (req, res) => {
 })
 
 // Локально signaling-сервер работает на 1341
-// В продакшене на отдельном домене: https://medtourrtc.nnmc.kz
+// В продакшене на отдельном домене: https://medtoursignaling.nnmc.kz
 const PORT = process.env.PORT || 1341
 
 configureRedisAdapter()

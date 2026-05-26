@@ -140,16 +140,18 @@ const useChatStore = create((set, get) => ({
     if (socket?.connected && conversationId) socket.emit('chat:typing', { conversationId, isTyping })
   },
 
-  fetchConversations: async (userId) => {
+  fetchConversations: async () => {
     set({ isLoading: true, error: null })
     try {
       get().connectSocket()
-      const response = await conversationsAPI.getAll(userId)
+      const response = await conversationsAPI.getAll()
       const { data } = normalizeResponse(response)
       set({ conversations: data || [], isLoading: false })
+      return data || []
     } catch (error) {
       console.error('Error fetching conversations:', error)
       set({ error: error.message, isLoading: false, conversations: [] })
+      return []
     }
   },
 

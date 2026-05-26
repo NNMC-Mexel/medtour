@@ -42,6 +42,14 @@ for (const key of required) {
 if (process.env.NODE_ENV === 'production') {
   if (process.env.DATABASE_CLIENT !== 'postgres') fail('DATABASE_CLIENT must be postgres in production');
   if (process.env.PAYMENTS_LIVE !== 'true') fail('PAYMENTS_LIVE=true is required in production');
+  const requiredOrigins = [
+    'https://medtour.nnmc.kz',
+    'https://medtourserver.nnmc.kz',
+    'https://medtoursignaling.nnmc.kz',
+  ];
+  for (const origin of requiredOrigins) {
+    if (!process.env.FRONTEND_URLS?.includes(origin)) fail(`FRONTEND_URLS must include ${origin}`);
+  }
   for (const key of productionRequired) {
     if (!process.env[key]) fail(`${key} is required in production`);
     else console.log(`  [OK] ${key}`);

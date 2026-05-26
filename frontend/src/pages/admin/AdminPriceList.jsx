@@ -7,22 +7,21 @@ import Input from '../../components/ui/Input'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import Textarea from '../../components/ui/Textarea'
+import { useToast } from '../../components/ui/Toast'
 import { normalizeResponse, priceItemsAPI } from '../../services/api'
 import { formatPrice } from '../../utils/pricing'
+import { DEFAULT_CONTENT_LOCALE, SUPPORTED_LOCALES } from '../../utils/locales'
 
 const defaultForm = {
-  title: '',
-  category: '',
-  description: '',
+  translations: {},
   price: '',
   currency: 'KZT',
-  unit: '',
-  badge: '',
-  note: '',
   sortOrder: '',
   isActive: true,
   isFeatured: false,
 }
+
+const priceTextFields = ['title', 'category', 'description', 'unit', 'badge', 'note']
 
 const currencyOptions = [
   { value: 'KZT', label: 'KZT' },
@@ -40,31 +39,74 @@ function sortItems(list) {
   })
 }
 
+function getEmptyTranslations() {
+  return SUPPORTED_LOCALES.reduce((acc, locale) => {
+    acc[locale.code] = priceTextFields.reduce((fields, field) => {
+      fields[field] = ''
+      return fields
+    }, {})
+    return acc
+  }, {})
+}
+
+function getLocalizedField(item, field, lang) {
+  return item?.i18n?.[lang]?.[field] || item?.[field] || ''
+}
+
+function normalizeItemTranslations(item) {
+  const translations = getEmptyTranslations()
+  SUPPORTED_LOCALES.forEach((locale) => {
+    priceTextFields.forEach((field) => {
+      translations[locale.code][field] = getLocalizedField(item, field, locale.code)
+    })
+  })
+  return translations
+}
+
 function toPayload(form, fallbackOrder) {
+  const translations = {
+    ...getEmptyTranslations(),
+    ...(form.translations || {}),
+  }
+  const baseTranslation =
+    translations[DEFAULT_CONTENT_LOCALE] ||
+    translations[SUPPORTED_LOCALES[0]?.code] ||
+    {}
+
   return {
-    title: form.title.trim(),
-    category: form.category.trim(),
-    description: form.description?.trim() || '',
+    title: baseTranslation.title.trim(),
+    category: baseTranslation.category.trim(),
+    description: baseTranslation.description?.trim() || '',
     price: Number(form.price) || 0,
     currency: form.currency || 'KZT',
-    unit: form.unit?.trim() || '',
-    badge: form.badge?.trim() || '',
-    note: form.note?.trim() || '',
+    unit: baseTranslation.unit?.trim() || '',
+    badge: baseTranslation.badge?.trim() || '',
+    note: baseTranslation.note?.trim() || '',
     sortOrder: Number(form.sortOrder) || fallbackOrder,
     isActive: Boolean(form.isActive),
     isFeatured: Boolean(form.isFeatured),
+    i18n: SUPPORTED_LOCALES.reduce((acc, locale) => {
+      const source = translations[locale.code] || {}
+      acc[locale.code] = priceTextFields.reduce((fields, field) => {
+        fields[field] = source[field]?.trim() || ''
+        return fields
+      }, {})
+      return acc
+    }, {}),
   }
 }
 
 function AdminPriceList() {
   const { t } = useTranslation()
+  const toast = useToast()
   const [items, setItems] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
+  const [activeLocale, setActiveLocale] = useState(DEFAULT_CONTENT_LOCALE)
   const [search, setSearch] = useState('')
-  const [form, setForm] = useState(defaultForm)
+  const [form, setForm] = useState({ ...defaultForm, translations: getEmptyTranslations() })
 
   const loadData = async () => {
     setIsLoading(true)
@@ -87,16 +129,17 @@ function AdminPriceList() {
     const query = search.trim().toLowerCase()
     if (!query) return items
     return items.filter((item) =>
-      item.title?.toLowerCase().includes(query) ||
-      item.category?.toLowerCase().includes(query) ||
-      item.description?.toLowerCase().includes(query),
+      getLocalizedField(item, 'title', activeLocale)?.toLowerCase().includes(query) ||
+      getLocalizedField(item, 'category', activeLocale)?.toLowerCase().includes(query) ||
+      getLocalizedField(item, 'description', activeLocale)?.toLowerCase().includes(query),
     )
-  }, [items, search])
+  }, [items, search, activeLocale])
 
   const openCreateModal = () => {
     setEditingItem(null)
     setForm({
       ...defaultForm,
+      translations: getEmptyTranslations(),
       sortOrder: String((items?.length || 0) + 1),
     })
     setIsModalOpen(true)
@@ -105,14 +148,9 @@ function AdminPriceList() {
   const openEditModal = (item) => {
     setEditingItem(item)
     setForm({
-      title: item.title || '',
-      category: item.category || '',
-      description: item.description || '',
+      translations: normalizeItemTranslations(item),
       price: item.price !== undefined ? String(item.price) : '',
       currency: item.currency || 'KZT',
-      unit: item.unit || '',
-      badge: item.badge || '',
-      note: item.note || '',
       sortOrder: item.sortOrder !== undefined ? String(item.sortOrder) : '',
       isActive: item.isActive !== false,
       isFeatured: Boolean(item.isFeatured),
@@ -123,13 +161,14 @@ function AdminPriceList() {
   const handleSave = async (e) => {
     e.preventDefault()
 
-    if (!form.title.trim() || !form.category.trim()) {
-      alert(t('admin_price.err_required'))
+    const baseTranslation = form.translations?.[DEFAULT_CONTENT_LOCALE] || {}
+    if (!baseTranslation.title?.trim() || !baseTranslation.category?.trim()) {
+      toast.warning(t('admin_price.err_required'))
       return
     }
 
     if (Number(form.price) < 0 || Number.isNaN(Number(form.price))) {
-      alert(t('admin_price.err_price'))
+      toast.warning(t('admin_price.err_price'))
       return
     }
 
@@ -145,11 +184,12 @@ function AdminPriceList() {
 
       setIsModalOpen(false)
       setEditingItem(null)
-      setForm(defaultForm)
+      setForm({ ...defaultForm, translations: getEmptyTranslations() })
       await loadData()
+      toast.success(editingItem ? t('admin_price.saved') : t('admin_price.created'))
     } catch (error) {
       console.error('Error saving price item:', error)
-      alert(t('admin_price.err_save'))
+      toast.error(t('admin_price.err_save'))
     } finally {
       setIsSaving(false)
     }
@@ -158,21 +198,37 @@ function AdminPriceList() {
   const handleDelete = async (item) => {
     if (!item?.documentId) return
 
-    const confirmed = window.confirm(t('admin_price.confirm_delete', { title: item.title }))
+    const confirmed = window.confirm(t('admin_price.confirm_delete', { title: getLocalizedField(item, 'title', activeLocale) }))
     if (!confirmed) return
 
     try {
       await priceItemsAPI.delete(item.documentId)
       await loadData()
+      toast.success(t('admin_price.deleted'))
     } catch (error) {
       console.error('Error deleting price item:', error)
-      alert(t('admin_price.err_delete'))
+      toast.error(t('admin_price.err_delete'))
     }
   }
 
   const setFormValue = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
+
+  const setTranslationValue = (key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      translations: {
+        ...prev.translations,
+        [activeLocale]: {
+          ...(prev.translations?.[activeLocale] || {}),
+          [key]: value,
+        },
+      },
+    }))
+  }
+
+  const activeTranslation = form.translations?.[activeLocale] || {}
 
   if (isLoading) {
     return (
@@ -192,6 +248,23 @@ function AdminPriceList() {
         <Button leftIcon={<Plus className='h-4 w-4' />} onClick={openCreateModal}>
           {t('admin_price.add_btn')}
         </Button>
+      </div>
+
+      <div className='flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm'>
+        {SUPPORTED_LOCALES.map((locale) => (
+          <button
+            key={locale.code}
+            type='button'
+            onClick={() => setActiveLocale(locale.code)}
+            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+              activeLocale === locale.code
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+          >
+            {locale.label}
+          </button>
+        ))}
       </div>
 
       <Input
@@ -233,17 +306,17 @@ function AdminPriceList() {
                             <ReceiptText className='h-4 w-4' />
                           </div>
                           <div>
-                            <div className='font-medium text-slate-900'>{item.title}</div>
+                            <div className='font-medium text-slate-900'>{getLocalizedField(item, 'title', activeLocale)}</div>
                             <div className='mt-1 max-w-lg truncate text-sm text-slate-500'>
-                              {item.description || item.note || '—'}
+                              {getLocalizedField(item, 'description', activeLocale) || getLocalizedField(item, 'note', activeLocale) || '—'}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className='px-6 py-4 text-slate-600'>{item.category}</td>
+                      <td className='px-6 py-4 text-slate-600'>{getLocalizedField(item, 'category', activeLocale)}</td>
                       <td className='px-6 py-4'>
                         <div className='font-semibold text-slate-900'>{formatPrice(item.price, item.currency)}</div>
-                        <div className='text-xs text-slate-500'>/ {item.unit || t('admin_price.unit_default')}</div>
+                        <div className='text-xs text-slate-500'>/ {getLocalizedField(item, 'unit', activeLocale) || t('admin_price.unit_default')}</div>
                       </td>
                       <td className='px-6 py-4'>
                         <div className='flex flex-wrap gap-2'>
@@ -303,19 +376,36 @@ function AdminPriceList() {
         }
       >
         <form onSubmit={handleSave} className='space-y-4'>
+          <div className='flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-2'>
+            {SUPPORTED_LOCALES.map((locale) => (
+              <button
+                key={locale.code}
+                type='button'
+                onClick={() => setActiveLocale(locale.code)}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  activeLocale === locale.code
+                    ? 'bg-white text-teal-700 shadow-sm'
+                    : 'text-slate-600 hover:bg-white hover:text-slate-900'
+                }`}
+              >
+                {locale.label}
+              </button>
+            ))}
+          </div>
+
           <div className='grid gap-4 md:grid-cols-2'>
             <Input
               label={t('admin_price.label_title')}
               required
-              value={form.title}
-              onChange={(e) => setFormValue('title', e.target.value)}
+              value={activeTranslation.title || ''}
+              onChange={(e) => setTranslationValue('title', e.target.value)}
               placeholder={t('admin_price.placeholder_title')}
             />
             <Input
               label={t('admin_price.label_category')}
               required
-              value={form.category}
-              onChange={(e) => setFormValue('category', e.target.value)}
+              value={activeTranslation.category || ''}
+              onChange={(e) => setTranslationValue('category', e.target.value)}
               placeholder={t('admin_price.placeholder_category')}
             />
           </div>
@@ -323,8 +413,8 @@ function AdminPriceList() {
           <Textarea
             label={t('admin_price.label_description')}
             rows={3}
-            value={form.description}
-            onChange={(e) => setFormValue('description', e.target.value)}
+            value={activeTranslation.description || ''}
+            onChange={(e) => setTranslationValue('description', e.target.value)}
             placeholder={t('admin_price.placeholder_description')}
           />
 
@@ -346,8 +436,8 @@ function AdminPriceList() {
             />
             <Input
               label={t('admin_price.label_unit')}
-              value={form.unit}
-              onChange={(e) => setFormValue('unit', e.target.value)}
+              value={activeTranslation.unit || ''}
+              onChange={(e) => setTranslationValue('unit', e.target.value)}
               placeholder={t('admin_price.placeholder_unit')}
             />
             <Input
@@ -362,15 +452,15 @@ function AdminPriceList() {
           <div className='grid gap-4 md:grid-cols-2'>
             <Input
               label={t('admin_price.label_badge')}
-              value={form.badge}
-              onChange={(e) => setFormValue('badge', e.target.value)}
+              value={activeTranslation.badge || ''}
+              onChange={(e) => setTranslationValue('badge', e.target.value)}
               placeholder={t('admin_price.placeholder_badge')}
             />
             <Textarea
               label={t('admin_price.label_note')}
               rows={2}
-              value={form.note}
-              onChange={(e) => setFormValue('note', e.target.value)}
+              value={activeTranslation.note || ''}
+              onChange={(e) => setTranslationValue('note', e.target.value)}
               placeholder={t('admin_price.placeholder_note')}
             />
           </div>

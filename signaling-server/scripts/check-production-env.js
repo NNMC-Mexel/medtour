@@ -34,9 +34,16 @@ if (process.env.NODE_ENV === 'production') {
     failed = true;
     console.error('  [FAIL] PAYMENTS_LIVE=true is required in production');
   }
-  if (!process.env.CORS_ORIGINS?.includes('https://medtour.nnmc.kz')) {
-    failed = true;
-    console.error('  [FAIL] CORS_ORIGINS must include production frontend origin');
+  const requiredOrigins = [
+    'https://medtour.nnmc.kz',
+    'https://medtourserver.nnmc.kz',
+    'https://medtoursignaling.nnmc.kz',
+  ];
+  for (const origin of requiredOrigins) {
+    if (!process.env.CORS_ORIGINS?.includes(origin)) {
+      failed = true;
+      console.error(`  [FAIL] CORS_ORIGINS must include ${origin}`);
+    }
   }
   for (const key of paymentKeys) {
     if (!process.env[key]) {
