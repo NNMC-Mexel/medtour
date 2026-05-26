@@ -72,9 +72,13 @@ if (missingPayment.length > 0) {
   console.warn(`[STARTUP] Missing ePay variables (live payments disabled): ${missingPayment.join(', ')}`)
 }
 const PAYMENTS_LIVE = process.env.PAYMENTS_LIVE === 'true'
-if (process.env.NODE_ENV === 'production' && !PAYMENTS_LIVE) {
-  console.error('[STARTUP] PAYMENTS_LIVE=true is required in production')
+const ALLOW_TEST_PAYMENTS_IN_PRODUCTION = process.env.ALLOW_TEST_PAYMENTS_IN_PRODUCTION === 'true'
+if (process.env.NODE_ENV === 'production' && !PAYMENTS_LIVE && !ALLOW_TEST_PAYMENTS_IN_PRODUCTION) {
+  console.error('[STARTUP] PAYMENTS_LIVE=true is required in production unless ALLOW_TEST_PAYMENTS_IN_PRODUCTION=true')
   process.exit(1)
+}
+if (process.env.NODE_ENV === 'production' && !PAYMENTS_LIVE && ALLOW_TEST_PAYMENTS_IN_PRODUCTION) {
+  console.warn('[STARTUP] Test payments are enabled in production; Halyk live payments are disabled')
 }
 if (PAYMENTS_LIVE && missingPayment.length > 0) {
   console.error(`[STARTUP] Missing ePay variables while PAYMENTS_LIVE=true: ${missingPayment.join(', ')}`)

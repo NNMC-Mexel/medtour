@@ -340,6 +340,7 @@ export default factories.createCoreController('api::appointment.appointment', ()
 
     const isFreeConsultation = process.env.FREE_CONSULTATIONS === 'true';
     const isPaymentsLive = process.env.PAYMENTS_LIVE === 'true';
+    const allowTestPaymentsInProduction = process.env.ALLOW_TEST_PAYMENTS_IN_PRODUCTION === 'true';
 
     // When free-consultation mode is active, price is always 0 regardless of the doctor's rate.
     // Price validation is also skipped for case-based and staff-created appointments.
@@ -369,7 +370,7 @@ export default factories.createCoreController('api::appointment.appointment', ()
     // Payment gateway checks are bypassed in free-consultation mode.
     if (!isFreeConsultation) {
       const isProduction = process.env.NODE_ENV === 'production';
-      if (isProduction && !isPaymentsLive && (isApiToken || isPatient)) {
+      if (isProduction && !isPaymentsLive && !allowTestPaymentsInProduction && (isApiToken || isPatient)) {
         return ctx.badRequest('Live payments must be enabled before appointments can be created in production');
       }
       if (!isHumanAdmin && !isApiToken && isPatient && isPaymentsLive) {

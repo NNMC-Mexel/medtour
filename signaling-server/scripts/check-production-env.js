@@ -30,9 +30,12 @@ for (const key of required) {
 }
 
 if (process.env.NODE_ENV === 'production') {
-  if (process.env.PAYMENTS_LIVE !== 'true') {
+  const allowTestPaymentsInProduction = process.env.ALLOW_TEST_PAYMENTS_IN_PRODUCTION === 'true';
+  if (process.env.PAYMENTS_LIVE !== 'true' && !allowTestPaymentsInProduction) {
     failed = true;
-    console.error('  [FAIL] PAYMENTS_LIVE=true is required in production');
+    console.error('  [FAIL] PAYMENTS_LIVE=true is required in production unless ALLOW_TEST_PAYMENTS_IN_PRODUCTION=true');
+  } else if (process.env.PAYMENTS_LIVE !== 'true') {
+    console.warn('  [WARN] Test payments are enabled in production; Halyk live payments are disabled');
   }
   const requiredOrigins = [
     'https://medtour.nnmc.kz',
@@ -45,12 +48,14 @@ if (process.env.NODE_ENV === 'production') {
       console.error(`  [FAIL] CORS_ORIGINS must include ${origin}`);
     }
   }
-  for (const key of paymentKeys) {
-    if (!process.env[key]) {
-      failed = true;
-      console.error(`  [FAIL] ${key} is required when PAYMENTS_LIVE=true`);
-    } else {
-      console.log(`  [OK] ${key}`);
+  if (process.env.PAYMENTS_LIVE === 'true') {
+    for (const key of paymentKeys) {
+      if (!process.env[key]) {
+        failed = true;
+        console.error(`  [FAIL] ${key} is required when PAYMENTS_LIVE=true`);
+      } else {
+        console.log(`  [OK] ${key}`);
+      }
     }
   }
 }
