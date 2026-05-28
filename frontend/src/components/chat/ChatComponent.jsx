@@ -35,6 +35,13 @@ function conversationCaseId(conversation) {
   return medicalCase.documentId || medicalCase.id || medicalCase
 }
 
+const STAFF_CHAT_ROLES = new Set(['manager', 'coordinator', 'admin'])
+
+const getPersonDisplayName = (person) => {
+  if (!person) return ''
+  return person.fullName || person.username || person.name || ''
+}
+
 function ChatComponent({ userRole = 'patient' }) {
   const { t, i18n } = useTranslation()
   const lang = i18n.language
@@ -217,15 +224,38 @@ function ChatComponent({ userRole = 'patient' }) {
     }
   }
 
-  const filteredConversations = conversations.filter(conv => {
-    const participant = conv.participants?.find(p => p.id !== user?.id) || {}
-    const name = participant.fullName || participant.username || ''
-    return name.toLowerCase().includes(searchQuery.toLowerCase())
-  })
-
   const getParticipant = (conv) => {
     return conv.participants?.find(p => p.id !== user?.id) || {}
   }
+
+  const getConversationDisplay = (conv) => {
+    if (userRole === 'patient') {
+      const manager = conv.activeManager || conv.medical_case?.manager || getParticipant(conv)
+      return {
+        person: manager,
+        name: t('chat.manager'),
+      }
+    }
+
+    if (STAFF_CHAT_ROLES.has(userRole)) {
+      const patient = conv.medical_case?.patient || getParticipant(conv)
+      return {
+        person: patient,
+        name: getPersonDisplayName(patient) || t('chat.patient'),
+      }
+    }
+
+    const participant = getParticipant(conv)
+    return {
+      person: participant,
+      name: getPersonDisplayName(participant) || t('chat.interlocutor'),
+    }
+  }
+
+  const filteredConversations = conversations.filter(conv => {
+    const { name } = getConversationDisplay(conv)
+    return name.toLowerCase().includes(searchQuery.toLowerCase())
+  })
 
   return (
     <div className="h-full min-h-0 flex bg-white border-y border-slate-200 sm:border sm:rounded-2xl overflow-hidden">
@@ -263,8 +293,7 @@ function ChatComponent({ userRole = 'patient' }) {
             </div>
           ) : (
             filteredConversations.map((conversation) => {
-              const participant = getParticipant(conversation)
-              const participantName = participant.fullName || participant.username || t('chat.interlocutor')
+              const { person: participant, name: participantName } = getConversationDisplay(conversation)
               const isOnline = participant.isOnline || false
               const spec = userRole === 'patient'
                 ? getSpecName(participant.specialization, lang)
@@ -437,8 +466,7 @@ function ChatComponent({ userRole = 'patient' }) {
                 ←
               </button>
               {(() => {
-                const participant = getParticipant(currentConversation)
-                const participantName = participant.fullName || participant.username || t('chat.interlocutor')
+                const { person: participant, name: participantName } = getConversationDisplay(currentConversation)
                 const isOnline = participant.isOnline || false
                 const spec = userRole === 'patient'
                   ? getSpecName(participant.specialization, lang)

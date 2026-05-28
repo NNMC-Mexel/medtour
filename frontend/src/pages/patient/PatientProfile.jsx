@@ -5,25 +5,37 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Avatar from '../../components/ui/Avatar'
-import PriceListSection from '../../components/pricing/PriceListSection'
+import Modal from '../../components/ui/Modal'
+import { useToast } from '../../components/ui/Toast'
 import useAuthStore from '../../stores/authStore'
 import { formatDate, cn } from '../../utils/helpers'
 
+const getProfileFormData = (user) => ({
+  fullName: user?.fullName || '',
+  email: user?.email || '',
+  phone: user?.phone || '',
+  iin: user?.iin || '',
+  birthDate: user?.birthDate || '',
+  i18n: user?.i18n || {},
+})
+
 function PatientProfile() {
   const { t } = useTranslation()
-  const { user, updateProfile, logout } = useAuthStore()
+  const { user, updateProfile, changePassword, logout } = useAuthStore()
+  const toast = useToast()
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [transLang, setTransLang] = useState('kk')
-  const [formData, setFormData] = useState({
-    fullName: user?.fullName || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    iin: user?.iin || '',
-    birthDate: user?.birthDate || '',
-    address: user?.address || '',
-    i18n: user?.i18n || {},
+  const [formData, setFormData] = useState(() => getProfileFormData(user))
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    password: '',
+    passwordConfirmation: '',
   })
+  const [passwordErrors, setPasswordErrors] = useState({})
+  const visibleFormData = isEditing ? formData : getProfileFormData(user)
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -39,9 +51,74 @@ function PatientProfile() {
 
   const handleSave = async () => {
     setIsSaving(true)
-    await updateProfile(formData)
+    const result = await updateProfile(formData)
     setIsSaving(false)
+
+    if (!result.success) {
+      toast.error(result.error || t('profile.save_error'))
+      return
+    }
+
+    toast.success(t('profile.save_success'))
+    setFormData(getProfileFormData(result.user || user))
     setIsEditing(false)
+  }
+
+  const handleEdit = () => {
+    setFormData(getProfileFormData(user))
+    setIsEditing(true)
+  }
+
+  const handleCancel = () => {
+    setFormData(getProfileFormData(user))
+    setIsEditing(false)
+  }
+
+  const closePasswordModal = () => {
+    if (isChangingPassword) return
+    setIsPasswordModalOpen(false)
+    setPasswordForm({ currentPassword: '', password: '', passwordConfirmation: '' })
+    setPasswordErrors({})
+  }
+
+  const handlePasswordChange = (event) => {
+    const { name, value } = event.target
+    setPasswordForm((prev) => ({ ...prev, [name]: value }))
+    setPasswordErrors((prev) => ({ ...prev, [name]: undefined, submit: undefined }))
+  }
+
+  const validatePasswordForm = () => {
+    const errors = {}
+    if (!passwordForm.currentPassword) errors.currentPassword = t('profile.password_current_required')
+    if (!passwordForm.password || passwordForm.password.length < 6) {
+      errors.password = t('profile.password_min')
+    }
+    if (passwordForm.password && passwordForm.currentPassword === passwordForm.password) {
+      errors.password = t('profile.password_same')
+    }
+    if (passwordForm.password !== passwordForm.passwordConfirmation) {
+      errors.passwordConfirmation = t('profile.password_mismatch')
+    }
+    return errors
+  }
+
+  const handleChangePassword = async (event) => {
+    event.preventDefault()
+    const errors = validatePasswordForm()
+    setPasswordErrors(errors)
+    if (Object.keys(errors).length > 0) return
+
+    setIsChangingPassword(true)
+    const result = await changePassword(passwordForm)
+    setIsChangingPassword(false)
+
+    if (!result.success) {
+      setPasswordErrors({ submit: result.error || t('profile.password_change_error') })
+      return
+    }
+
+    toast.success(t('profile.password_changed'))
+    closePasswordModal()
   }
 
   const profileFields = [
@@ -79,7 +156,7 @@ function PatientProfile() {
           <div className="sm:ml-auto">
             {isEditing ? (
               <div className="flex gap-2">
-                <Button variant="secondary" onClick={() => setIsEditing(false)}>
+                <Button variant="secondary" onClick={handleCancel}>
                   {t('profile.cancel')}
                 </Button>
                 <Button onClick={handleSave} isLoading={isSaving}>
@@ -87,7 +164,7 @@ function PatientProfile() {
                 </Button>
               </div>
             ) : (
-              <Button variant="outline" onClick={() => setIsEditing(true)}>
+              <Button variant="outline" onClick={handleEdit}>
                 {t('profile.edit')}
               </Button>
             )}
@@ -108,7 +185,7 @@ function PatientProfile() {
                 label={field.label}
                 name={field.name}
                 type={field.type}
-                value={formData[field.name]}
+                value={visibleFormData[field.name]}
                 onChange={handleChange}
                 disabled={!isEditing}
                 leftIcon={<field.icon className="w-4 h-4" />}
@@ -153,16 +230,14 @@ function PatientProfile() {
 
           <Input
             label={`${t('profile.full_name')} (${transLang === 'kk' ? 'Қазақша' : 'English'}) — ${t('profile.optional')}`}
-            value={formData.i18n?.[transLang]?.fullName || ''}
+            value={visibleFormData.i18n?.[transLang]?.fullName || ''}
             onChange={(e) => handleI18nChange(transLang, e.target.value)}
             disabled={!isEditing}
-            placeholder={formData.fullName}
+            placeholder={visibleFormData.fullName}
             leftIcon={<User className="w-4 h-4" />}
           />
         </CardContent>
       </Card>
-
-      <PriceListSection compact limit={6} className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm" />
 
       {/* Settings */}
       <div className="grid sm:grid-cols-2 gap-6">
@@ -175,15 +250,29 @@ function PatientProfile() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button variant="outline" className="w-full justify-start">
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => setIsPasswordModalOpen(true)}
+            >
               {t('profile.change_password')}
             </Button>
-            <Button variant="outline" className="w-full justify-start">
-              {t('profile.two_factor')}
-            </Button>
-            <Button variant="outline" className="w-full justify-start">
-              {t('profile.active_sessions')}
-            </Button>
+            {[
+              t('profile.two_factor'),
+              t('profile.active_sessions'),
+            ].map((label) => (
+              <button
+                key={label}
+                type="button"
+                disabled
+                className="w-full min-h-12 px-4 py-2.5 rounded-xl border-2 border-slate-200 text-slate-400 bg-slate-50 cursor-not-allowed flex items-center justify-between gap-3 text-sm font-medium"
+              >
+                <span>{label}</span>
+                <span className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-xs text-slate-500">
+                  {t('profile.in_development')}
+                </span>
+              </button>
+            ))}
           </CardContent>
         </Card>
 
@@ -231,6 +320,61 @@ function PatientProfile() {
           </div>
         </CardContent>
       </Card>
+
+      <Modal
+        isOpen={isPasswordModalOpen}
+        onClose={closePasswordModal}
+        title={t('profile.password_modal_title')}
+        description={t('profile.password_modal_desc')}
+        size="sm"
+        closeOnOverlay={!isChangingPassword}
+        footer={
+          <>
+            <Button variant="secondary" onClick={closePasswordModal} disabled={isChangingPassword}>
+              {t('profile.cancel')}
+            </Button>
+            <Button type="submit" form="change-password-form" isLoading={isChangingPassword}>
+              {t('profile.password_save')}
+            </Button>
+          </>
+        }
+      >
+        <form id="change-password-form" onSubmit={handleChangePassword} className="space-y-4">
+          <Input
+            label={t('profile.password_current')}
+            name="currentPassword"
+            type="password"
+            autoComplete="current-password"
+            value={passwordForm.currentPassword}
+            onChange={handlePasswordChange}
+            error={passwordErrors.currentPassword}
+          />
+          <Input
+            label={t('profile.password_new')}
+            name="password"
+            type="password"
+            autoComplete="new-password"
+            value={passwordForm.password}
+            onChange={handlePasswordChange}
+            error={passwordErrors.password}
+            hint={t('profile.password_hint')}
+          />
+          <Input
+            label={t('profile.password_confirm')}
+            name="passwordConfirmation"
+            type="password"
+            autoComplete="new-password"
+            value={passwordForm.passwordConfirmation}
+            onChange={handlePasswordChange}
+            error={passwordErrors.passwordConfirmation}
+          />
+          {passwordErrors.submit && (
+            <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              {passwordErrors.submit}
+            </p>
+          )}
+        </form>
+      </Modal>
     </div>
   )
 }
