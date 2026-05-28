@@ -14,6 +14,7 @@ import {
   Stethoscope,
   Tags,
   Activity,
+  CircleHelp,
   X,
 } from 'lucide-react'
 import { cn } from '../../utils/helpers'
@@ -34,6 +35,7 @@ const iconMap = {
   'receipt-text': ReceiptText,
   tags: Tags,
   activity: Activity,
+  'circle-help': CircleHelp,
 }
 
 function Sidebar({ navItems, onNavClick }) {

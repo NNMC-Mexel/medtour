@@ -1024,6 +1024,47 @@ export interface ApiGlobalGlobal extends Struct.SingleTypeSchema {
   };
 }
 
+export interface ApiGuideVideoGuideVideo extends Struct.CollectionTypeSchema {
+  collectionName: 'guide_videos';
+  info: {
+    description: 'Patient platform guide videos';
+    displayName: 'Guide Video';
+    pluralName: 'guide-videos';
+    singularName: 'guide-video';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    description: Schema.Attribute.Text;
+    i18n: Schema.Attribute.JSON;
+    icon: Schema.Attribute.Enumeration<
+      ['play', 'upload', 'video', 'chat', 'document']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'play'>;
+    isActive: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::guide-video.guide-video'
+    > &
+      Schema.Attribute.Private;
+    poster: Schema.Attribute.Media<'images'>;
+    publishedAt: Schema.Attribute.DateTime;
+    sortOrder: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    videoFile: Schema.Attribute.Media<'videos'>;
+    videoUrl: Schema.Attribute.String;
+  };
+}
+
 export interface ApiMedicalCaseMedicalCase extends Struct.CollectionTypeSchema {
   collectionName: 'medical_cases';
   info: {
@@ -2201,6 +2242,9 @@ export interface PluginUsersPermissionsUser
         minLength: 6;
       }>;
     phone: Schema.Attribute.String;
+    platformGuideCompleted: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<true>;
+    platformGuideCompletedAt: Schema.Attribute.DateTime;
     provider: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     resetPasswordToken: Schema.Attribute.String & Schema.Attribute.Private;
@@ -2248,6 +2292,7 @@ declare module '@strapi/strapi' {
       'api::doctor.doctor': ApiDoctorDoctor;
       'api::finance-ledger.finance-ledger': ApiFinanceLedgerFinanceLedger;
       'api::global.global': ApiGlobalGlobal;
+      'api::guide-video.guide-video': ApiGuideVideoGuideVideo;
       'api::medical-case.medical-case': ApiMedicalCaseMedicalCase;
       'api::medical-document.medical-document': ApiMedicalDocumentMedicalDocument;
       'api::message.message': ApiMessageMessage;

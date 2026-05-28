@@ -257,18 +257,21 @@ const UPLOAD_ALLOWED_TYPES = [
     'image/jpeg',
     'image/png',
     'image/webp',
+    'video/mp4',
+    'video/webm',
+    'video/quicktime',
     'application/pdf',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]
-const UPLOAD_MAX_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
+const UPLOAD_MAX_SIZE_BYTES = 300 * 1024 * 1024 // 300 MB
 
 export const uploadFile = async (file) => {
     if (!UPLOAD_ALLOWED_TYPES.includes(file.type)) {
-        throw new Error(`Недопустимый тип файла. Разрешены: JPEG, PNG, WebP, PDF, DOC, DOCX`)
+        throw new Error(`Недопустимый тип файла. Разрешены: JPEG, PNG, WebP, MP4, WebM, MOV, PDF, DOC, DOCX`)
     }
     if (file.size > UPLOAD_MAX_SIZE_BYTES) {
-        throw new Error(`Файл слишком большой. Максимальный размер: 10 МБ`)
+        throw new Error(`Файл слишком большой. Максимальный размер: 300 МБ`)
     }
 
     // Sanitize filename — strip path separators and non-printable characters
@@ -349,7 +352,9 @@ export const authAPI = {
 
     getMe: () => api.get("/api/users/me?populate=*"),
 
-    updateProfile: (userId, data) => api.put(`/api/users/${userId}`, data),
+    changePassword: (data) => api.post("/api/auth/change-password", data),
+
+    updateProfile: (_userId, data) => api.put("/api/users/me", data),
 };
 
 export const usersAPI = {
@@ -531,6 +536,39 @@ export const priceItemsAPI = {
     update: (id, data) => updatePublishedDocument(`/api/price-items/${id}`, data),
 
     delete: (id) => api.delete(`/api/price-items/${id}`),
+};
+
+export const guideVideosAPI = {
+    getAll: (params = {}) => {
+        const query = new URLSearchParams();
+        query.append("populate", "*");
+        query.append("sort", "sortOrder:asc,title:asc");
+        query.append("pagination[limit]", LARGE_COLLECTION_LIMIT);
+        if (!params.includeInactive) query.append("filters[isActive][$eq]", "true");
+        return api.get(`/api/guide-videos?${query}`);
+    },
+
+    getOne: (id) => api.get(`/api/guide-videos/${id}?populate=*`),
+
+    create: async (data) => {
+        try {
+            return await api.post("/api/guide-videos?status=published", { data });
+        } catch (error) {
+            if (error?.response?.status === 400 || error?.response?.status === 404) {
+                return api.post("/api/guide-videos", {
+                    data: {
+                        ...data,
+                        publishedAt: new Date().toISOString(),
+                    },
+                });
+            }
+            throw error;
+        }
+    },
+
+    update: (id, data) => updatePublishedDocument(`/api/guide-videos/${id}`, data),
+
+    delete: (id) => api.delete(`/api/guide-videos/${id}`),
 };
 
 // ===========================================

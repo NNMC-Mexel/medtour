@@ -19,6 +19,107 @@
 export default (plugin) => {
   // Сохраняем оригинальную factory-функцию контроллера auth
   const originalAuthFactory = plugin.controllers.auth;
+  const originalUserController = plugin.controllers.user;
+  const originalContentApiRoutes = plugin.routes['content-api'];
+
+  const sanitizeProfilePayload = (body: any) => {
+    const allowedFields = [
+      'fullName',
+      'email',
+      'phone',
+      'country',
+      'language',
+      'timezone',
+      'passportNumber',
+      'iin',
+      'birthDate',
+      'gender',
+      'i18n',
+      'platformGuideCompleted',
+    ];
+
+    const data = allowedFields.reduce((acc: Record<string, any>, field) => {
+      if (Object.prototype.hasOwnProperty.call(body, field)) {
+        const value = body[field];
+        acc[field] = value === '' ? null : value;
+      }
+      return acc;
+    }, {});
+
+    if (Object.prototype.hasOwnProperty.call(data, 'platformGuideCompleted')) {
+      data.platformGuideCompleted = data.platformGuideCompleted === true;
+      data.platformGuideCompletedAt = data.platformGuideCompleted ? new Date().toISOString() : null;
+    }
+
+    return data;
+  };
+
+  plugin.controllers.user = {
+    ...originalUserController,
+
+    async updateMe(ctx) {
+      const authUser = ctx.state.user;
+      if (!authUser) return ctx.unauthorized();
+
+      const requestBody = ctx.request?.body || {};
+      const sourceBody =
+        requestBody?.data && typeof requestBody.data === 'object'
+          ? requestBody.data
+          : requestBody;
+      const data = sanitizeProfilePayload(sourceBody);
+
+      if (Object.keys(data).length === 0) {
+        return ctx.badRequest('No allowed profile fields to update');
+      }
+
+      const currentUser = await strapi.query('plugin::users-permissions.user').findOne({
+        where: { id: authUser.id },
+      });
+      if (!currentUser) return ctx.notFound('User not found');
+
+      if (data.email) {
+        const email = String(data.email).trim().toLowerCase();
+        const sameEmailUser = await strapi.query('plugin::users-permissions.user').findOne({
+          where: { email },
+        });
+        if (sameEmailUser && String(sameEmailUser.id) !== String(authUser.id)) {
+          return ctx.badRequest('Email already taken');
+        }
+        data.email = email;
+        if (currentUser.username === currentUser.email) data.username = email;
+      }
+
+      const updated = await strapi.query('plugin::users-permissions.user').update({
+        where: { id: authUser.id },
+        data,
+        populate: { avatar: true, role: true },
+      });
+
+      const schema = strapi.getModel('plugin::users-permissions.user');
+      ctx.body = await strapi.contentAPI.sanitize.output(updated, schema, { auth: ctx.state.auth });
+    },
+  };
+
+  plugin.routes['content-api'] = (strapi) => {
+    const router = originalContentApiRoutes(strapi);
+    const routes = Array.isArray(router) ? router : router.routes;
+    const updateMeRoute = {
+      method: 'PUT',
+      path: '/users/me',
+      handler: 'user.updateMe',
+      config: { prefix: '' },
+    };
+    const userUpdateIndex = routes.findIndex((route: any) => route.method === 'PUT' && route.path === '/users/:id');
+    const nextRoutes = userUpdateIndex === -1
+      ? [...routes, updateMeRoute]
+      : [
+          ...routes.slice(0, userUpdateIndex),
+          updateMeRoute,
+          ...routes.slice(userUpdateIndex),
+        ];
+
+    return Array.isArray(router) ? nextRoutes : { ...router, routes: nextRoutes };
+  };
 
   // Заменяем на новую factory, которая оборачивает оригинальную
   plugin.controllers.auth = (factoryContext) => {
@@ -162,6 +263,8 @@ export default (plugin) => {
               phone: phone || null,
               country: country || null,
               iin: iin || null,
+              platformGuideCompleted: false,
+              platformGuideCompletedAt: null,
               role: roleId,
             },
           });
@@ -173,6 +276,8 @@ export default (plugin) => {
           responseBody.user.fullName = fullName || null;
           responseBody.user.phone = phone || null;
           responseBody.user.country = country || null;
+          responseBody.user.platformGuideCompleted = false;
+          responseBody.user.platformGuideCompletedAt = null;
 
           if (ctx.response?.body) {
             ctx.response.body = responseBody;

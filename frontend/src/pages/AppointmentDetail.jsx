@@ -757,18 +757,6 @@ function AppointmentDetail() {
             </CardContent>
           </Card>
 
-          {/* Price */}
-          {(appointment.price || appointment.doctor?.price) && (
-            <Card>
-              <CardContent>
-                <p className="text-sm text-slate-500 mb-1">{t('appointment_detail.price_label')}</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {(appointment.price || appointment.doctor?.price || 0).toLocaleString(dateLocale)} ₸
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Window info card (doctor only, completed) */}
           {isDoctor && isCompleted && (
             <Card>

@@ -59,6 +59,8 @@ const medTourReadPermissions = [
   'api::about.about.findOne',
   'api::price-item.price-item.find',
   'api::price-item.price-item.findOne',
+  'api::guide-video.guide-video.find',
+  'api::guide-video.guide-video.findOne',
 ];
 
 const medTourPatientPermissions = [
@@ -201,6 +203,8 @@ const roleDefinitions = {
       'plugin::upload.content-api.findOne',
       // Users-permissions — профиль
       'plugin::users-permissions.user.me',
+      'plugin::users-permissions.user.updateMe',
+      'plugin::users-permissions.auth.changePassword',
     ],
   },
   doctor: {
@@ -256,6 +260,8 @@ const roleDefinitions = {
       'plugin::upload.content-api.findOne',
       // Users-permissions — профиль
       'plugin::users-permissions.user.me',
+      'plugin::users-permissions.user.updateMe',
+      'plugin::users-permissions.auth.changePassword',
     ],
   },
   manager: {
@@ -299,6 +305,8 @@ const roleDefinitions = {
       'plugin::upload.content-api.find',
       'plugin::upload.content-api.findOne',
       'plugin::users-permissions.user.me',
+      'plugin::users-permissions.user.updateMe',
+      'plugin::users-permissions.auth.changePassword',
     ],
   },
   coordinator: {
@@ -341,6 +349,8 @@ const roleDefinitions = {
       'plugin::upload.content-api.find',
       'plugin::upload.content-api.findOne',
       'plugin::users-permissions.user.me',
+      'plugin::users-permissions.user.updateMe',
+      'plugin::users-permissions.auth.changePassword',
     ],
   },
   admin: {
@@ -367,6 +377,10 @@ const roleDefinitions = {
       'api::price-item.price-item.create',
       'api::price-item.price-item.update',
       'api::price-item.price-item.delete',
+      // Patient guide videos — полный CRUD
+      'api::guide-video.guide-video.create',
+      'api::guide-video.guide-video.update',
+      'api::guide-video.guide-video.delete',
       // Appointments — полный CRUD
       'api::appointment.appointment.find',
       'api::appointment.appointment.findOne',
@@ -439,6 +453,8 @@ const roleDefinitions = {
       'plugin::users-permissions.user.update',
       'plugin::users-permissions.user.destroy',
       'plugin::users-permissions.user.me',
+      'plugin::users-permissions.user.updateMe',
+      'plugin::users-permissions.auth.changePassword',
     ],
   },
 };
@@ -576,10 +592,14 @@ async function seedRolesAndPermissions(strapi: Core.Strapi) {
       'api::about.about.findOne',
       'api::price-item.price-item.find',
       'api::price-item.price-item.findOne',
+      'api::guide-video.guide-video.find',
+      'api::guide-video.guide-video.findOne',
       'api::review.review.find',
       'api::time-slot.time-slot.find',
       'api::time-slot.time-slot.findOne',
       'plugin::users-permissions.user.me',
+      'plugin::users-permissions.user.updateMe',
+      'plugin::users-permissions.auth.changePassword',
     ];
 
     // Удаляем все текущие permissions этой роли
@@ -627,6 +647,8 @@ async function seedRolesAndPermissions(strapi: Core.Strapi) {
       'api::about.about.findOne',
       'api::price-item.price-item.find',
       'api::price-item.price-item.findOne',
+      'api::guide-video.guide-video.find',
+      'api::guide-video.guide-video.findOne',
       'api::review.review.find',
       'api::time-slot.time-slot.find',
       'api::time-slot.time-slot.findOne',

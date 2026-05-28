@@ -1,0 +1,53 @@
+{
+  "kind": "collectionType",
+  "collectionName": "guide_videos",
+  "info": {
+    "singularName": "guide-video",
+    "pluralName": "guide-videos",
+    "displayName": "Guide Video",
+    "description": "Patient platform guide videos"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "text"
+    },
+    "videoUrl": {
+      "type": "string"
+    },
+    "videoFile": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": ["videos"]
+    },
+    "poster": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": ["images"]
+    },
+    "icon": {
+      "type": "enumeration",
+      "enum": ["play", "upload", "video", "chat", "document"],
+      "default": "play",
+      "required": true
+    },
+    "sortOrder": {
+      "type": "integer",
+      "default": 0
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true
+    },
+    "i18n": {
+      "type": "json"
+    }
+  }
+}

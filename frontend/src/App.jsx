@@ -23,6 +23,7 @@ import PatientAppointments from './pages/patient/PatientAppointments'
 import PatientProfile from './pages/patient/PatientProfile'
 import PatientChat from './pages/patient/PatientChat'
 import PatientDocuments from './pages/patient/PatientDocuments'
+import PatientGuide from './pages/patient/PatientGuide'
 import AppointmentDetail from './pages/AppointmentDetail'
 
 // Doctor Pages
@@ -39,6 +40,7 @@ import AdminDoctors from './pages/admin/AdminDoctors'
 import AdminAppointments from './pages/admin/AdminAppointments'
 import AdminSpecializations from './pages/admin/AdminSpecializations'
 import AdminPriceList from './pages/admin/AdminPriceList'
+import AdminGuideVideos from './pages/admin/AdminGuideVideos'
 import AdminContent from './pages/admin/AdminContent'
 import MedicalCasesPage from './pages/cases/MedicalCasesPage'
 import MedicalCaseDetail from './pages/cases/MedicalCaseDetail'
@@ -72,8 +74,18 @@ function LoadingScreen() {
 }
 
 // Protected Route Component
+function getRoleHomePath(userRole, user) {
+  if (userRole === 'doctor') return '/doctor'
+  if (userRole === 'admin') return '/admin'
+  if (userRole === 'manager') return '/manager'
+  if (userRole === 'coordinator') return '/coordinator'
+  if (user?.platformGuideCompleted === false) return '/patient/guide'
+  return '/patient'
+}
+
 function ProtectedRoute({ children, allowedRoles = [] }) {
   const { isAuthenticated, user, _hasHydrated } = useAuthStore()
+  const location = useLocation()
   
   // Ждём пока zustand загрузит данные из localStorage
   if (!_hasHydrated) {
@@ -88,12 +100,16 @@ function ProtectedRoute({ children, allowedRoles = [] }) {
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
-    // Redirect to appropriate dashboard based on role
-    if (userRole === 'doctor') return <Navigate to="/doctor" replace />
-    if (userRole === 'admin') return <Navigate to="/admin" replace />
-    if (userRole === 'manager') return <Navigate to="/manager" replace />
-    if (userRole === 'coordinator') return <Navigate to="/coordinator" replace />
-    return <Navigate to="/patient" replace />
+    return <Navigate to={getRoleHomePath(userRole, user)} replace />
+  }
+
+  if (userRole === 'patient') {
+    const isGuidePath = location.pathname.startsWith('/patient/guide')
+
+    if (user?.platformGuideCompleted === false && !isGuidePath) {
+      return <Navigate to="/patient/guide" replace />
+    }
+
   }
 
   return children
@@ -112,11 +128,7 @@ function PublicRoute({ children }) {
   const userRole = user?.userRole || 'patient'
 
   if (isAuthenticated) {
-    if (userRole === 'doctor') return <Navigate to="/doctor" replace />
-    if (userRole === 'admin') return <Navigate to="/admin" replace />
-    if (userRole === 'manager') return <Navigate to="/manager" replace />
-    if (userRole === 'coordinator') return <Navigate to="/coordinator" replace />
-    return <Navigate to="/patient" replace />
+    return <Navigate to={getRoleHomePath(userRole, user)} replace />
   }
 
   return children
@@ -197,6 +209,7 @@ function App() {
           }
         >
           <Route index element={<PatientDashboard />} />
+          <Route path="guide" element={<PatientGuide />} />
           <Route path="cases" element={<MedicalCasesPage />} />
           <Route path="cases/:id" element={<MedicalCaseDetail />} />
           <Route path="appointments" element={<PatientAppointments />} />
@@ -245,6 +258,7 @@ function App() {
           <Route path="appointments" element={<AdminAppointments />} />
           <Route path="specializations" element={<AdminSpecializations />} />
           <Route path="prices" element={<AdminPriceList />} />
+          <Route path="guide-videos" element={<AdminGuideVideos />} />
           <Route path="settings" element={<AdminContent />} />
           <Route path="cases" element={<MedicalCasesPage />} />
           <Route path="cases/:id" element={<MedicalCaseDetail />} />

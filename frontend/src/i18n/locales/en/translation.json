@@ -85,6 +85,7 @@
     "medical_cases": "Medical Cases",
     "chat": "Messages",
     "documents": "Documents",
+    "guide": "Guide",
     "profile": "Profile",
     "schedule": "Schedule",
     "patients": "Patients",
@@ -94,6 +95,7 @@
     "admin_appointments": "Appointments",
     "admin_specializations": "Specializations",
     "admin_prices": "Price List",
+    "admin_guide_videos": "Guide Videos",
     "admin_settings": "Site Content",
     "login_as_patient": "Sign in as Patient",
     "login_as_doctor": "Sign in as Doctor",
@@ -343,6 +345,8 @@
       "/patient/chat_sub": "Chat with the MedTour team",
       "/patient/documents": "Documents",
       "/patient/documents_sub": "Medical documents",
+      "/patient/guide": "Guide",
+      "/patient/guide_sub": "A short start with the MedTour platform",
       "/patient/profile": "Profile",
       "/patient/profile_sub": "Personal information",
       "/doctor": "Home",
@@ -369,6 +373,8 @@
       "/admin/appointments_sub": "All appointments",
       "/admin/specializations": "Specializations",
       "/admin/specializations_sub": "Doctor directions",
+      "/admin/guide-videos": "Guide Videos",
+      "/admin/guide-videos_sub": "Manage patient training materials",
       "/admin/settings": "Settings",
       "/admin/settings_sub": "System settings",
       "/manager": "Medical Cases",
@@ -719,7 +725,23 @@
     "logout": "Sign out",
     "cancel": "Cancel",
     "save": "Save",
+    "save_success": "Profile saved",
+    "save_error": "Could not save profile",
     "edit": "Edit",
+    "in_development": "In development",
+    "password_modal_title": "Change password",
+    "password_modal_desc": "Enter your current password and a new sign-in password.",
+    "password_current": "Current password",
+    "password_new": "New password",
+    "password_confirm": "Repeat new password",
+    "password_save": "Change password",
+    "password_hint": "Minimum 6 characters.",
+    "password_current_required": "Enter your current password",
+    "password_min": "New password must be at least 6 characters",
+    "password_same": "New password must be different from the current password",
+    "password_mismatch": "Passwords do not match",
+    "password_changed": "Password changed",
+    "password_change_error": "Could not change password",
     "translations_title": "My name in other languages",
     "translations_hint": "If left empty, doctors will see your name in Russian.",
     "optional": "optional"
@@ -1908,6 +1930,8 @@
     "no_conversations": "No conversations",
     "no_conversations_hint": "Conversations will appear after booking an appointment",
     "interlocutor": "Interlocutor",
+    "manager": "Manager",
+    "patient": "Patient",
     "no_messages": "No messages",
     "start_dialog": "Be the first to start the conversation!",
     "history_title": "Consultation history",
@@ -1940,5 +1964,33 @@
     "step5_desc": "You will receive a personalised treatment plan with procedures, cost, and timeline. You can accept or decline it.",
     "step6_title": "Arrival & treatment in Kazakhstan",
     "step6_desc": "Our coordinator will arrange your visa, hotel, and airport transfer. You will be met and guided through every stage of treatment."
+  },
+  "platform_guide": {
+    "badge": "First sign-in",
+    "title": "How to use the MedTour platform",
+    "subtitle": "Watch the short videos before getting started: how to create a medical case, upload documents, join a consultation and communicate with the support team.",
+    "finish": "Go to dashboard",
+    "video_pending": "The MedTour team will add this video.",
+    "error": "Could not save guide status",
+    "after_title": "After the guide",
+    "after_desc": "The dashboard will open. This guide will not be shown automatically again.",
+    "videos": {
+      "start": {
+        "title": "First step in the portal",
+        "desc": "What to open after registration and how to start a medical case."
+      },
+      "documents": {
+        "title": "Uploading documents",
+        "desc": "Which files the doctor needs and where they are stored."
+      },
+      "consultation": {
+        "title": "Online consultation",
+        "desc": "How to choose a time, join the video call and receive the doctor's summary."
+      },
+      "chat": {
+        "title": "Messages and support",
+        "desc": "Where to talk to your manager and receive case updates."
+      }
+    }
   }
 }

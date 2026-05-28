@@ -171,6 +171,13 @@
       "type": "boolean",
       "default": false
     },
+    "platformGuideCompleted": {
+      "type": "boolean",
+      "default": true
+    },
+    "platformGuideCompletedAt": {
+      "type": "datetime"
+    },
     "i18n": {
       "type": "json"
     }

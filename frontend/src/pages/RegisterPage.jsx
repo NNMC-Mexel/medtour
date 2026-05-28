@@ -123,7 +123,7 @@ function RegisterPage() {
     }
 
     const result = await register(userData)
-    if (result.success) navigate('/patient')
+    if (result.success) navigate('/patient/guide')
   }
 
   const patientBenefits = [

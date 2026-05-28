@@ -136,15 +136,62 @@ const useAuthStore = create(
       updateProfile: async (data) => {
         set({ isLoading: true, error: null })
         try {
-          const userId = get().user?.id
-          const token = get().token
-          const response = await api.put(`/api/users/${userId}`, data, {
-            headers: { Authorization: `Bearer ${token}` }
-          })
-          set({ user: response.data, isLoading: false })
-          return { success: true }
+          const currentUser = get().user
+          const profileData = {
+            fullName: data.fullName || null,
+            email: data.email || null,
+            phone: data.phone || null,
+            iin: data.iin || null,
+            birthDate: data.birthDate || null,
+            i18n: data.i18n || {},
+          }
+          const response = await api.put('/api/users/me', profileData)
+          set({ user: { ...currentUser, ...profileData, ...response.data }, isLoading: false })
+          return { success: true, user: response.data }
         } catch (error) {
           const message = error.response?.data?.error?.message || 'Ошибка обновления'
+          set({ error: message, isLoading: false })
+          return { success: false, error: message }
+        }
+      },
+
+      changePassword: async ({ currentPassword, password, passwordConfirmation }) => {
+        set({ isLoading: true, error: null })
+        try {
+          const response = await authAPI.changePassword({
+            currentPassword,
+            password,
+            passwordConfirmation,
+          })
+          const { jwt, user } = response.data || {}
+          set((state) => ({
+            token: jwt || state.token,
+            user: user || state.user,
+            isAuthenticated: true,
+            isLoading: false,
+          }))
+          return { success: true }
+        } catch (error) {
+          const message = error.response?.data?.error?.message || 'Ошибка смены пароля'
+          set({ error: message, isLoading: false })
+          return { success: false, error: message }
+        }
+      },
+
+      completePlatformGuide: async () => {
+        set({ isLoading: true, error: null })
+        try {
+          const currentUser = get().user
+          const response = await api.put('/api/users/me', {
+            platformGuideCompleted: true,
+          })
+          set({
+            user: { ...currentUser, ...response.data },
+            isLoading: false,
+          })
+          return { success: true, user: response.data }
+        } catch (error) {
+          const message = error.response?.data?.error?.message || 'Ошибка сохранения обучения'
           set({ error: message, isLoading: false })
           return { success: false, error: message }
         }
