@@ -22,6 +22,50 @@ export default (plugin) => {
   const originalUserController = plugin.controllers.user;
   const originalContentApiRoutes = plugin.routes['content-api'];
 
+  const allowedUserRoles = ['patient', 'doctor', 'manager', 'coordinator', 'admin'];
+
+  const resolveRoleByType = async (roleType: string) => {
+    let role = await strapi
+      .query('plugin::users-permissions.role')
+      .findOne({ where: { type: roleType } });
+
+    if (!role) {
+      const roleName = roleType.charAt(0).toUpperCase() + roleType.slice(1);
+      role = await strapi
+        .query('plugin::users-permissions.role')
+        .findOne({ where: { name: roleName } });
+    }
+
+    return role;
+  };
+
+  const normalizeContentApiBody = (requestBody: any) => {
+    return requestBody?.data && typeof requestBody.data === 'object'
+      ? requestBody.data
+      : requestBody;
+  };
+
+  const assignRoleFromUserRole = async (body: any) => {
+    if (body.role) return body;
+
+    const requestedRole = typeof body.userRole === 'string'
+      ? body.userRole.toLowerCase()
+      : 'patient';
+
+    if (!allowedUserRoles.includes(requestedRole)) {
+      throw new Error(`Unsupported userRole '${requestedRole}'`);
+    }
+
+    const targetRole = await resolveRoleByType(requestedRole);
+    if (!targetRole) {
+      throw new Error(`Role '${requestedRole}' not found in Strapi. Check roles configuration.`);
+    }
+
+    body.userRole = requestedRole;
+    body.role = targetRole.id;
+    return body;
+  };
+
   const sanitizeProfilePayload = (body: any) => {
     const allowedFields = [
       'fullName',
@@ -57,15 +101,25 @@ export default (plugin) => {
   plugin.controllers.user = {
     ...originalUserController,
 
+    async create(ctx) {
+      try {
+        const sourceBody = normalizeContentApiBody(ctx.request?.body || {});
+        await assignRoleFromUserRole(sourceBody);
+        ctx.request.body = sourceBody;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return ctx.badRequest(message);
+      }
+
+      return originalUserController.create(ctx);
+    },
+
     async updateMe(ctx) {
       const authUser = ctx.state.user;
       if (!authUser) return ctx.unauthorized();
 
       const requestBody = ctx.request?.body || {};
-      const sourceBody =
-        requestBody?.data && typeof requestBody.data === 'object'
-          ? requestBody.data
-          : requestBody;
+      const sourceBody = normalizeContentApiBody(requestBody);
       const data = sanitizeProfilePayload(sourceBody);
 
       if (Object.keys(data).length === 0) {
@@ -196,10 +250,7 @@ export default (plugin) => {
         // 0. Извлекаем дополнительные поля и УБИРАЕМ из body,
         //    иначе Strapi-валидация отклонит запрос: "Invalid parameters"
         const requestBody = ctx.request?.body || {};
-        const sourceBody =
-          requestBody?.data && typeof requestBody.data === 'object'
-            ? requestBody.data
-            : requestBody;
+        const sourceBody = normalizeContentApiBody(requestBody);
 
         const { userRole: rawRole, fullName, phone, country, iin, doctorData, ...cleanBody } = sourceBody;
 
@@ -234,16 +285,7 @@ export default (plugin) => {
 
         try {
           // 1. Находим целевую Strapi-роль
-          let targetRole = await strapi
-            .query('plugin::users-permissions.role')
-            .findOne({ where: { type: userRole } });
-
-          if (!targetRole) {
-            const roleName = userRole.charAt(0).toUpperCase() + userRole.slice(1);
-            targetRole = await strapi
-              .query('plugin::users-permissions.role')
-              .findOne({ where: { name: roleName } });
-          }
+          const targetRole = await resolveRoleByType(userRole);
 
           if (!targetRole) {
             // Hard fail — assigning the wrong role (authenticated) is a security risk

@@ -129,19 +129,6 @@ function AdminUsers() {
 
     setIsCreating(true)
     try {
-      let roleId = null
-      try {
-        const rolesRes = await api.get('/api/users-permissions/roles')
-        const roleList = rolesRes?.data?.roles || rolesRes?.data || []
-        roleId =
-          roleList.find((r) => r?.type === createForm.userRole)?.id ||
-          roleList.find((r) => String(r?.name || '').toLowerCase() === createForm.userRole)?.id ||
-          roleList.find((r) => r?.type === 'authenticated')?.id ||
-          null
-      } catch {
-        /* ignore */
-      }
-
       const payload = {
         username: createForm.username.trim(),
         email: createForm.email.trim().toLowerCase(),
@@ -151,7 +138,6 @@ function AdminUsers() {
         userRole: createForm.userRole,
         fullName: createForm.fullName.trim(),
       }
-      if (roleId) payload.role = roleId
 
       await api.post('/api/users', payload)
       setIsCreateModalOpen(false)

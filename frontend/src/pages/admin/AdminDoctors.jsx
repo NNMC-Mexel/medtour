@@ -68,7 +68,6 @@ function AdminDoctors({ readonly = false }) {
   const [isSaving, setIsSaving] = useState(false)
   const [editingDoctor, setEditingDoctor] = useState(null)
   const [form, setForm] = useState(defaultForm)
-  const [doctorRoleId, setDoctorRoleId] = useState(null)
   const [photoFile, setPhotoFile] = useState(null)
   const [photoPreview, setPhotoPreview] = useState('')
   const [removePhoto, setRemovePhoto] = useState(false)
@@ -90,15 +89,10 @@ function AdminDoctors({ readonly = false }) {
   }
 
   const createDoctorUser = async () => {
-    if (!doctorRoleId) {
-      throw new Error('Doctor role is not configured')
-    }
-
     const payload = {
       username: form.username.trim(),
       email: form.email.trim().toLowerCase(),
       password: form.password,
-      role: doctorRoleId,
       confirmed: true,
       blocked: false,
       userRole: 'doctor',
@@ -125,25 +119,6 @@ function AdminDoctors({ readonly = false }) {
       const usersRes = await api.get('/api/users?populate[role][fields][0]=id&populate[role][fields][1]=type&populate[role][fields][2]=name&pagination[limit]=1000')
       const usersData = Array.isArray(usersRes.data) ? usersRes.data : []
       const usersMap = new Map(usersData.map((user) => [user.id, user]))
-      let detectedDoctorRoleId =
-        usersData.find((u) => u?.role?.type === 'doctor')?.role?.id ||
-        usersData.find((u) => u?.userRole === 'doctor' && u?.role?.id)?.role?.id ||
-        null
-
-      if (!detectedDoctorRoleId) {
-        try {
-          const rolesRes = await api.get('/api/users-permissions/roles')
-          const roleList = rolesRes?.data?.roles || rolesRes?.data || []
-          detectedDoctorRoleId =
-            roleList.find((role) => role?.type === 'doctor')?.id ||
-            roleList.find((role) => String(role?.name || '').toLowerCase() === 'doctor')?.id ||
-            null
-        } catch (roleError) {
-          console.warn('Could not fetch roles list:', roleError)
-        }
-      }
-
-      setDoctorRoleId(detectedDoctorRoleId)
 
       const normalizedDoctors = (doctorsData || []).map((doctor) => {
         const relationUser = extractUser(doctor.users_permissions_user)
@@ -304,11 +279,6 @@ function AdminDoctors({ readonly = false }) {
       return
     }
 
-    if (!doctorRoleId && (!editingDoctor || !(extractUser(editingDoctor.users_permissions_user)?.id))) {
-      toast.error(t('admin_doc.err_no_role'))
-      return
-    }
-
     if (form.password && form.password.length < 6) {
       toast.warning(t('admin_doc.err_short_password'))
       return
@@ -339,9 +309,6 @@ function AdminDoctors({ readonly = false }) {
             email: form.email.trim().toLowerCase(),
             userRole: 'doctor',
             fullName: form.fullName.trim(),
-          }
-          if (doctorRoleId) {
-            userPayload.role = doctorRoleId
           }
           if (form.password) {
             userPayload.password = form.password

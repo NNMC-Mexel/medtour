@@ -454,6 +454,8 @@ const roleDefinitions = {
       'plugin::users-permissions.user.destroy',
       'plugin::users-permissions.user.me',
       'plugin::users-permissions.user.updateMe',
+      'plugin::users-permissions.role.find',
+      'plugin::users-permissions.role.findOne',
       'plugin::users-permissions.auth.changePassword',
     ],
   },
