@@ -123,7 +123,21 @@ function RegisterPage() {
     }
 
     const result = await register(userData)
-    if (result.success) navigate('/patient/guide')
+    if (!result.success) return
+
+    if (result.requiresEmailConfirmation) {
+      // Backend created the account but kept confirmed=false until the user
+      // clicks the link in the confirmation email. Don't auto-login.
+      navigate('/verify-email-sent', {
+        state: {
+          email: formData.email,
+          message: result.message,
+        },
+      })
+      return
+    }
+
+    navigate('/patient/guide')
   }
 
   const patientBenefits = [

@@ -88,10 +88,47 @@ export default factories.createCoreController(UID, () => ({
       }
     }
 
-    const data = {
-      ...body,
-      createdByUser: user.documentId || user.id,
-    };
+    // Whitelist input (mass-assignment / M1). reconciliationStatus is excluded
+    // here — it is a post-creation reconciliation field, set only via update.
+    // patient is bound to the linked case's patient below, never trusted from
+    // the body, so a manager cannot attribute an entry to an arbitrary patient.
+    const CREATE_ALLOWED_FIELDS = [
+      'entryType',
+      'amount',
+      'currency',
+      'paymentProvider',
+      'providerPaymentId',
+      'medical_case',
+      'appointment',
+      'notes',
+      'metadata',
+    ];
+    const data: Record<string, any> = {};
+    for (const key of CREATE_ALLOWED_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(body, key) && body[key] !== undefined) {
+        data[key] = body[key];
+      }
+    }
+    data.createdByUser = user.documentId || user.id;
+
+    if (body.medical_case) {
+      const caseRef = typeof body.medical_case === 'object'
+        ? (body.medical_case.documentId || body.medical_case.id)
+        : body.medical_case;
+      const caseRecord = typeof caseRef === 'number'
+        ? await strapi.query('api::medical-case.medical-case' as any).findOne({
+            where: { id: caseRef }, populate: { patient: true },
+          })
+        : await strapi.documents('api::medical-case.medical-case' as any).findOne({
+            documentId: caseRef, populate: { patient: { fields: ['id', 'documentId'] } } as any,
+          });
+      if ((caseRecord as any)?.patient?.documentId) {
+        data.patient = (caseRecord as any).patient.documentId;
+      }
+    } else if (role === 'admin' && body.patient) {
+      // Admin may create a standalone entry not tied to a case.
+      data.patient = body.patient;
+    }
 
     const item = await strapi.documents(UID).create({ data, populate: '*' });
     return { data: item };

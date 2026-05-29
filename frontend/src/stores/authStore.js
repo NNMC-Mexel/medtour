@@ -76,8 +76,21 @@ const useAuthStore = create(
             doctorData: userData.doctorData || null,
           })
 
-          const { jwt, user } = response.data
+          const { jwt, user, requiresEmailConfirmation, message } = response.data
 
+          // New flow: server requires email confirmation before issuing JWT.
+          // Do not authenticate locally — show the "check your email" screen instead.
+          if (requiresEmailConfirmation || !jwt) {
+            set({ isLoading: false })
+            return {
+              success: true,
+              requiresEmailConfirmation: true,
+              user: user || null,
+              message: message || 'Please check your email to confirm your account.',
+            }
+          }
+
+          // Legacy path: server returned JWT directly (e.g. existing accounts).
           set({
             user,
             token: jwt,

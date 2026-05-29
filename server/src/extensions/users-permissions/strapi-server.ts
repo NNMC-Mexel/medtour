@@ -16,6 +16,8 @@
  *
  * В B2B-модели врачи создаются только администратором клиники через админ-панель.
  */
+import { maskUserPIIForRole } from '../../utils/pii-crypto';
+
 export default (plugin) => {
   // Сохраняем оригинальную factory-функцию контроллера auth
   const originalAuthFactory = plugin.controllers.auth;
@@ -101,6 +103,14 @@ export default (plugin) => {
   plugin.controllers.user = {
     ...originalUserController,
 
+    // Mask iin/passportNumber for callers who are not allowed the full value
+    // (patient/doctor see ****1234; admin/manager/coordinator see full).
+    async me(ctx) {
+      await originalUserController.me(ctx);
+      const role = ctx.state.user?.role?.type || ctx.state.user?.userRole;
+      maskUserPIIForRole(ctx.body, role);
+    },
+
     async create(ctx) {
       try {
         const sourceBody = normalizeContentApiBody(ctx.request?.body || {});
@@ -151,6 +161,8 @@ export default (plugin) => {
 
       const schema = strapi.getModel('plugin::users-permissions.user');
       ctx.body = await strapi.contentAPI.sanitize.output(updated, schema, { auth: ctx.state.auth });
+      const role = authUser.role?.type || authUser.userRole;
+      maskUserPIIForRole(ctx.body, role);
     },
   };
 
@@ -296,7 +308,9 @@ export default (plugin) => {
 
           const roleId = targetRole.id;
 
-          // 2. Обновляем user: userRole + fullName + phone + country + iin + правильная Strapi-роль
+          // 2. Обновляем user: userRole + fullName + phone + country + iin + правильная Strapi-роль.
+          // Сбрасываем confirmed=false — пользователь должен подтвердить email перед login.
+          // Без этого регистрация = заявка на любой email (email squatting / impersonation).
           await strapi.query('plugin::users-permissions.user').update({
             where: { id: userId },
             data: {
@@ -308,23 +322,56 @@ export default (plugin) => {
               platformGuideCompleted: false,
               platformGuideCompletedAt: null,
               role: roleId,
+              confirmed: false,
             },
           });
 
-          console.log(`[auth.register] User ${userId} updated: userRole=${userRole}, roleId=${roleId}`);
+          console.log(`[auth.register] User ${userId} updated: userRole=${userRole}, roleId=${roleId}, confirmed=false`);
 
-          // 3. Обновляем response body, чтобы фронтенд получил актуальные данные
-          responseBody.user.userRole = userRole;
-          responseBody.user.fullName = fullName || null;
-          responseBody.user.phone = phone || null;
-          responseBody.user.country = country || null;
-          responseBody.user.platformGuideCompleted = false;
-          responseBody.user.platformGuideCompletedAt = null;
+          // 3. Шлём подтверждение email. sendConfirmationEmail внутри генерирует
+          // confirmationToken, сохраняет на пользователе и шлёт письмо с
+          // ссылкой /api/auth/email-confirmation?confirmation=<token>.
+          // Не блокируем регистрацию если SMTP недоступен — пользователь
+          // позже может запросить повторную отправку через
+          // /api/auth/send-email-confirmation.
+          const freshUser = await strapi.query('plugin::users-permissions.user').findOne({
+            where: { id: userId },
+          });
+          try {
+            await strapi
+              .plugin('users-permissions')
+              .service('user')
+              .sendConfirmationEmail(freshUser);
+          } catch (emailError) {
+            const emailMsg = emailError instanceof Error ? emailError.message : String(emailError);
+            console.error('[auth.register] Failed to send confirmation email — continuing:', emailMsg);
+          }
+
+          // 4. Подменяем ответ: JWT НЕ возвращаем (email не подтверждён).
+          // Фронтенд должен показать "проверьте почту" и не залогинить пользователя.
+          const safeUser = {
+            id: responseBody.user.id,
+            documentId: responseBody.user.documentId,
+            username: responseBody.user.username,
+            email: responseBody.user.email,
+            confirmed: false,
+            blocked: false,
+            userRole,
+            fullName: fullName || null,
+            phone: phone || null,
+            country: country || null,
+          };
+
+          const newBody = {
+            user: safeUser,
+            requiresEmailConfirmation: true,
+            message: 'Registration successful. Please check your email to confirm your account before logging in.',
+          };
 
           if (ctx.response?.body) {
-            ctx.response.body = responseBody;
+            ctx.response.body = newBody;
           } else {
-            ctx.body = responseBody;
+            ctx.body = newBody;
           }
 
           // Audit log — registration
@@ -332,10 +379,12 @@ export default (plugin) => {
             audit: 'USER_REGISTERED',
             userId,
             userRole,
+            confirmed: false,
+            emailConfirmationSent: true,
             ts: new Date().toISOString(),
           }));
 
-          console.log('[auth.register] Registration complete');
+          console.log('[auth.register] Registration complete — awaiting email confirmation');
         } catch (error) {
           const safeMessage = error instanceof Error ? error.message : String(error);
           console.error('[auth.register] Error during extended registration — rolling back user:', safeMessage);

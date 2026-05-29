@@ -4,6 +4,56 @@ import { normalizeCaseStatus } from '../../../utils/medical-case-workflow';
 
 const UID = 'api::treatment-plan.treatment-plan' as any;
 
+// Fields a clinician (doctor / coordinator / admin) may set on CREATE.
+// Excludes status, sentAt, acceptedAt, declinedAt — those are set by the
+// state machine (create => DRAFT, then update transitions). Preventing the
+// caller from forcing status:'ACCEPTED' bypasses the patient-consent step.
+const CREATE_ALLOWED_FIELDS = [
+  'medical_case',
+  'diagnosisSummary',
+  'doctorDecisionNotes',
+  'procedures',
+  'estimatedDurationDays',
+  'totalCost',
+  'currency',
+  'attachments',
+  'translationStatus',
+  'internalNotes',
+];
+
+// Fields a clinician (doctor / coordinator / admin) may set on UPDATE.
+// Note: medical_case is intentionally excluded — you cannot move a plan to a
+// different case. status is whitelisted but constrained below to DRAFT/SENT.
+const STAFF_UPDATE_ALLOWED_FIELDS = [
+  'status',
+  'diagnosisSummary',
+  'doctorDecisionNotes',
+  'procedures',
+  'estimatedDurationDays',
+  'totalCost',
+  'currency',
+  'attachments',
+  'translationStatus',
+  'internalNotes',
+  'sentAt',
+];
+
+// ACCEPTED / DECLINED are the patient's decision and must come through the
+// patient branch (which verifies the plan is in SENT state). Letting staff set
+// them directly would bypass the patient-consent step required for informed
+// consent under the RK health code.
+const STAFF_ALLOWED_STATUSES = ['DRAFT', 'SENT'];
+
+function pickAllowedFields(body: Record<string, any>, allowed: string[]): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const key of allowed) {
+    if (Object.prototype.hasOwnProperty.call(body, key) && body[key] !== undefined) {
+      out[key] = body[key];
+    }
+  }
+  return out;
+}
+
 export default factories.createCoreController(UID, () => ({
   async find(ctx) {
     const user = ctx.state.user;
@@ -37,12 +87,17 @@ export default factories.createCoreController(UID, () => ({
     }
     const body = (ctx.request.body as any)?.data || ctx.request.body || {};
     if (!(await userCanAccessMedicalCase(strapi, user, body.medical_case))) return ctx.forbidden('Forbidden');
-    if (body.status === 'SENT') {
-      const missing = ['diagnosisSummary', 'doctorDecisionNotes', 'procedures', 'estimatedDurationDays', 'totalCost']
-        .filter((field) => body[field] === undefined || body[field] === null || body[field] === '' || (Array.isArray(body[field]) && body[field].length === 0));
-      if (missing.length > 0) return ctx.badRequest(`Cannot send treatment plan. Missing: ${missing.join(', ')}`);
-    }
-    const item = await strapi.documents(UID).create({ data: body, status: 'published', populate: '*' });
+
+    // Whitelist input. Status is ALWAYS forced to DRAFT on create — moving
+    // to SENT or ACCEPTED happens through the update endpoint which enforces
+    // the patient-consent FSM. Without this, a doctor could publish a plan
+    // already in ACCEPTED state and skip the patient's explicit confirmation.
+    const data = {
+      ...pickAllowedFields(body, CREATE_ALLOWED_FIELDS),
+      status: 'DRAFT',
+    };
+
+    const item = await strapi.documents(UID).create({ data, status: 'published', populate: '*' });
     return { data: item };
   },
 
@@ -54,7 +109,7 @@ export default factories.createCoreController(UID, () => ({
     if (!(await userCanAccessMedicalCase(strapi, user, (existing as any).medical_case))) return ctx.forbidden('Forbidden');
     const body = (ctx.request.body as any)?.data || ctx.request.body || {};
     const role = getUserRole(user);
-    let data = body;
+    let data: Record<string, any>;
 
     if (role === 'patient') {
       if (!['ACCEPTED', 'DECLINED'].includes(body.status)) {
@@ -67,7 +122,16 @@ export default factories.createCoreController(UID, () => ({
         status: body.status,
         ...(body.status === 'ACCEPTED' ? { acceptedAt: new Date().toISOString() } : {}),
       };
-    } else if (!['doctor', 'coordinator', 'admin'].includes(role)) {
+    } else if (['doctor', 'coordinator', 'admin'].includes(role)) {
+      // Whitelist input — without this a doctor could PUT status:'ACCEPTED'
+      // and acceptedAt directly, faking the patient's consent.
+      data = pickAllowedFields(body, STAFF_UPDATE_ALLOWED_FIELDS);
+      if (data.status !== undefined && !STAFF_ALLOWED_STATUSES.includes(data.status)) {
+        return ctx.badRequest(
+          'Staff can only set treatment plan status to DRAFT or SENT. ACCEPTED/DECLINED is the patient decision.'
+        );
+      }
+    } else {
       return ctx.forbidden('Forbidden');
     }
 

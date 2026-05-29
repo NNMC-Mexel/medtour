@@ -280,6 +280,25 @@ export default factories.createCoreController('api::medical-document.medical-doc
       }
     }
 
+    // SECURITY (file-IDOR): a media field is a polymorphic relation, so the
+    // same upload file can be linked from multiple medical-documents. Without
+    // this check a patient could enumerate upload ids and attach another
+    // patient's file to a document they own, then read it through the
+    // file-proxy (which authorises by doc.user === caller). Staff/doctor link
+    // files on behalf of patients and are already gated by case/appointment
+    // access checks above, so this only constrains the patient self-upload path.
+    if (body.file && !isAdmin && !isDoctor && !isStaff) {
+      const fileId = typeof body.file === 'object' ? (body.file.id ?? body.file.documentId ?? body.file) : body.file;
+      const existingForFile = await strapi.documents('api::medical-document.medical-document').findMany({
+        filters: { file: { id: fileId } } as any,
+        populate: { user: { fields: ['id'] } } as any,
+        limit: 50,
+      });
+      if (existingForFile.some((d: any) => d.user?.id && d.user.id !== user.id)) {
+        return ctx.forbidden('This file is not available');
+      }
+    }
+
     // Resolve sharedWithDoctors documentIds
     let sharedDoctorDocIds: string[] | undefined;
     if (body.sharedWithDoctors && Array.isArray(body.sharedWithDoctors)) {

@@ -1,4 +1,5 @@
 import type { Core } from '@strapi/strapi';
+import { decryptUserPII, encryptUserPII, isPiiEncryptionEnabled } from './utils/pii-crypto';
 
 const defaultSpecializations = [
   { name: 'Терапевт', description: 'Врач общей практики', icon: 'stethoscope', sortOrder: 1 },
@@ -197,10 +198,10 @@ const roleDefinitions = {
       'api::notification.notification.delete',
       'api::notification.notification.unreadCount',
       'api::notification.notification.markAllAsRead',
-      // Upload
+      // Upload — write only. Listing removed: /api/upload/files is not
+      // owner-scoped in Strapi, so it leaked the whole media library and fed
+      // the file-IDOR (see N1). Files come back inline on POST /api/upload.
       'plugin::upload.content-api.upload',
-      'plugin::upload.content-api.find',
-      'plugin::upload.content-api.findOne',
       // Users-permissions — профиль
       'plugin::users-permissions.user.me',
       'plugin::users-permissions.user.updateMe',
@@ -254,10 +255,10 @@ const roleDefinitions = {
       'api::notification.notification.delete',
       'api::notification.notification.unreadCount',
       'api::notification.notification.markAllAsRead',
-      // Upload
+      // Upload — write only. Listing removed: /api/upload/files is not
+      // owner-scoped in Strapi, so it leaked the whole media library and fed
+      // the file-IDOR (see N1). Files come back inline on POST /api/upload.
       'plugin::upload.content-api.upload',
-      'plugin::upload.content-api.find',
-      'plugin::upload.content-api.findOne',
       // Users-permissions — профиль
       'plugin::users-permissions.user.me',
       'plugin::users-permissions.user.updateMe',
@@ -301,9 +302,8 @@ const roleDefinitions = {
       'api::notification.notification.delete',
       'api::notification.notification.unreadCount',
       'api::notification.notification.markAllAsRead',
+      // Upload — write only (listing removed, see N1).
       'plugin::upload.content-api.upload',
-      'plugin::upload.content-api.find',
-      'plugin::upload.content-api.findOne',
       'plugin::users-permissions.user.me',
       'plugin::users-permissions.user.updateMe',
       'plugin::users-permissions.auth.changePassword',
@@ -345,9 +345,8 @@ const roleDefinitions = {
       'api::notification.notification.delete',
       'api::notification.notification.unreadCount',
       'api::notification.notification.markAllAsRead',
+      // Upload — write only (listing removed, see N1).
       'plugin::upload.content-api.upload',
-      'plugin::upload.content-api.find',
-      'plugin::upload.content-api.findOne',
       'plugin::users-permissions.user.me',
       'plugin::users-permissions.user.updateMe',
       'plugin::users-permissions.auth.changePassword',
@@ -574,6 +573,31 @@ async function seedRolesAndPermissions(strapi: Core.Strapi) {
     console.log(`  Permissions set for "${definition.name}".`);
   }
 
+  // SECURITY (N1): the loop above only ADDS permissions, it never removes
+  // them. On databases provisioned before this fix, patient/doctor/manager/
+  // coordinator still carry upload list/findOne, which exposes the entire
+  // media library and enables the file-IDOR. Actively revoke them here so the
+  // fix applies to existing deployments, not just fresh seeds.
+  const revokeFromNonAdmin = [
+    'plugin::upload.content-api.find',
+    'plugin::upload.content-api.findOne',
+  ];
+  for (const roleType of ['patient', 'doctor', 'manager', 'coordinator']) {
+    const role = await strapi
+      .query('plugin::users-permissions.role')
+      .findOne({ where: { type: roleType } });
+    if (!role) continue;
+    for (const action of revokeFromNonAdmin) {
+      const stale = await strapi
+        .query('plugin::users-permissions.permission')
+        .findMany({ where: { action, role: role.id } });
+      for (const perm of stale) {
+        await strapi.query('plugin::users-permissions.permission').delete({ where: { id: perm.id } });
+        console.log(`  Revoked ${action} from role "${roleType}" (N1).`);
+      }
+    }
+  }
+
   // Убираем опасные permissions из authenticated (если она осталась дефолтной)
   const authenticatedRole = await strapi
     .query('plugin::users-permissions.role')
@@ -672,12 +696,104 @@ async function seedRolesAndPermissions(strapi: Core.Strapi) {
   console.log('Roles and permissions setup complete.');
 }
 
+/**
+ * Force users-permissions advanced settings into a secure baseline on every
+ * boot. Specifically: email_confirmation = true so /api/auth/local refuses
+ * to log in unconfirmed accounts. Without this, anyone could register any
+ * email address and immediately receive a JWT — enabling email squatting
+ * and impersonation.
+ *
+ * Strapi stores advanced settings in core_store. We read the current value,
+ * merge our overrides and write it back so an admin can still tune other
+ * fields via the Strapi admin panel.
+ */
+async function enforceUsersPermissionsAdvanced(strapi: Core.Strapi) {
+  try {
+    const pluginStore = strapi.store({ type: 'plugin', name: 'users-permissions', key: 'advanced' });
+    const current = ((await pluginStore.get()) as Record<string, unknown> | null) || {};
+
+    const desiredRedirect = process.env.FRONTEND_URL
+      ? `${process.env.FRONTEND_URL.replace(/\/$/, '')}/email-confirmed`
+      : (current.email_confirmation_redirection as string | undefined) || '/email-confirmed';
+
+    const next = {
+      ...current,
+      email_confirmation: true,
+      email_confirmation_redirection: desiredRedirect,
+      // Defence: refuse login for blocked accounts; default-strict on
+      // unique email (Strapi default is true, but we make it explicit).
+      unique_email: true,
+      allow_register: current.allow_register !== false,
+    };
+
+    await pluginStore.set({ value: next });
+    console.log('Users-permissions advanced settings enforced: email_confirmation=true');
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('Failed to enforce users-permissions advanced settings:', msg);
+  }
+}
+
 export default {
-  register(/* { strapi }: { strapi: Core.Strapi } */) {},
+  register({ strapi }: { strapi: Core.Strapi }) {
+    // PII encryption-at-rest for iin / passportNumber (RK Law 94-V art.10).
+    // Hooks the DB layer so every write path — REST API, custom register,
+    // updateMe and the Strapi admin panel — is covered uniformly. Encrypt
+    // before persisting; decrypt after reading so app code & admin see plaintext.
+    strapi.db.lifecycles.subscribe({
+      models: ['plugin::users-permissions.user'],
+      async beforeCreate(event: any) {
+        encryptUserPII(event.params?.data);
+      },
+      async beforeUpdate(event: any) {
+        encryptUserPII(event.params?.data);
+      },
+      async afterCreate(event: any) {
+        decryptUserPII(event.result);
+      },
+      async afterUpdate(event: any) {
+        decryptUserPII(event.result);
+      },
+      async afterFindOne(event: any) {
+        decryptUserPII(event.result);
+      },
+      async afterFindMany(event: any) {
+        if (Array.isArray(event.result)) event.result.forEach(decryptUserPII);
+      },
+    });
+  },
 
   async bootstrap({ strapi }: { strapi: Core.Strapi }) {
     await seedSpecializations(strapi);
     await seedClinics(strapi);
     await seedRolesAndPermissions(strapi);
+    await enforceUsersPermissionsAdvanced(strapi);
+
+    // L1: refuse to silently store IIN / passport in plaintext in production.
+    if (!isPiiEncryptionEnabled()) {
+      const msg = 'PII_ENCRYPTION_KEY missing/invalid (need 32 bytes as hex or base64): ' +
+        'iin/passportNumber will be stored in PLAINTEXT. Required for RK Law 94-V compliance.';
+      if (process.env.NODE_ENV === 'production') {
+        strapi.log.error('⛔ ' + msg);
+      } else {
+        strapi.log.warn('⚠️  ' + msg);
+      }
+    } else {
+      strapi.log.info('PII encryption enabled (iin/passportNumber, AES-256-GCM).');
+    }
+
+    // N3: test-payment mode lets patients create "paid" appointments without a
+    // real gateway charge. Acceptable in staging, dangerous in production. Make
+    // it impossible to leave on silently.
+    if (
+      process.env.NODE_ENV === 'production' &&
+      process.env.PAYMENTS_LIVE !== 'true' &&
+      process.env.ALLOW_TEST_PAYMENTS_IN_PRODUCTION === 'true'
+    ) {
+      strapi.log.warn(
+        '⚠️  ALLOW_TEST_PAYMENTS_IN_PRODUCTION=true with PAYMENTS_LIVE!=true: ' +
+        'appointments can be marked PAID without a real payment. Disable this before going live.'
+      );
+    }
   },
 };

@@ -22,13 +22,15 @@ export default ({ env }) => {
               'data:',
               'blob:',
               'market-assets.strapi.io',
-              env('MINIO_PUBLIC_URL', 'http://localhost:9000'),
+              // Always reference files via the file-proxy on the API origin,
+              // never via the internal MinIO endpoint (was leaking 192.168.x.x).
+              env('SERVER_URL', env('STRAPI_URL', 'http://localhost:1340')),
             ],
             'media-src': [
               "'self'",
               'data:',
               'blob:',
-              env('MINIO_PUBLIC_URL', 'http://localhost:9000'),
+              env('SERVER_URL', env('STRAPI_URL', 'http://localhost:1340')),
             ],
             upgradeInsecureRequests: null,
           },
@@ -61,6 +63,9 @@ export default ({ env }) => {
     'strapi::poweredBy',
     'strapi::query',
     'strapi::body',
+    // Upload guard MUST come after strapi::body so files are parsed,
+    // and before strapi::session so we reject early.
+    { name: 'global::upload-guard', config: {} },
     'strapi::session',
     'strapi::favicon',
     'strapi::public',
