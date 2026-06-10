@@ -1,0 +1,43 @@
+{
+  "kind": "collectionType",
+  "collectionName": "device_tokens",
+  "info": {
+    "singularName": "device-token",
+    "pluralName": "device-tokens",
+    "displayName": "DeviceToken"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "token": {
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    "platform": {
+      "type": "enumeration",
+      "required": true,
+      "enum": [
+        "ios",
+        "android"
+      ]
+    },
+    "appId": {
+      "type": "string",
+      "default": "kz.nnmc.medtour"
+    },
+    "lastSeenAt": {
+      "type": "datetime"
+    },
+    "disabledAt": {
+      "type": "datetime"
+    },
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

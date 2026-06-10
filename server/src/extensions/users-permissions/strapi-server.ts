@@ -264,7 +264,7 @@ export default (plugin) => {
         const requestBody = ctx.request?.body || {};
         const sourceBody = normalizeContentApiBody(requestBody);
 
-        const { userRole: rawRole, fullName, phone, country, iin, doctorData, ...cleanBody } = sourceBody;
+        const { userRole: rawRole, fullName, phone, country, language, timezone, iin, doctorData, ...cleanBody } = sourceBody;
 
         // MedTour security: public registration is only for patients.
         // Staff and partner doctors must be created/verified by an admin.
@@ -318,6 +318,8 @@ export default (plugin) => {
               fullName: fullName || null,
               phone: phone || null,
               country: country || null,
+              language: language || 'en',
+              timezone: timezone || null,
               iin: iin || null,
               platformGuideCompleted: false,
               platformGuideCompletedAt: null,
@@ -360,6 +362,8 @@ export default (plugin) => {
             fullName: fullName || null,
             phone: phone || null,
             country: country || null,
+            language: language || 'en',
+            timezone: timezone || null,
           };
 
           const newBody = {

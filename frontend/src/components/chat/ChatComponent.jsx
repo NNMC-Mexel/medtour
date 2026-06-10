@@ -7,6 +7,7 @@ import { cn, formatTimeAgo, getSpecName } from '../../utils/helpers'
 import useChatStore from '../../stores/chatStore'
 import useAuthStore from '../../stores/authStore'
 import { getMediaUrl, appointmentsAPI, conversationsAPI, medicalCasesAPI, normalizeResponse, openMediaInNewTab } from '../../services/api'
+import AuthenticatedImage from '../ui/AuthenticatedImage'
 
 const ACTIVE_CASE_STATUSES = new Set([
   'NEW_LEAD',
@@ -559,7 +560,6 @@ function ChatComponent({ userRole = 'patient' }) {
                       {attachments.length > 0 && (
                         <div className="mt-2 space-y-2">
                           {attachments.map((file) => {
-                            const url = getMediaUrl(file)
                             const isImageFile = file.mime?.startsWith('image/') || message.messageType === 'image'
                             return (
                               <button
@@ -571,8 +571,8 @@ function ChatComponent({ userRole = 'patient' }) {
                                   isMe ? 'border-teal-400/50' : 'border-slate-200'
                                 )}
                               >
-                                {isImageFile && url ? (
-                                  <img src={url} alt={file.name || 'Attachment'} className="max-h-40 max-w-full object-cover" />
+                                {isImageFile ? (
+                                  <AuthenticatedImage media={file} alt={file.name || 'Attachment'} className="max-h-40 max-w-full object-cover" />
                                 ) : (
                                   <span className={cn('block px-3 py-2 text-xs', isMe ? 'text-white' : 'text-slate-700')}>
                                     {file.name || 'Attachment'}

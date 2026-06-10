@@ -526,6 +526,21 @@ function VideoConsultation() {
     }, delay)
   }
 
+  const retryConnection = () => {
+    setError(null)
+    reconnectAttemptsRef.current = 0
+    const socket = activeSocketRef.current || socketRef.current
+    if (socket?.connected) {
+      setConnectionState('waiting')
+      socket.emit('join-room', {
+        roomId,
+        isPortrait: window.innerHeight > window.innerWidth,
+      })
+      return
+    }
+    window.location.reload()
+  }
+
   const createPeerConnection = (socket, targetSocketId) => {
     if (peerConnectionRef.current) peerConnectionRef.current.close()
     activeSocketRef.current = socket
@@ -1134,7 +1149,12 @@ function VideoConsultation() {
                 </div>
                 <h3 className="text-white text-xl font-medium mb-2">{t('video.failed_title')}</h3>
                 <p className="text-slate-400 mb-6">{error || t('video.failed_desc')}</p>
-                <Button onClick={() => window.location.reload()}>{t('video.retry')}</Button>
+                <div className="flex flex-col sm:flex-row justify-center gap-3">
+                  <Button onClick={retryConnection}>{t('video.retry')}</Button>
+                  <Button variant="outline" onClick={() => navigate('/patient/chat')}>
+                    {t('video.fallback_chat')}
+                  </Button>
+                </div>
               </div>
             </div>
           )}

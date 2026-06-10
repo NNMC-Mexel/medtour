@@ -1,5 +1,5 @@
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { getUserRole } from '../../../utils/medtour-access';
+import { getUserRole, isAdminUser, userCanAccessMedicalCase } from '../../../utils/medtour-access';
 
 const getS3Client = () =>
   new S3Client({
@@ -60,14 +60,8 @@ const INLINE_SAFE_MIME = new Set<string>([
 ]);
 
 async function getAuthenticatedUser(ctx) {
-  // Prefer Authorization: Bearer. Query-string fallback is still accepted
-  // because <a href={getMediaUrl(file)}> and <img src> in the React frontend
-  // cannot attach headers — removing it would break document download links.
-  // TODO(H2): once getMediaUrl is refactored to fetch blobs via axios, remove
-  //          the query-token fallback. Tracked in QA_SECURITY_AUDIT.md.
   const authHeader = ctx.request.headers.authorization || '';
-  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
-  const token = bearerToken || (typeof ctx.query?.token === 'string' ? ctx.query.token : undefined);
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
 
   if (!token || typeof token !== 'string') return null;
 
@@ -172,7 +166,37 @@ async function decideFileAccess(ctx, key: string): Promise<AccessDecision> {
     }
   }
 
-  // 2. Otherwise, the file MUST be attached to a medical-document, and the
+  // 2. Chat attachments are private too, but they are linked to messages
+  //    rather than medical-document. Authorise through conversation/case RBAC.
+  const user = await getAuthenticatedUser(ctx);
+  const messages = await strapi.documents('api::message.message' as any).findMany({
+    filters: { attachments: { id: uploadFile.id } },
+    limit: 1,
+    populate: {
+      conversation: {
+        populate: {
+          users_permissions_users: { fields: ['id', 'documentId'] },
+          medical_case: true,
+        },
+      },
+    } as any,
+  });
+
+  const message = messages[0] as any;
+  if (message) {
+    const conversation = message.conversation;
+    const members = Array.isArray(conversation?.users_permissions_users) ? conversation.users_permissions_users : [];
+    const memberAccess = user && members.some((member: any) => member?.id === user.id);
+    const caseAccess = user && conversation?.medical_case
+      ? await userCanAccessMedicalCase(strapi, user, conversation.medical_case)
+      : false;
+    if (user && (isAdminUser(user) || memberAccess || caseAccess)) {
+      return { allowed: true, isMedicalDocument: true };
+    }
+    return { allowed: false, reason: 'not-found' };
+  }
+
+  // 3. Otherwise, the file MUST be attached to a medical-document, and the
   //    caller must have access to it. Look it up with full ownership chain.
   const medicalDocuments = await strapi.documents('api::medical-document.medical-document').findMany({
     filters: { file: { id: uploadFile.id } },
@@ -194,12 +218,11 @@ async function decideFileAccess(ctx, key: string): Promise<AccessDecision> {
 
   const medicalDocument = medicalDocuments[0];
 
-  // 3. If the upload exists but is linked to nothing (orphan) — refuse.
+  // 4. If the upload exists but is linked to nothing (orphan) — refuse.
   //    This covers race conditions during upload, failed link attempts,
   //    and files left over after parent records were deleted.
   if (!medicalDocument) return { allowed: false, reason: 'not-found' };
 
-  const user = await getAuthenticatedUser(ctx);
   if (user && canAccessMedicalDocumentFile(user, medicalDocument)) {
     return { allowed: true, isMedicalDocument: true };
   }

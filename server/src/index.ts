@@ -66,6 +66,8 @@ const medTourReadPermissions = [
 
 const medTourPatientPermissions = [
   ...medTourReadPermissions,
+  'api::device-token.device-token.register',
+  'api::device-token.device-token.unregister',
   'api::medical-case.medical-case.create',
   'api::medical-case.medical-case.update',
   'api::conversation.conversation.forCase',
@@ -88,6 +90,8 @@ const medTourPatientPermissions = [
 
 const medTourDoctorPermissions = [
   ...medTourReadPermissions,
+  'api::device-token.device-token.register',
+  'api::device-token.device-token.unregister',
   'api::medical-case.medical-case.update',
   'api::conversation.conversation.forCase',
   'api::conversation.conversation.messages',
@@ -105,6 +109,8 @@ const medTourDoctorPermissions = [
 
 const medTourStaffPermissions = [
   ...medTourReadPermissions,
+  'api::device-token.device-token.register',
+  'api::device-token.device-token.unregister',
   'api::medical-case.medical-case.create',
   'api::medical-case.medical-case.update',
   'api::medical-case.medical-case.delete',

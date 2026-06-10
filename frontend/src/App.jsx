@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ToastProvider } from './components/ui/Toast'
 
@@ -26,29 +26,11 @@ import PatientChat from './pages/patient/PatientChat'
 import PatientDocuments from './pages/patient/PatientDocuments'
 import PatientGuide from './pages/patient/PatientGuide'
 import AppointmentDetail from './pages/AppointmentDetail'
+import PatientPlanTrip from './pages/patient/PatientPlanTrip'
 
-// Doctor Pages
-import DoctorDashboard from './pages/doctor/DoctorDashboard'
-import DoctorSchedule from './pages/doctor/DoctorSchedule'
-import DoctorPatients from './pages/doctor/DoctorPatients'
-import DoctorProfile from './pages/doctor/DoctorProfile'
-import PatientHistory from './pages/doctor/PatientHistory'
-
-// Admin Pages
-import AdminDashboard from './pages/admin/AdminDashboard'
-import AdminUsers from './pages/admin/AdminUsers'
-import AdminDoctors from './pages/admin/AdminDoctors'
-import AdminAppointments from './pages/admin/AdminAppointments'
-import AdminSpecializations from './pages/admin/AdminSpecializations'
-import AdminPriceList from './pages/admin/AdminPriceList'
-import AdminGuideVideos from './pages/admin/AdminGuideVideos'
-import AdminContent from './pages/admin/AdminContent'
 import MedicalCasesPage from './pages/cases/MedicalCasesPage'
 import MedicalCaseDetail from './pages/cases/MedicalCaseDetail'
-import StaffDashboard from './pages/staff/StaffDashboard'
 
-// Other Pages
-import VideoConsultation from './pages/VideoConsultation'
 import NotificationsPage from './pages/NotificationsPage'
 import PaymentSuccess from './pages/PaymentSuccess'
 import PaymentFailure from './pages/PaymentFailure'
@@ -57,9 +39,27 @@ import TermsPage from './pages/TermsPage'
 
 // Stores
 import useAuthStore from './stores/authStore'
+import { initializeMobilePushNotifications } from './services/mobilePush'
 
 // Utils
 import { PATIENT_NAV_ITEMS, DOCTOR_NAV_ITEMS, ADMIN_NAV_ITEMS, MANAGER_NAV_ITEMS, COORDINATOR_NAV_ITEMS } from './utils/constants'
+
+const DoctorDashboard = lazy(() => import('./pages/doctor/DoctorDashboard'))
+const DoctorSchedule = lazy(() => import('./pages/doctor/DoctorSchedule'))
+const DoctorPatients = lazy(() => import('./pages/doctor/DoctorPatients'))
+const DoctorProfile = lazy(() => import('./pages/doctor/DoctorProfile'))
+const PatientHistory = lazy(() => import('./pages/doctor/PatientHistory'))
+
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
+const AdminDoctors = lazy(() => import('./pages/admin/AdminDoctors'))
+const AdminAppointments = lazy(() => import('./pages/admin/AdminAppointments'))
+const AdminSpecializations = lazy(() => import('./pages/admin/AdminSpecializations'))
+const AdminPriceList = lazy(() => import('./pages/admin/AdminPriceList'))
+const AdminGuideVideos = lazy(() => import('./pages/admin/AdminGuideVideos'))
+const AdminContent = lazy(() => import('./pages/admin/AdminContent'))
+const StaffDashboard = lazy(() => import('./pages/staff/StaffDashboard'))
+const VideoConsultation = lazy(() => import('./pages/VideoConsultation'))
 
 // Loading component
 function LoadingScreen() {
@@ -159,6 +159,7 @@ function App() {
   useEffect(() => {
     if (_hasHydrated && token) {
       fetchUser()
+      initializeMobilePushNotifications()
     }
   }, [token, fetchUser, _hasHydrated])
 
@@ -166,6 +167,7 @@ function App() {
     <ToastProvider>
     <BrowserRouter>
       <ScrollRestoration />
+      <Suspense fallback={<LoadingScreen />}>
       <Routes>
         {/* Public Routes */}
         <Route element={<PublicLayout />}>
@@ -220,6 +222,7 @@ function App() {
           <Route path="doctors/:id" element={<DoctorProfilePage />} />
           <Route path="chat" element={<PatientChat />} />
           <Route path="documents" element={<PatientDocuments />} />
+          <Route path="plan-trip" element={<PatientPlanTrip />} />
           <Route path="profile" element={<PatientProfile />} />
           <Route path="notifications" element={<NotificationsPage />} />
         </Route>
@@ -324,6 +327,7 @@ function App() {
         {/* 404 */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
     </ToastProvider>
   )

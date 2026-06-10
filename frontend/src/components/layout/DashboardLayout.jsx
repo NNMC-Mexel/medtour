@@ -1,11 +1,21 @@
 import { useState, useEffect, useRef } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Activity, ClipboardList, FileText, MessageCircle, User } from 'lucide-react'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import { cn } from '../../utils/helpers'
 import useAuthStore from '../../stores/authStore'
 import PatientChatWidget from '../chat/PatientChatWidget'
+import { PATIENT_BOTTOM_NAV_ITEMS } from '../../utils/constants'
+
+const bottomIconMap = {
+  activity: Activity,
+  'message-circle': MessageCircle,
+  'file-text': FileText,
+  'clipboard-list': ClipboardList,
+  user: User,
+}
 
 function DashboardLayout({ navItems }) {
   const { t } = useTranslation()
@@ -58,11 +68,38 @@ function DashboardLayout({ navItems }) {
           onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           isMobileMenuOpen={isMobileMenuOpen}
         />
-        <main className="flex-1 min-h-0 p-4 sm:p-6">
+        <main className={cn('flex-1 min-h-0 p-4 sm:p-6', user?.userRole === 'patient' && 'pb-24 sm:pb-6')}>
           <Outlet />
         </main>
       </div>
-      {user?.userRole === 'patient' && location.pathname.startsWith('/patient') && <PatientChatWidget />}
+      {user?.userRole === 'patient' && location.pathname.startsWith('/patient') && (
+        <>
+          <div className="hidden sm:block">
+            <PatientChatWidget />
+          </div>
+          <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur sm:hidden pb-[env(safe-area-inset-bottom)]">
+            <div className="grid grid-cols-5">
+              {PATIENT_BOTTOM_NAV_ITEMS.map((item) => {
+                const Icon = bottomIconMap[item.icon] || Activity
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    end={item.path === '/patient'}
+                    className={({ isActive }) => cn(
+                      'flex min-h-16 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium transition-colors',
+                      isActive ? 'text-teal-700' : 'text-slate-500'
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="max-w-full truncate">{t(item.label)}</span>
+                  </NavLink>
+                )
+              })}
+            </div>
+          </nav>
+        </>
+      )}
     </div>
   )
 }

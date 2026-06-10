@@ -827,6 +827,46 @@ export interface ApiConversationConversation
   };
 }
 
+export interface ApiDeviceTokenDeviceToken extends Struct.CollectionTypeSchema {
+  collectionName: 'device_tokens';
+  info: {
+    displayName: 'DeviceToken';
+    pluralName: 'device-tokens';
+    singularName: 'device-token';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    appId: Schema.Attribute.String &
+      Schema.Attribute.DefaultTo<'kz.nnmc.medtour'>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    disabledAt: Schema.Attribute.DateTime;
+    lastSeenAt: Schema.Attribute.DateTime;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::device-token.device-token'
+    > &
+      Schema.Attribute.Private;
+    platform: Schema.Attribute.Enumeration<['ios', 'android']> &
+      Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    token: Schema.Attribute.Text &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+  };
+}
+
 export interface ApiDoctorDoctor extends Struct.CollectionTypeSchema {
   collectionName: 'doctors';
   info: {
@@ -2289,6 +2329,7 @@ declare module '@strapi/strapi' {
       'api::category.category': ApiCategoryCategory;
       'api::clinic.clinic': ApiClinicClinic;
       'api::conversation.conversation': ApiConversationConversation;
+      'api::device-token.device-token': ApiDeviceTokenDeviceToken;
       'api::doctor.doctor': ApiDoctorDoctor;
       'api::finance-ledger.finance-ledger': ApiFinanceLedgerFinanceLedger;
       'api::global.global': ApiGlobalGlobal;

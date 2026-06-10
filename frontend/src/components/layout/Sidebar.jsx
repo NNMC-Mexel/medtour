@@ -15,6 +15,7 @@ import {
   Tags,
   Activity,
   CircleHelp,
+  ClipboardList,
   X,
 } from 'lucide-react'
 import { cn } from '../../utils/helpers'
@@ -36,6 +37,7 @@ const iconMap = {
   tags: Tags,
   activity: Activity,
   'circle-help': CircleHelp,
+  'clipboard-list': ClipboardList,
 }
 
 function Sidebar({ navItems, onNavClick }) {

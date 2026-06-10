@@ -5,7 +5,8 @@ import Button from '../ui/Button'
 import { cn } from '../../utils/helpers'
 import useAuthStore from '../../stores/authStore'
 import useChatStore from '../../stores/chatStore'
-import { getMediaUrl, medicalCasesAPI, normalizeResponse, openMediaInNewTab } from '../../services/api'
+import { medicalCasesAPI, normalizeResponse, openMediaInNewTab } from '../../services/api'
+import AuthenticatedImage from '../ui/AuthenticatedImage'
 
 function PatientChatWidget() {
   const { user } = useAuthStore()
@@ -153,11 +154,10 @@ function PatientChatWidget() {
                         )}>
                           <p className="whitespace-pre-wrap">{message.content}</p>
                           {(message.attachments || []).map((file) => {
-                            const url = getMediaUrl(file)
                             return (
                               <button key={file.id || file.url} type="button" onClick={() => openMediaInNewTab(file)} className="block mt-2 text-left">
-                                {file.mime?.startsWith('image/') && url ? (
-                                  <img src={url} alt={file.name || 'Attachment'} className="max-h-32 rounded-lg object-cover" />
+                                {file.mime?.startsWith('image/') ? (
+                                  <AuthenticatedImage media={file} alt={file.name || 'Attachment'} className="max-h-32 rounded-lg object-cover" />
                                 ) : (
                                   <span className={cn('text-xs underline', isMe ? 'text-teal-50' : 'text-teal-700')}>{file.name || 'Attachment'}</span>
                                 )}
