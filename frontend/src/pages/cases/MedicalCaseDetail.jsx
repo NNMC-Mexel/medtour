@@ -29,9 +29,9 @@ import {
   documentsAPI,
   clinicsAPI,
   doctorsAPI,
-  getMediaUrl,
   medicalCasesAPI,
   normalizeResponse,
+  openMediaInNewTab,
   treatmentPlansAPI,
   tripChecklistsAPI,
   usersAPI,
@@ -209,6 +209,14 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
     }
   }
 
+  const openDocument = async (doc) => {
+    try {
+      await openMediaInNewTab(doc.file)
+    } catch (error) {
+      toast.error(error?.response?.data?.error?.message || t('documents.preview_unavailable'))
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -267,7 +275,6 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
         ) : (
           <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
             {docs.map(doc => {
-              const url = getMediaUrl(doc.file)
               const reviewStatus = doc.reviewStatus || 'UPLOADED'
               const docId = doc.documentId || doc.id
               return (
@@ -285,10 +292,10 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
                       {doc.reviewNotes && <p className="text-xs text-slate-600 mt-1">{doc.reviewNotes}</p>}
                       {doc.dueDate && <p className="text-xs text-amber-700 mt-1">{t('case_detail.doc_due_date')}: {doc.dueDate}</p>}
                     </div>
-                    {url && (
-                      <a href={url} target="_blank" rel="noreferrer" className="shrink-0">
-                        <Button size="sm" variant="outline">{t('case_detail.doc_open_btn')}</Button>
-                      </a>
+                    {doc.file && (
+                      <Button size="sm" variant="outline" className="shrink-0" onClick={() => openDocument(doc)}>
+                        {t('case_detail.doc_open_btn')}
+                      </Button>
                     )}
                   </div>
                   {canReview && (
@@ -917,7 +924,7 @@ function MedicalCaseDetail() {
 
       // Auto-advance to DOCTOR_ASSIGNED when a doctor is first assigned
       const prevDoctorRef = getRef(medicalCase?.doctor)
-      const PRE_ASSIGNMENT_STATUSES = ['NEW_LEAD', 'REGISTERED', 'WAITING_FOR_DOCUMENTS', 'DOCUMENTS_UPLOADED', 'UNDER_REVIEW']
+      const PRE_ASSIGNMENT_STATUSES = ['WAITING_FOR_DOCUMENTS', 'DOCUMENTS_UPLOADED', 'UNDER_REVIEW']
       if (form.doctor && !prevDoctorRef && PRE_ASSIGNMENT_STATUSES.includes(normalizeCaseStatus(form.status))) {
         payload.status = 'DOCTOR_ASSIGNED'
       }

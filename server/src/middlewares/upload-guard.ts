@@ -30,6 +30,19 @@ const ALLOWED_MIME = new Set<string>([
   'video/quicktime',
 ]);
 
+// Positive allowlist of extensions, mirroring ALLOWED_MIME. This is the PRIMARY
+// gate: the upstream body parser (koa-body + formidable v2) collapses every
+// multipart part's MIME to "application/octet-stream", so we cannot rely on the
+// reported MIME at this layer — extension + the denylist below are authoritative.
+const ALLOWED_EXTENSIONS = new Set<string>([
+  // Documents
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+  // Images
+  '.jpg', '.jpeg', '.png', '.webp', '.gif',
+  // Video (consultation recordings, patient guide videos)
+  '.mp4', '.webm', '.mov',
+]);
+
 // Always rejected, regardless of MIME — defence in depth against MIME spoofing.
 const DENIED_EXTENSIONS = new Set<string>([
   // Script / markup (XSS vector when served back inline)
@@ -76,7 +89,20 @@ function isAllowedFile(file: any): { ok: true } | { ok: false; reason: string } 
     return { ok: false, reason: `File extension "${ext}" is not allowed` };
   }
 
-  if (mime && !ALLOWED_MIME.has(mime.toLowerCase())) {
+  // Primary gate: extension must be on the allowlist. The body parser reports
+  // MIME as octet-stream for every part, so the extension is the reliable signal.
+  if (!ext) {
+    return { ok: false, reason: 'File must have an extension' };
+  }
+  if (!ALLOWED_EXTENSIONS.has(ext)) {
+    return { ok: false, reason: `File extension "${ext}" is not allowed` };
+  }
+
+  // Secondary gate: only enforce MIME when the parser actually resolved a real
+  // type. "application/octet-stream" and empty are treated as "unknown" and fall
+  // back to the extension check above.
+  const normalizedMime = mime.toLowerCase();
+  if (normalizedMime && normalizedMime !== 'application/octet-stream' && !ALLOWED_MIME.has(normalizedMime)) {
     return { ok: false, reason: `MIME type "${mime}" is not allowed` };
   }
 
