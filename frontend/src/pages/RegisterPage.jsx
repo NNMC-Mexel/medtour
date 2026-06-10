@@ -13,6 +13,13 @@ import useAuthStore from '../stores/authStore'
 import { isValidEmail, isValidPhone, isValidIIN } from '../utils/helpers'
 import { specializationsAPI, normalizeResponse } from '../services/api'
 
+const defaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Almaty'
+const languageOptions = [
+  { value: 'en', label: 'English' },
+  { value: 'ru', label: 'Русский' },
+  { value: 'kk', label: 'Қазақша' },
+]
+
 function RegisterPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -22,7 +29,7 @@ function RegisterPage() {
   const [step, setStep] = useState(1)
   const [specializations, setSpecializations] = useState([])
   const [formData, setFormData] = useState({
-    fullName: '', email: '', phone: '', country: '', iin: '',
+    fullName: '', email: '', phone: '', country: '', language: 'en', timezone: defaultTimezone, iin: '',
     password: '', confirmPassword: '',
     specialization: '', licenseNumber: '', experience: '',
     education: '', workplace: '',
@@ -108,6 +115,8 @@ function RegisterPage() {
       fullName: formData.fullName,
       phone: formData.phone,
       country: formData.country,
+      language: formData.language,
+      timezone: formData.timezone,
       iin: formData.iin || null,
       userRole: userType,
     }
@@ -123,7 +132,21 @@ function RegisterPage() {
     }
 
     const result = await register(userData)
-    if (result.success) navigate('/patient/guide')
+    if (!result.success) return
+
+    if (result.requiresEmailConfirmation) {
+      // Backend created the account but kept confirmed=false until the user
+      // clicks the link in the confirmation email. Don't auto-login.
+      navigate('/verify-email-sent', {
+        state: {
+          email: formData.email,
+          message: result.message,
+        },
+      })
+      return
+    }
+
+    navigate('/patient/guide')
   }
 
   const patientBenefits = [
@@ -239,6 +262,31 @@ function RegisterPage() {
                       error={formErrors.country}
                       required
                     />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          {t('auth.register.language')}
+                        </label>
+                        <select
+                          name="language"
+                          value={formData.language}
+                          onChange={handleChange}
+                          className="w-full px-4 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        >
+                          {languageOptions.map((item) => (
+                            <option key={item.value} value={item.value}>{item.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <Input
+                        label={t('auth.register.timezone')}
+                        name="timezone"
+                        type="text"
+                        placeholder="Asia/Almaty"
+                        value={formData.timezone}
+                        onChange={handleChange}
+                      />
+                    </div>
                     <Button type="button" className="w-full" size="lg" onClick={handleNextStep}>
                       {t('common.continue')}
                     </Button>

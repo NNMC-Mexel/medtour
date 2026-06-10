@@ -72,12 +72,27 @@ const useAuthStore = create(
             fullName: userData.fullName,
             phone: userData.phone,
             country: userData.country,
+            language: userData.language,
+            timezone: userData.timezone,
             iin: userData.iin,
             doctorData: userData.doctorData || null,
           })
 
-          const { jwt, user } = response.data
+          const { jwt, user, requiresEmailConfirmation, message } = response.data
 
+          // New flow: server requires email confirmation before issuing JWT.
+          // Do not authenticate locally — show the "check your email" screen instead.
+          if (requiresEmailConfirmation || !jwt) {
+            set({ isLoading: false })
+            return {
+              success: true,
+              requiresEmailConfirmation: true,
+              user: user || null,
+              message: message || 'Please check your email to confirm your account.',
+            }
+          }
+
+          // Legacy path: server returned JWT directly (e.g. existing accounts).
           set({
             user,
             token: jwt,
@@ -141,6 +156,9 @@ const useAuthStore = create(
             fullName: data.fullName || null,
             email: data.email || null,
             phone: data.phone || null,
+            country: data.country || null,
+            language: data.language || null,
+            timezone: data.timezone || null,
             iin: data.iin || null,
             birthDate: data.birthDate || null,
             i18n: data.i18n || {},

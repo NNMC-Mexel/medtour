@@ -115,3 +115,18 @@ SERVER_URL=https://medtourserver.nnmc.kz
 - Doctor не видит case chat, если `doctorChatEnabled=false`.
 - `npm run check:chat-permissions` проходит в server.
 - `npm run smoke:chat-workspace` проходит на staging с JWT ролей.
+
+## 9. Capacitor mobile MVP
+
+- `cd frontend && npm run build && npm run cap:sync` проходит.
+- Android project содержит `CAMERA`, `RECORD_AUDIO`, `POST_NOTIFICATIONS` permissions.
+- iOS `Info.plist` содержит Camera/Microphone/Photo Library usage descriptions.
+- Patient после login попадает на рабочий dashboard, не на landing page.
+- Bottom navigation на iPhone SE: Case, Chat, Documents, Plan, Profile помещаются без overlap.
+- Register собирает country, preferred language и timezone; email confirmation не логинит пользователя автоматически.
+- Patient может открыть active MedicalCase, загрузить PDF/JPEG/PNG, открыть документ через authenticated blob fetch.
+- В network/request URL для `/api/file-proxy/*` нет `?token=`.
+- Анонимный запрос к private medical document через `/api/file-proxy/:key` возвращает 404/403 и не раскрывает файл.
+- `/patient/plan-trip` показывает read-only treatment plan/trip checklist.
+- `/consultation/:roomId` в native shell запрашивает camera/microphone; при ошибке доступны retry и chat fallback.
+- Push token регистрируется через `POST /api/device-tokens/register`; Firebase/APNs secrets не лежат во frontend.

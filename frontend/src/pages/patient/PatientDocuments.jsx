@@ -256,9 +256,8 @@ function PatientDocuments() {
   const handleDownload = async (doc) => {
     try {
       await openMediaInNewTab(doc.file)
-    } catch {
-      const url = getMediaUrl(doc.file)
-      if (url) window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (error) {
+      console.error('secure document open failed:', error)
     }
   }
 

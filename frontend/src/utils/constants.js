@@ -75,8 +75,17 @@ export const PATIENT_NAV_ITEMS = [
   { path: '/patient/appointments', label: 'nav.consultations', icon: 'calendar' },
   { path: '/patient/chat', label: 'nav.chat', icon: 'message-circle' },
   { path: '/patient/documents', label: 'nav.documents', icon: 'file-text' },
+  { path: '/patient/plan-trip', label: 'nav.plan_trip', icon: 'clipboard-list' },
   { path: '/patient/guide', label: 'nav.guide', icon: 'circle-help' },
   { path: '/patient/profile', label: 'nav.profile', icon: 'user' },
+]
+
+export const PATIENT_BOTTOM_NAV_ITEMS = [
+  { path: '/patient', label: 'nav.case_short', icon: 'activity' },
+  { path: '/patient/chat', label: 'nav.chat_short', icon: 'message-circle' },
+  { path: '/patient/documents', label: 'nav.documents_short', icon: 'file-text' },
+  { path: '/patient/plan-trip', label: 'nav.plan_trip_short', icon: 'clipboard-list' },
+  { path: '/patient/profile', label: 'nav.profile_short', icon: 'user' },
 ]
 
 export const DOCTOR_NAV_ITEMS = [

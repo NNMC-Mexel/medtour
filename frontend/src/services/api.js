@@ -311,13 +311,6 @@ export const getMediaUrl = (media) => {
     if (!url) return null;
 
     const fullUrl = url.startsWith("http") ? url : `${API_URL}${url}`;
-    const token = getAuthToken();
-
-    if (token && fullUrl.includes("/api/file-proxy/") && !fullUrl.includes("token=")) {
-        const separator = fullUrl.includes("?") ? "&" : "?";
-        return `${fullUrl}${separator}token=${encodeURIComponent(token)}`;
-    }
-
     return fullUrl;
 };
 
@@ -328,6 +321,21 @@ export const openMediaInNewTab = async (media) => {
     const response = await api.get(url, { responseType: "blob" });
     const objectUrl = URL.createObjectURL(response.data);
     window.open(objectUrl, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+};
+
+export const downloadMediaFile = async (media, filename = 'download') => {
+    const url = getMediaUrl(media);
+    if (!url) return;
+
+    const response = await api.get(url, { responseType: "blob" });
+    const objectUrl = URL.createObjectURL(response.data);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = filename || media?.name || "download";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
     setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 };
 
@@ -347,6 +355,8 @@ export const authAPI = {
             fullName: data.fullName,
             phone: data.phone,
             country: data.country,
+            language: data.language,
+            timezone: data.timezone,
             userRole: "patient",
         }),
 
@@ -913,4 +923,9 @@ export const notificationsAPI = {
         if (!documentId) return { data: { data: null } };
         return api.delete(`/api/notifications/${documentId}`);
     },
+};
+
+export const deviceTokensAPI = {
+    register: (data) => api.post('/api/device-tokens/register', data),
+    unregister: (token) => api.delete('/api/device-tokens/unregister', { data: { token } }),
 };

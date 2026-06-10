@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { User, Mail, Phone, Calendar, CreditCard, Shield, Bell, LogOut, Languages } from 'lucide-react'
+import { User, Mail, Phone, Calendar, CreditCard, Shield, Bell, LogOut, Languages, Globe2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -14,6 +14,9 @@ const getProfileFormData = (user) => ({
   fullName: user?.fullName || '',
   email: user?.email || '',
   phone: user?.phone || '',
+  country: user?.country || '',
+  language: user?.language || 'en',
+  timezone: user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || '',
   iin: user?.iin || '',
   birthDate: user?.birthDate || '',
   i18n: user?.i18n || {},
@@ -125,6 +128,9 @@ function PatientProfile() {
     { name: 'fullName', label: t('profile.full_name'), icon: User, type: 'text' },
     { name: 'email', label: t('profile.email'), icon: Mail, type: 'email' },
     { name: 'phone', label: t('profile.phone'), icon: Phone, type: 'tel' },
+    { name: 'country', label: t('profile.country'), icon: Globe2, type: 'text' },
+    { name: 'language', label: t('profile.language'), icon: Languages, type: 'text' },
+    { name: 'timezone', label: t('profile.timezone'), icon: Globe2, type: 'text' },
     { name: 'iin', label: t('profile.iin'), icon: CreditCard, type: 'text' },
     { name: 'birthDate', label: t('profile.birth_date'), icon: Calendar, type: 'date' },
   ]
