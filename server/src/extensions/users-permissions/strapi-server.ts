@@ -257,8 +257,6 @@ export default (plugin) => {
       },
 
       async register(ctx) {
-        console.log('[auth.register] Custom registration handler started');
-
         // 0. Извлекаем дополнительные поля и УБИРАЕМ из body,
         //    иначе Strapi-валидация отклонит запрос: "Invalid parameters"
         const requestBody = ctx.request?.body || {};
@@ -273,44 +271,57 @@ export default (plugin) => {
           return ctx.forbidden('Staff registration is disabled. MedTour staff and doctors are created by administrators.');
         }
         const userRole = 'patient';
+        const email = typeof cleanBody.email === 'string' ? cleanBody.email.toLowerCase() : '';
 
-        console.log(`[auth.register] userRole=${userRole}, fullName=${fullName}`);
-
-        // Подменяем body — оставляем только username, email, password
+        // Подменяем body — Strapi-валидатор видит только username, email, password
         ctx.request.body = cleanBody;
 
-        // Вызываем оригинальную регистрацию Strapi (создаёт user + JWT)
-        await originalRegister(ctx);
-
-        // Если регистрация не удалась — выходим (ошибка уже в ctx.response)
-        const responseBody = ctx.response?.body || ctx.body;
-        console.log('[auth.register] Response user id:', responseBody?.user?.id);
-
-        if (!responseBody?.user?.id) {
-          console.log('[auth.register] No user id in response, skipping role assignment');
-          return;
+        // Strapi's built-in register CREATES the user (confirmed=false, because
+        // email_confirmation is enforced on at bootstrap) and THEN tries to send
+        // the confirmation email. If only the email send fails it throws
+        // 'Error sending confirmation email' AFTER the user row already exists.
+        //
+        // Previously that throw escaped before our profile/role update ran, which
+        // left a half-created account (no role/profile/iin) that could never be
+        // re-registered or logged into. We now swallow ONLY that specific failure
+        // and finish the account, while genuine validation/duplicate errors are
+        // re-thrown so the client still gets the correct 4xx.
+        let confirmationEmailFailed = false;
+        try {
+          await originalRegister(ctx);
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          if (!/sending confirmation email/i.test(msg)) {
+            throw error; // bad password, taken email, invalid params, etc.
+          }
+          confirmationEmailFailed = true;
+          strapi.log.warn('[auth.register] Confirmation email failed at create time; account kept, will retry once.');
         }
 
-        const userId = responseBody.user.id;
-
-        let createdDoctorDocId: string | undefined;
+        // Resolve the freshly-created user id — from the success response, or by
+        // email when the email-send path threw before ctx.send populated the body.
+        const responseBody = ctx.response?.body || ctx.body;
+        let userId = responseBody?.user?.id;
+        if (!userId && email) {
+          const existing = await strapi.query('plugin::users-permissions.user').findOne({ where: { email } });
+          userId = existing?.id;
+        }
+        if (!userId) {
+          // Nothing was created — leave whatever response Strapi produced.
+          return;
+        }
 
         try {
           // 1. Находим целевую Strapi-роль
           const targetRole = await resolveRoleByType(userRole);
-
           if (!targetRole) {
             // Hard fail — assigning the wrong role (authenticated) is a security risk
             throw new Error(`Role '${userRole}' not found in Strapi. Check roles configuration.`);
           }
 
-          console.log(`[auth.register] Found role: id=${targetRole.id}, name=${targetRole.name}, type=${targetRole.type}`);
-
-          const roleId = targetRole.id;
-
-          // 2. Обновляем user: userRole + fullName + phone + country + iin + правильная Strapi-роль.
-          // Сбрасываем confirmed=false — пользователь должен подтвердить email перед login.
-          // Без этого регистрация = заявка на любой email (email squatting / impersonation).
+          // 2. Обновляем user: userRole + профиль + правильная Strapi-роль.
+          // confirmed=false — пользователь должен подтвердить email перед login
+          // (иначе регистрация = заявка на чужой email / impersonation).
           await strapi.query('plugin::users-permissions.user').update({
             where: { id: userId },
             data: {
@@ -323,39 +334,32 @@ export default (plugin) => {
               iin: iin || null,
               platformGuideCompleted: false,
               platformGuideCompletedAt: null,
-              role: roleId,
+              role: targetRole.id,
               confirmed: false,
             },
           });
 
-          console.log(`[auth.register] User ${userId} updated: userRole=${userRole}, roleId=${roleId}, confirmed=false`);
-
-          // 3. Шлём подтверждение email. sendConfirmationEmail внутри генерирует
-          // confirmationToken, сохраняет на пользователе и шлёт письмо с
-          // ссылкой /api/auth/email-confirmation?confirmation=<token>.
-          // Не блокируем регистрацию если SMTP недоступен — пользователь
-          // позже может запросить повторную отправку через
-          // /api/auth/send-email-confirmation.
-          const freshUser = await strapi.query('plugin::users-permissions.user').findOne({
-            where: { id: userId },
-          });
-          try {
-            await strapi
-              .plugin('users-permissions')
-              .service('user')
-              .sendConfirmationEmail(freshUser);
-          } catch (emailError) {
-            const emailMsg = emailError instanceof Error ? emailError.message : String(emailError);
-            console.error('[auth.register] Failed to send confirmation email — continuing:', emailMsg);
+          // 3. Письмо подтверждения шлём ТОЛЬКО если встроенный register не смог.
+          // На happy-path Strapi уже отправил ровно одно письмо — повторная
+          // отправка перегенерировала бы confirmationToken и убила бы ссылку,
+          // которую пользователь только что получил (это и был баг с двойным письмом).
+          if (confirmationEmailFailed) {
+            const freshUser = await strapi.query('plugin::users-permissions.user').findOne({ where: { id: userId } });
+            try {
+              await strapi.plugin('users-permissions').service('user').sendConfirmationEmail(freshUser);
+              confirmationEmailFailed = false;
+            } catch (emailError) {
+              const emailMsg = emailError instanceof Error ? emailError.message : String(emailError);
+              strapi.log.error('[auth.register] Confirmation email retry failed — account kept:', emailMsg);
+            }
           }
 
-          // 4. Подменяем ответ: JWT НЕ возвращаем (email не подтверждён).
-          // Фронтенд должен показать "проверьте почту" и не залогинить пользователя.
+          // 4. Ответ без JWT — email не подтверждён, пользователь не залогинен.
           const safeUser = {
-            id: responseBody.user.id,
-            documentId: responseBody.user.documentId,
-            username: responseBody.user.username,
-            email: responseBody.user.email,
+            id: userId,
+            documentId: responseBody?.user?.documentId,
+            username: responseBody?.user?.username,
+            email: responseBody?.user?.email || email,
             confirmed: false,
             blocked: false,
             userRole,
@@ -369,9 +373,13 @@ export default (plugin) => {
           const newBody = {
             user: safeUser,
             requiresEmailConfirmation: true,
-            message: 'Registration successful. Please check your email to confirm your account before logging in.',
+            emailDelivered: !confirmationEmailFailed,
+            message: confirmationEmailFailed
+              ? 'Registration successful, but we could not send the confirmation email right now. Please use "resend confirmation" or contact support.'
+              : 'Registration successful. Please check your email to confirm your account before logging in.',
           };
 
+          ctx.status = 200;
           if (ctx.response?.body) {
             ctx.response.body = newBody;
           } else {
@@ -384,33 +392,20 @@ export default (plugin) => {
             userId,
             userRole,
             confirmed: false,
-            emailConfirmationSent: true,
+            emailConfirmationSent: !confirmationEmailFailed,
             ts: new Date().toISOString(),
           }));
-
-          console.log('[auth.register] Registration complete — awaiting email confirmation');
         } catch (error) {
+          // Profile finalization itself failed (DB error / missing role). Roll the
+          // user back so the email can be reused on retry. Email-send failures do
+          // NOT reach here — they are handled above without rollback.
           const safeMessage = error instanceof Error ? error.message : String(error);
-          console.error('[auth.register] Error during extended registration — rolling back user:', safeMessage);
-
-          // Rollback: remove the partially-created doctor profile and user so the
-          // client can safely retry. The JWT was only written to ctx.body (not flushed),
-          // so we can still overwrite the response before Strapi sends it.
-          if (createdDoctorDocId) {
-            try {
-              await strapi.documents('api::doctor.doctor').delete({ documentId: createdDoctorDocId });
-              console.log(`[auth.register] Rolled back doctor profile ${createdDoctorDocId}`);
-            } catch (deleteErr) {
-              const deleteMsg = deleteErr instanceof Error ? deleteErr.message : String(deleteErr);
-              console.error('[auth.register] Failed to rollback doctor profile:', deleteMsg);
-            }
-          }
+          strapi.log.error('[auth.register] Profile finalization failed — rolling back user:', safeMessage);
           try {
             await strapi.query('plugin::users-permissions.user').delete({ where: { id: userId } });
-            console.log(`[auth.register] Rolled back user ${userId}`);
           } catch (deleteErr) {
             const deleteMsg = deleteErr instanceof Error ? deleteErr.message : String(deleteErr);
-            console.error('[auth.register] Failed to rollback user:', deleteMsg);
+            strapi.log.error('[auth.register] Failed to rollback user:', deleteMsg);
           }
 
           ctx.status = 500;

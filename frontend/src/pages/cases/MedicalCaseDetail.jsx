@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -162,6 +162,9 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
   const [description, setDescription] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const [savingDocId, setSavingDocId] = useState(null)
+  // Synchronous guard against double-submit (the isUploading state disables the
+  // button only after a re-render, leaving a fast double-click window).
+  const uploadingRef = useRef(false)
 
   const docs = medicalCase.medical_documents || []
 
@@ -171,6 +174,8 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
       toast.warning(t('case_detail.toast_doc_choose'))
       return
     }
+    if (uploadingRef.current) return
+    uploadingRef.current = true
     setIsUploading(true)
     try {
       const uploaded = await uploadFile(file)
@@ -192,6 +197,7 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
       toast.error(error?.response?.data?.error?.message || error.message || t('case_detail.toast_doc_error'))
     } finally {
       setIsUploading(false)
+      uploadingRef.current = false
     }
   }
 

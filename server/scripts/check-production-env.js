@@ -21,9 +21,24 @@ const productionRequired = [
   'MINIO_ACCESS_KEY',
   'MINIO_SECRET_KEY',
   'MINIO_BUCKET',
+  // PII encryption-at-rest for iin/passportNumber (RK Law 94-V art.10).
+  // Without it those fields are stored in plaintext — not acceptable in prod.
+  'PII_ENCRYPTION_KEY',
 ];
 
 const insecureValues = new Set(['', 'toBeModified1,toBeModified2', 'tobemodified', 'changeme', 'change-me']);
+
+// A valid PII key is 32 bytes, supplied as 64 hex chars OR base64 (mirrors
+// src/utils/pii-crypto.ts getKey()).
+function isValidPiiKey(raw) {
+  if (!raw) return false;
+  if (/^[0-9a-fA-F]{64}$/.test(raw)) return true;
+  try {
+    return Buffer.from(raw, 'base64').length === 32;
+  } catch {
+    return false;
+  }
+}
 
 function fail(message) {
   console.error(`  [FAIL] ${message}`);
@@ -58,6 +73,13 @@ if (process.env.NODE_ENV === 'production') {
   for (const key of productionRequired) {
     if (!process.env[key]) fail(`${key} is required in production`);
     else console.log(`  [OK] ${key}`);
+  }
+
+  // PII_ENCRYPTION_KEY must not only be present but be a usable 32-byte key,
+  // otherwise pii-crypto silently falls back to plaintext storage.
+  const piiKey = (process.env.PII_ENCRYPTION_KEY || '').replace(/^"|"$/g, '');
+  if (piiKey && !isValidPiiKey(piiKey)) {
+    fail('PII_ENCRYPTION_KEY must be 32 bytes as 64 hex chars or base64 (openssl rand -hex 32)');
   }
 }
 

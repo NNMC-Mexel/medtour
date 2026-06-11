@@ -80,6 +80,11 @@ function PatientDocuments() {
   const [uploadType, setUploadType] = useState('other')
   const [uploadDescription, setUploadDescription] = useState('')
   const fileInputRef = useRef(null)
+  // Synchronous double-submit guard: the `isUploading` store flag only disables
+  // the button after a React re-render, leaving a window where a fast double
+  // click / mobile double-tap fires a second upload. This ref flips in the same
+  // tick and blocks the second call immediately.
+  const uploadingRef = useRef(false)
 
   useEffect(() => {
     if (user?.id) {
@@ -229,15 +234,21 @@ function PatientDocuments() {
 
   const handleUpload = async () => {
     if (!uploadFileState || !uploadTitle) return
-    const result = await uploadDocument(uploadFileState, {
-      title: uploadTitle,
-      type: uploadType,
-      description: uploadDescription,
-      userId: user.id,
-    })
-    if (result.success) {
-      setShowUploadModal(false)
-      resetUploadForm()
+    if (uploadingRef.current) return
+    uploadingRef.current = true
+    try {
+      const result = await uploadDocument(uploadFileState, {
+        title: uploadTitle,
+        type: uploadType,
+        description: uploadDescription,
+        userId: user.id,
+      })
+      if (result.success) {
+        setShowUploadModal(false)
+        resetUploadForm()
+      }
+    } finally {
+      uploadingRef.current = false
     }
   }
 
