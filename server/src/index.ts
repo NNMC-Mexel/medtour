@@ -778,12 +778,14 @@ export default {
     // L1: refuse to silently store IIN / passport in plaintext in production.
     if (!isPiiEncryptionEnabled()) {
       const msg = 'PII_ENCRYPTION_KEY missing/invalid (need 32 bytes as hex or base64): ' +
-        'iin/passportNumber will be stored in PLAINTEXT. Required for RK Law 94-V compliance.';
+        'iin/passportNumber would be stored in PLAINTEXT. Required for RK Law 94-V compliance.';
       if (process.env.NODE_ENV === 'production') {
-        strapi.log.error('⛔ ' + msg);
-      } else {
-        strapi.log.warn('⚠️  ' + msg);
+        // Hard fail: do not boot a production node that would persist medical
+        // PII in the clear. Crashing here is safer than silently leaking.
+        strapi.log.error('⛔ ' + msg + ' Refusing to start.');
+        throw new Error('PII_ENCRYPTION_KEY is required in production');
       }
+      strapi.log.warn('⚠️  ' + msg);
     } else {
       strapi.log.info('PII encryption enabled (iin/passportNumber, AES-256-GCM).');
     }

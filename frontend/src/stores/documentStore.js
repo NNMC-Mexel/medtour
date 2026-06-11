@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { documentsAPI, normalizeResponse, uploadFile } from '../services/api'
 
-const useDocumentStore = create((set) => ({
+const useDocumentStore = create((set, get) => ({
   documents: [],
   currentDocument: null,
   myDoctors: [],
@@ -39,6 +39,12 @@ const useDocumentStore = create((set) => ({
 
   // Upload document
   uploadDocument: async (file, metadata) => {
+    // Defence-in-depth against double-submit: the store flag updates
+    // synchronously, so a second call while the first is in flight bails out
+    // even if the UI button has not yet re-rendered to its disabled state.
+    if (get().isUploading) {
+      return { success: false, error: 'Upload already in progress' }
+    }
     set({ isUploading: true, error: null })
     try {
       // 1. Загружаем файл в Media Library
