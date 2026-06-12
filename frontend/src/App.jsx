@@ -220,8 +220,8 @@ function App() {
           <Route path="cases/:id" element={<MedicalCaseDetail />} />
           <Route path="appointments" element={<PatientAppointments />} />
           <Route path="appointments/:id" element={<AppointmentDetail />} />
-          <Route path="doctors" element={<DoctorsPage />} />
-          <Route path="doctors/:id" element={<DoctorProfilePage />} />
+          <Route path="doctors" element={<Navigate to="/patient/appointments" replace />} />
+          <Route path="doctors/:id" element={<Navigate to="/patient/appointments" replace />} />
           <Route path="chat" element={<PatientChat />} />
           <Route path="documents" element={<PatientDocuments />} />
           <Route path="plan-trip" element={<PatientPlanTrip />} />

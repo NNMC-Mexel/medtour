@@ -6,7 +6,6 @@ import {
     Briefcase,
     GraduationCap,
     MessageCircle,
-    Calendar,
     ChevronLeft,
     Video,
     MapPin,
@@ -25,7 +24,6 @@ import {
 import Button from "../components/ui/Button";
 import Avatar from "../components/ui/Avatar";
 import Badge from "../components/ui/Badge";
-import BookingModal from "../components/appointments/BookingModal";
 import { useTranslation } from "react-i18next";
 import api, { normalizeResponse, getMediaUrl } from "../services/api";
 import { formatPrice, formatDate, isDoctorOnline, getSpecName, getDoctorField } from "../utils/helpers";
@@ -36,7 +34,6 @@ function DoctorProfilePage() {
     const [doctor, setDoctor] = useState(null);
     const [reviews, setReviews] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [showBookingModal, setShowBookingModal] = useState(false);
 
     useEffect(() => {
         fetchDoctorData();
@@ -200,7 +197,7 @@ function DoctorProfilePage() {
                                         </div>
                                     </div>
 
-                                    {/* Price & Book Button */}
+                                    {/* Price */}
                                     <div className='p-4 bg-gradient-to-br from-teal-50 to-sky-50 rounded-2xl mb-4 text-teal-800 border border-teal-100'>
                                         <p className='text-xs uppercase tracking-wide text-teal-500 mb-1'>
                                             {t('doctor_public.price_label')}
@@ -218,18 +215,6 @@ function DoctorProfilePage() {
                                             </span>
                                         </p>
                                     </div>
-
-                                    <Button
-                                        className='w-full'
-                                        size='lg'
-                                        onClick={() =>
-                                            setShowBookingModal(true)
-                                        }
-                                        leftIcon={
-                                            <Calendar className='w-5 h-5' />
-                                        }>
-                                        {t('doctor_public.book')}
-                                    </Button>
                                 </CardContent>
                             </Card>
 
@@ -513,13 +498,6 @@ function DoctorProfilePage() {
                         </div>
                     </div>
                 </div>
-
-                {/* Booking Modal */}
-                <BookingModal
-                    isOpen={showBookingModal}
-                    onClose={() => setShowBookingModal(false)}
-                    doctor={doctor}
-                />
             </div>
         </div>
     );

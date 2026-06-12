@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useSearchParams, useLocation } from 'react-router-dom'
+import { useSearchParams, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Search,
@@ -13,8 +13,6 @@ import { Card, CardContent } from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import DoctorCard from '../components/doctors/DoctorCard'
 import useAppointmentStore from '../stores/appointmentStore'
-import useAuthStore from '../stores/authStore'
-import BookingModal from '../components/appointments/BookingModal'
 import { getSpecName } from '../utils/helpers'
 
 function DoctorsPage() {
@@ -32,8 +30,6 @@ function DoctorsPage() {
   const [sortBy, setSortBy] = useState('rating')
   const [showFilters, setShowFilters] = useState(false)
   const [priceRange, setPriceRange] = useState({ min: '', max: '' })
-  const [selectedDoctor, setSelectedDoctor] = useState(null)
-  const [showBookingModal, setShowBookingModal] = useState(false)
 
   const { 
     doctors, 
@@ -43,7 +39,6 @@ function DoctorsPage() {
     fetchSpecializations 
   } = useAppointmentStore()
   
-  const { isAuthenticated } = useAuthStore()
   const location = useLocation()
   
   // Определяем базовый путь (для пациентов и публичных страниц)
@@ -83,15 +78,6 @@ function DoctorsPage() {
           return 0
       }
     })
-
-  const handleBookClick = (doctor) => {
-    if (!isAuthenticated) {
-      window.location.href = '/login'
-      return
-    }
-    setSelectedDoctor(doctor)
-    setShowBookingModal(true)
-  }
 
   const isInDashboard = basePath === '/patient'
 
@@ -291,7 +277,6 @@ function DoctorsPage() {
                     key={doctor.id || doctor.documentId}
                     doctor={doctor}
                     basePath={basePath}
-                    onBookClick={handleBookClick}
                   />
                 ))}
               </div>
@@ -299,18 +284,6 @@ function DoctorsPage() {
           </div>
         </div>
       </div>
-
-      {/* Booking Modal */}
-      {selectedDoctor && (
-        <BookingModal
-          isOpen={showBookingModal}
-          onClose={() => {
-            setShowBookingModal(false)
-            setSelectedDoctor(null)
-          }}
-          doctor={selectedDoctor}
-        />
-      )}
     </div>
   )
 }

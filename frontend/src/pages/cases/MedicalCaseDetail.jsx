@@ -837,7 +837,7 @@ function MedicalCaseDetail() {
   const [clinics, setClinics] = useState([])
   const [doctors, setDoctors] = useState([])
   const [managers, setManagers] = useState([])
-  const [coordinators, setCoordinators] = useState([])
+  const [_coordinators, setCoordinators] = useState([])
   const [plans, setPlans] = useState([])
   const [checklists, setChecklists] = useState([])
   const [visas, setVisas] = useState([])

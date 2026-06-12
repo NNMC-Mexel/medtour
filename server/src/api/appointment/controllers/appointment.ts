@@ -234,12 +234,16 @@ export default factories.createCoreController('api::appointment.appointment', ()
     const isAdmin = isApiToken || user?.role?.type === 'admin' || user?.userRole === 'admin';
     const isHumanAdmin = user?.role?.type === 'admin' || user?.userRole === 'admin';
     const isStaff = !isApiToken && (['manager', 'coordinator'].includes(user?.userRole) || ['manager', 'coordinator'].includes(user?.role?.type));
+    const body = (ctx.request.body as any)?.data || ctx.request.body || {};
+    const linkedCaseRef = body.medical_case || body.medicalCase;
 
-    if (!isPatient && !isAdmin && !isStaff) {
-      return ctx.forbidden('Only patients or staff can create appointments');
+    if (isPatient && !linkedCaseRef) {
+      return ctx.forbidden('Patients can only book consultation time for an assigned MedTour case.');
     }
 
-    const body = (ctx.request.body as any)?.data || ctx.request.body || {};
+    if (!isAdmin && !isStaff) {
+      if (!isPatient) return ctx.forbidden('Only staff can create appointments');
+    }
 
     // --- Input validation ---
     if (!body.dateTime) return ctx.badRequest('dateTime is required');
@@ -255,15 +259,15 @@ export default factories.createCoreController('api::appointment.appointment', ()
     if (!body.roomId || typeof body.roomId !== 'string' || body.roomId.length > 128) {
       return ctx.badRequest('roomId is required and must be a valid string');
     }
-    if (body.medical_case) {
-      if (!isApiToken && !(await userCanAccessMedicalCase(strapi, user, body.medical_case))) {
+    if (linkedCaseRef) {
+      if (!isApiToken && !(await userCanAccessMedicalCase(strapi, user, linkedCaseRef))) {
         return ctx.forbidden('Medical case is not available for this appointment');
       }
       // In Strapi v5, relations in published documents require the related document
       // to also be published. Ensure a published version of the medical case exists.
-      const caseDocId = typeof body.medical_case === 'string'
-        ? body.medical_case
-        : String(body.medical_case);
+      const caseDocId = typeof linkedCaseRef === 'string'
+        ? linkedCaseRef
+        : String(linkedCaseRef);
       await ensureMedicalCasePublished(strapi, caseDocId);
     }
 
@@ -338,6 +342,25 @@ export default factories.createCoreController('api::appointment.appointment', ()
       return ctx.badRequest('Doctor not found');
     }
 
+    if (isPatient) {
+      const caseDocId = typeof linkedCaseRef === 'string' ? linkedCaseRef : String(linkedCaseRef);
+      const medicalCase = await strapi.documents('api::medical-case.medical-case' as any).findOne({
+        documentId: caseDocId,
+        populate: { doctor: { fields: ['id', 'documentId'] } },
+      });
+      const assignedDoctorDocId = medicalCase?.doctor?.documentId;
+      if (!assignedDoctorDocId) {
+        return ctx.forbidden('A doctor must be assigned before the patient can choose consultation time.');
+      }
+      if (assignedDoctorDocId !== doctorDocId) {
+        return ctx.forbidden('Patients can only book time with the doctor assigned to their MedTour case.');
+      }
+      const allowedCaseStatuses = ['DOCTOR_ASSIGNED', 'WAITING_PATIENT_CONFIRMATION', 'UNDER_REVIEW', 'DOCUMENTS_UPLOADED'];
+      if (!allowedCaseStatuses.includes(medicalCase?.status)) {
+        return ctx.forbidden('Consultation time can only be selected while the case is waiting for booking.');
+      }
+    }
+
     const isFreeConsultation = process.env.FREE_CONSULTATIONS === 'true';
     const isPaymentsLive = process.env.PAYMENTS_LIVE === 'true';
     const allowTestPaymentsInProduction = process.env.ALLOW_TEST_PAYMENTS_IN_PRODUCTION === 'true';
@@ -345,7 +368,7 @@ export default factories.createCoreController('api::appointment.appointment', ()
     // When free-consultation mode is active, price is always 0 regardless of the doctor's rate.
     // Price validation is also skipped for case-based and staff-created appointments.
     const actualPrice = isFreeConsultation ? 0 : Number(doctorRecord.price);
-    const isCaseBased = !!body.medical_case;
+    const isCaseBased = !!linkedCaseRef;
     if (!isFreeConsultation && !isCaseBased && !isStaff) {
       const submittedPrice = Number(body.price);
       if (!submittedPrice || submittedPrice !== actualPrice) {

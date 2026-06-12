@@ -284,11 +284,6 @@ function PatientDashboard() {
                 <div className="text-center py-8">
                   <Calendar className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-600">{t('patient.no_appointments')}</p>
-                  <Link to="/patient/doctors">
-                    <Button variant="outline" size="sm" className="mt-3">
-                      {t('patient.book_appointment')}
-                    </Button>
-                  </Link>
                 </div>
               ) : (
                 upcomingAppointments.map((appointment) => {
