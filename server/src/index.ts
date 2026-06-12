@@ -740,6 +740,50 @@ async function enforceUsersPermissionsAdvanced(strapi: Core.Strapi) {
   }
 }
 
+/**
+ * users-permissions stores transactional email templates in core_store. Those
+ * templates carry their own "from" address and do not use the email provider's
+ * defaultFrom. Keep them aligned with SMTP env so Yandex does not reject
+ * confirmation emails with "Sender address rejected: user not found".
+ */
+async function enforceUsersPermissionsEmailSettings(strapi: Core.Strapi) {
+  const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER;
+  if (!fromEmail) {
+    strapi.log.warn('SMTP_FROM/SMTP_USER is not set; users-permissions email sender was not enforced.');
+    return;
+  }
+
+  try {
+    const pluginStore = strapi.store({ type: 'plugin', name: 'users-permissions' });
+    const current = ((await pluginStore.get({ key: 'email' })) as Record<string, any> | null) || {};
+    const from = {
+      name: process.env.SMTP_FROM_NAME || 'MedTour',
+      email: fromEmail,
+    };
+
+    const patchTemplate = (template: any) => ({
+      ...(template || {}),
+      options: {
+        ...(template?.options || {}),
+        from,
+        response_email: fromEmail,
+      },
+    });
+
+    const next = {
+      ...current,
+      email_confirmation: patchTemplate(current.email_confirmation),
+      reset_password: patchTemplate(current.reset_password),
+    };
+
+    await pluginStore.set({ key: 'email', value: next });
+    strapi.log.info(`Users-permissions email sender enforced: ${from.email}`);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    strapi.log.error(`Failed to enforce users-permissions email settings: ${msg}`);
+  }
+}
+
 export default {
   register({ strapi }: { strapi: Core.Strapi }) {
     // PII encryption-at-rest for iin / passportNumber (RK Law 94-V art.10).
@@ -774,6 +818,7 @@ export default {
     await seedClinics(strapi);
     await seedRolesAndPermissions(strapi);
     await enforceUsersPermissionsAdvanced(strapi);
+    await enforceUsersPermissionsEmailSettings(strapi);
 
     // L1: refuse to silently store IIN / passport in plaintext in production.
     if (!isPiiEncryptionEnabled()) {
