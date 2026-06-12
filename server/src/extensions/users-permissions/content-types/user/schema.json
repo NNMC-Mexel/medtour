@@ -120,6 +120,11 @@
     "phone": {
       "type": "string"
     },
+    "phoneNormalized": {
+      "type": "string",
+      "private": true,
+      "configurable": false
+    },
     "country": {
       "type": "string"
     },

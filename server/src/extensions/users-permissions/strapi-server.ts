@@ -47,6 +47,40 @@ export default (plugin) => {
       : requestBody;
   };
 
+  const normalizePhoneDigits = (value: any) => String(value || '').replace(/\D/g, '');
+
+  const buildPhoneLookupValues = (value: any) => {
+    const digits = normalizePhoneDigits(value);
+    if (!digits) return { normalizedCandidates: [], displayCandidates: [] };
+
+    const localDigits = digits.slice(-10);
+    const normalizedCandidates = [
+      digits,
+      localDigits.length === 10 ? localDigits : null,
+      localDigits.length === 10 ? `7${localDigits}` : null,
+      localDigits.length === 10 ? `8${localDigits}` : null,
+    ].filter(Boolean) as string[];
+
+    const displayCandidates = [
+      String(value).trim(),
+      localDigits.length === 10 ? `+7${localDigits}` : null,
+      localDigits.length === 10 ? `7${localDigits}` : null,
+      localDigits.length === 10 ? `8${localDigits}` : null,
+      localDigits.length === 10 ? localDigits : null,
+    ].filter(Boolean) as string[];
+
+    return {
+      normalizedCandidates: [...new Set(normalizedCandidates)],
+      displayCandidates: [...new Set(displayCandidates)],
+    };
+  };
+
+  const enrichPhoneNormalized = (data: any) => {
+    if (!Object.prototype.hasOwnProperty.call(data, 'phone')) return data;
+    data.phoneNormalized = data.phone ? normalizePhoneDigits(data.phone) || null : null;
+    return data;
+  };
+
   const assignRoleFromUserRole = async (body: any) => {
     if (body.role) return body;
 
@@ -97,7 +131,7 @@ export default (plugin) => {
       data.platformGuideCompletedAt = data.platformGuideCompleted ? new Date().toISOString() : null;
     }
 
-    return data;
+    return enrichPhoneNormalized(data);
   };
 
   plugin.controllers.user = {
@@ -115,6 +149,7 @@ export default (plugin) => {
       try {
         const sourceBody = normalizeContentApiBody(ctx.request?.body || {});
         await assignRoleFromUserRole(sourceBody);
+        enrichPhoneNormalized(sourceBody);
         ctx.request.body = sourceBody;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -210,40 +245,55 @@ export default (plugin) => {
 
         if (identifier) {
           const trimmed = String(identifier).trim();
-          const digitsOnly = trimmed.replace(/\D/g, '');
+          const digitsOnly = normalizePhoneDigits(trimmed);
           const isPhone = digitsOnly.length >= 7 && /^[\d\s\+\-\(\)]+$/.test(trimmed);
 
           if (isPhone) {
-            // Build exact-match candidates from the same digit string to avoid
-            // loading ALL users into memory (collision + performance risk).
-            // We try up to 4 known formats used in Kazakhstan:
-            //   +7XXXXXXXXXX  (international)
-            //    7XXXXXXXXXX  (without +)
-            //    8XXXXXXXXXX  (Russian-style)
-            //     XXXXXXXXXX  (local 10-digit)
-            const localDigits = digitsOnly.slice(-10); // last 10 digits
-            const phoneCandidates: string[] = [trimmed];
+            const { normalizedCandidates, displayCandidates } = buildPhoneLookupValues(trimmed);
 
-            if (localDigits.length === 10) {
-              const variants = [
-                `+7${localDigits}`,
-                `7${localDigits}`,
-                `8${localDigits}`,
-                localDigits,
-              ];
-              // Add variants not already in the list
-              variants.forEach((v) => {
-                if (!phoneCandidates.includes(v)) phoneCandidates.push(v);
+            let foundUser: any = null;
+
+            for (const phoneNormalized of normalizedCandidates) {
+              foundUser = await strapi.query('plugin::users-permissions.user').findOne({
+                where: { phoneNormalized },
+                select: ['id', 'email', 'phone', 'phoneNormalized'],
+              });
+              if (foundUser) break;
+            }
+
+            for (const phoneVariant of displayCandidates) {
+              if (foundUser) break;
+              foundUser = await strapi.query('plugin::users-permissions.user').findOne({
+                where: { phone: phoneVariant },
+                select: ['id', 'email', 'phone', 'phoneNormalized'],
               });
             }
 
-            let foundUser: any = null;
-            for (const phoneVariant of phoneCandidates) {
-              foundUser = await strapi.query('plugin::users-permissions.user').findOne({
-                where: { phone: phoneVariant },
-                select: ['id', 'email', 'phone'],
+            // Backward compatibility for existing users whose phone was saved as
+            // "+7 778 000 36 34" etc. Once found, persist phoneNormalized so the
+            // next login is an exact lookup instead of this bounded scan.
+            if (!foundUser) {
+              const usersWithPhone = await strapi.query('plugin::users-permissions.user').findMany({
+                where: { phone: { $notNull: true } },
+                select: ['id', 'email', 'phone', 'phoneNormalized'],
+                limit: 2000,
               });
-              if (foundUser) break;
+              foundUser = usersWithPhone.find((user: any) => {
+                const normalizedPhone = normalizePhoneDigits(user.phone);
+                return normalizedCandidates.includes(normalizedPhone);
+              });
+            }
+
+            if (foundUser?.id && foundUser.phone && !foundUser.phoneNormalized) {
+              try {
+                await strapi.query('plugin::users-permissions.user').update({
+                  where: { id: foundUser.id },
+                  data: { phoneNormalized: normalizePhoneDigits(foundUser.phone) || null },
+                });
+              } catch (error) {
+                const msg = error instanceof Error ? error.message : String(error);
+                strapi.log.warn(`[auth.login] Failed to backfill phoneNormalized: ${msg}`);
+              }
             }
 
             if (foundUser?.email) {
@@ -336,6 +386,7 @@ export default (plugin) => {
               platformGuideCompletedAt: null,
               role: targetRole.id,
               confirmed: false,
+              phoneNormalized: phone ? normalizePhoneDigits(phone) || null : null,
             },
           });
 

@@ -15,6 +15,7 @@ import RegisterPage from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import VerifyEmailSentPage from './pages/VerifyEmailSentPage'
+import EmailConfirmedPage from './pages/EmailConfirmedPage'
 import TourismPage from './pages/TourismPage'
 import PriceListPage from './pages/PriceListPage'
 
@@ -202,6 +203,7 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/verify-email-sent" element={<VerifyEmailSentPage />} />
+        <Route path="/email-confirmed" element={<EmailConfirmedPage />} />
 
         {/* Patient Routes */}
         <Route

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import api, { authAPI } from '../services/api'
+import i18n from '../i18n'
 
 // Decode JWT expiry without external library (no signature verification — just expiry)
 function getJwtExpiry(token) {
@@ -17,6 +18,28 @@ function isTokenExpired(token) {
   const expiry = getJwtExpiry(token)
   if (!expiry) return false // can't determine, assume valid
   return Date.now() >= expiry
+}
+
+function getAuthErrorMessage(error, fallback = 'Ошибка входа') {
+  const status = error.response?.status
+  const name = error.response?.data?.error?.name || ''
+  const message = error.response?.data?.error?.message || ''
+  const normalized = String(message).toLowerCase()
+
+  if (status === 429 || name === 'TooManyRequests') {
+    return i18n.t('auth.login.error_too_many')
+  }
+  if (normalized.includes('email is not confirmed') || normalized.includes('email not confirmed')) {
+    return i18n.t('auth.login.error_unconfirmed')
+  }
+  if (normalized.includes('invalid identifier') || normalized.includes('invalid email or password')) {
+    return i18n.t('auth.login.error_invalid_credentials')
+  }
+  if (normalized.includes('blocked')) {
+    return i18n.t('auth.login.error_blocked')
+  }
+
+  return message || fallback
 }
 
 const useAuthStore = create(
@@ -51,7 +74,7 @@ const useAuthStore = create(
           
           return { success: true, user }
         } catch (error) {
-          const message = error.response?.data?.error?.message || 'Ошибка входа'
+          const message = getAuthErrorMessage(error)
           set({ error: message, isLoading: false })
           return { success: false, error: message }
         }
@@ -78,7 +101,7 @@ const useAuthStore = create(
             doctorData: userData.doctorData || null,
           })
 
-          const { jwt, user, requiresEmailConfirmation, message } = response.data
+          const { jwt, user, requiresEmailConfirmation, emailDelivered, message } = response.data
 
           // New flow: server requires email confirmation before issuing JWT.
           // Do not authenticate locally — show the "check your email" screen instead.
@@ -87,6 +110,7 @@ const useAuthStore = create(
             return {
               success: true,
               requiresEmailConfirmation: true,
+              emailDelivered: emailDelivered !== false,
               user: user || null,
               message: message || 'Please check your email to confirm your account.',
             }
