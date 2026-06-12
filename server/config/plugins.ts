@@ -4,6 +4,8 @@ export default ({ env }) => {
   const storageSecretKey = env('MINIO_SECRET_KEY', env('S3_ACCESS_SECRET'));
   const storageBucket = env('MINIO_BUCKET', env('S3_BUCKET'));
   const serverUrl = env('SERVER_URL', env('STRAPI_URL', 'http://localhost:1340'));
+  const smtpFrom = env('SMTP_FROM', env('SMTP_USER'));
+  const smtpFromName = env('SMTP_FROM_NAME', 'MedTour');
 
   return ({
   'users-permissions': {
@@ -30,8 +32,8 @@ export default ({ env }) => {
         },
       },
       settings: {
-        defaultFrom: `MedTour <${env('SMTP_FROM')}>`,
-        defaultReplyTo: env('SMTP_FROM'),
+        defaultFrom: smtpFrom ? `${smtpFromName} <${smtpFrom}>` : undefined,
+        defaultReplyTo: smtpFrom,
       },
     },
   },
