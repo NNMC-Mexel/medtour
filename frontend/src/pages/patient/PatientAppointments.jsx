@@ -227,11 +227,6 @@ function PatientAppointments() {
           <h1 className="text-2xl font-bold text-slate-900">{t('nav.appointments')}</h1>
           <p className="text-slate-600">{t('appointments.subtitle')}</p>
         </div>
-        <Link to="/doctors">
-          <Button rightIcon={<ChevronRight className="w-4 h-4" />}>
-            {t('appointments.book')}
-          </Button>
-        </Link>
       </div>
 
       {/* Search + Status filters */}
@@ -333,9 +328,6 @@ function PatientAppointments() {
                 ? t('appointments.empty_filtered')
                 : t('appointments.empty_all')}
             </p>
-            <Link to="/doctors">
-              <Button>{t('appointments.book')}</Button>
-            </Link>
           </CardContent>
         </Card>
       ) : (

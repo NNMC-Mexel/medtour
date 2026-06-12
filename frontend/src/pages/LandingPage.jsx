@@ -342,11 +342,6 @@ function DoctorsCarousel({ doctors }) {
                                                                 {t('common.price_per_consultation')}
                                                             </p>
                                                         </div>
-                                                        <Button
-                                                            size='sm'
-                                                            className='pointer-events-none'>
-                                                            {t('landing.doctors.book')}
-                                                        </Button>
                                                     </div>
                                                 </div>
                                             </div>

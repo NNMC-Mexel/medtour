@@ -6,7 +6,6 @@ import {
   Activity,
   AlertCircle,
   Bell,
-  Calendar,
   CheckCircle,
   Clock,
   FileText,

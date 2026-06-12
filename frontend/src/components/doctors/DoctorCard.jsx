@@ -1,7 +1,6 @@
 import { Star, Clock, ThumbsUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import Button from '../ui/Button'
 import { getMediaUrl } from '../../services/api'
 import { cn, getInitials, isDoctorOnline, getSpecName, getDoctorField } from '../../utils/helpers'
 
@@ -16,7 +15,7 @@ const colors = [
   'bg-gradient-to-br from-pink-400 to-pink-600',
 ]
 
-function DoctorCard({ doctor, onBookClick, basePath = '' }) {
+function DoctorCard({ doctor, basePath = '' }) {
   const navigate = useNavigate()
   const { t, i18n } = useTranslation()
 
@@ -44,11 +43,6 @@ function DoctorCard({ doctor, onBookClick, basePath = '' }) {
 
   const handleCardClick = () => {
     navigate(`${basePath}/doctors/${doctor.documentId}`)
-  }
-
-  const handleBookClick = (e) => {
-    e.stopPropagation()
-    onBookClick?.(doctor)
   }
 
   return (
@@ -100,15 +94,12 @@ function DoctorCard({ doctor, onBookClick, basePath = '' }) {
           </div>
         </div>
 
-        {/* Bottom row: Price + Button */}
+        {/* Bottom row: Price */}
         <div className="flex items-center justify-between pt-3 border-t border-slate-100">
           <div>
             <p className="text-xl font-bold text-slate-900">{price.toLocaleString('ru-RU')} ₸</p>
             <p className="text-xs text-slate-500">{t('common.price_per_consultation')}</p>
           </div>
-          <Button onClick={handleBookClick} size="md">
-            {t('common.book_appt')}
-          </Button>
         </div>
       </div>
 
@@ -186,9 +177,6 @@ function DoctorCard({ doctor, onBookClick, basePath = '' }) {
             <p className="text-xs text-slate-500">{t('common.price_per_consultation')}</p>
           </div>
 
-          <Button onClick={handleBookClick} size="md">
-            {t('common.book_appt')}
-          </Button>
         </div>
       </div>
     </div>

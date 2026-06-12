@@ -161,7 +161,7 @@ const medTourLogisticsAdminPermissions = [
 const roleDefinitions = {
   patient: {
     name: 'Patient',
-    description: 'Пациент — может записываться к врачам, просматривать свои записи и документы',
+    description: 'Пациент — может просматривать свои консультации и документы, выбирать слот после назначения врача',
     permissions: [
       // Doctors — только чтение
       'api::doctor.doctor.find',
@@ -170,7 +170,7 @@ const roleDefinitions = {
       // Specializations — только чтение
       'api::specialization.specialization.find',
       'api::specialization.specialization.findOne',
-      // Appointments — CRUD (ownership проверяется policy)
+      // Appointments — история, подключение и выбор слота после назначения врача.
       'api::appointment.appointment.find',
       'api::appointment.appointment.findOne',
       'api::appointment.appointment.create',
