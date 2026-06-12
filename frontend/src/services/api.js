@@ -364,6 +364,9 @@ export const authAPI = {
 
     changePassword: (data) => api.post("/api/auth/change-password", data),
 
+    sendEmailConfirmation: (email) =>
+        api.post("/api/auth/send-email-confirmation", { email }),
+
     updateProfile: (_userId, data) => api.put("/api/users/me", data),
 };
 

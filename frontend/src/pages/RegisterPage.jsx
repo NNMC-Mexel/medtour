@@ -140,6 +140,7 @@ function RegisterPage() {
       navigate('/verify-email-sent', {
         state: {
           email: formData.email,
+          emailDelivered: result.emailDelivered,
           message: result.message,
         },
       })
