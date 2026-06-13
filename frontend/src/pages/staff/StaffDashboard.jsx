@@ -445,11 +445,13 @@ function StaffDashboard() {
               ) : inbox.map((conversation) => {
                 const item = conversation.medical_case
                 const isSupportChat = conversation.channel === 'support'
+                const supportPatient = conversation.participants?.find((person) => !['manager', 'coordinator', 'admin'].includes(person?.userRole))
+                const supportName = conversation.guestName || supportPatient?.fullName || supportPatient?.username || conversation.guestContact
                 const title = isSupportChat
                   ? t('staff.support_chat_fallback')
                   : item?.caseNumber || item?.title || t('staff.case_chat_fallback')
                 const subtitle = isSupportChat
-                  ? conversation.guestContact || conversation.guestName || t('staff.support_guest_fallback')
+                  ? supportName || t('staff.support_guest_fallback')
                   : item?.patient?.fullName || t('cases.patient_fallback')
                 return (
                   <button

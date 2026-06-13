@@ -379,26 +379,34 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     if (!user) return ctx.forbidden('Not authenticated');
 
     const queryFilters = (ctx.query?.filters as any) || {};
+    const supportVisitorId = sanitizeText((ctx.query as any)?.supportVisitorId, 80);
+    const currentRole = getUserRole(user);
     let filters: any = queryFilters;
 
     if (!isAdminUser(user)) {
-      const role = getUserRole(user);
       const caseFilter = await getMedicalCaseAccessFilter(strapi, user);
+      const memberFilter = { users_permissions_users: { id: user.id } };
+      const supportGuestFilter = supportVisitorId && currentRole === 'patient'
+        ? { channel: 'support', guestId: supportVisitorId }
+        : null;
       if (caseFilter === null) {
-        filters = { ...queryFilters, users_permissions_users: { id: user.id } };
+        filters = supportGuestFilter
+          ? { ...queryFilters, $or: [memberFilter, supportGuestFilter] }
+          : { ...queryFilters, ...memberFilter };
       } else {
         const accessFilters: any[] = [
           { medical_case: caseFilter },
-          { users_permissions_users: { id: user.id } },
+          memberFilter,
         ];
-        if (['manager', 'coordinator'].includes(role)) {
+        if (['manager', 'coordinator'].includes(currentRole)) {
           accessFilters.push({ channel: 'support', sharedQueue: true });
         }
+        if (supportGuestFilter) accessFilters.push(supportGuestFilter);
         filters = {
           ...queryFilters,
           $or: accessFilters,
         };
-        if (role === 'doctor') filters.doctorChatEnabled = true;
+        if (currentRole === 'doctor') filters.doctorChatEnabled = true;
       }
     }
 
@@ -416,7 +424,22 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
 
     const visible = [];
     for (const conversation of candidates as any[]) {
-      if (await canAccessConversation(strapi, user, conversation)) visible.push(conversation);
+      const isLocalSupportGuest = Boolean(
+        supportVisitorId
+        && currentRole === 'patient'
+        && conversation.channel === 'support'
+        && conversation.guestId === supportVisitorId
+      );
+      if (await canAccessConversation(strapi, user, conversation) || isLocalSupportGuest) {
+        visible.push(conversation);
+        if (isLocalSupportGuest && user.id) {
+          try {
+            await connectConversationMembers(strapi, conversation.id, [user]);
+          } catch (error) {
+            strapi.log.warn('support conversation auto-link failed:', error);
+          }
+        }
+      }
     }
 
     const data = await enrichConversationsForUser(strapi, user, visible);

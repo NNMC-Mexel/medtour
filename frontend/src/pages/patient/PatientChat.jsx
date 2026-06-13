@@ -7,7 +7,7 @@ function PatientChat() {
   const { user } = useAuthStore()
   const role = user?.userRole || 'patient'
   return (
-    <div className="animate-fadeIn h-full min-h-0 flex flex-col">
+    <div className="animate-fadeIn flex h-[calc(var(--app-height)-5.75rem)] min-h-0 flex-col sm:h-[calc(var(--app-height)-8rem)]">
       <div className="mb-4 sm:mb-6 hidden sm:block">
         <h1 className="text-2xl font-bold text-slate-900">{t('patient.chat_title')}</h1>
         <p className="text-slate-600">{t('patient.chat_subtitle')}</p>

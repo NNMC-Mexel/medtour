@@ -44,6 +44,8 @@ const getPersonDisplayName = (person) => {
   return person.fullName || person.username || person.name || ''
 }
 
+const isStaffPerson = (person) => STAFF_CHAT_ROLES.has(person?.userRole)
+
 function ChatComponent({ userRole = 'patient' }) {
   const { t, i18n } = useTranslation()
   const lang = i18n.language
@@ -251,6 +253,19 @@ function ChatComponent({ userRole = 'patient' }) {
     return conv.participants?.find(p => p.id !== user?.id) || {}
   }
 
+  const getSupportGuestDisplay = (conv) => {
+    const patient = conv.participants?.find((person) => person.id !== user?.id && !isStaffPerson(person))
+    const name = conv.guestName
+      || getPersonDisplayName(patient)
+      || conv.guestContact
+      || t('staff.support_guest_fallback')
+
+    return {
+      person: patient || { fullName: name },
+      name,
+    }
+  }
+
   const getConversationDisplay = (conv) => {
     if (userRole === 'patient') {
       if (conv.channel === 'support') {
@@ -277,11 +292,7 @@ function ChatComponent({ userRole = 'patient' }) {
 
     if (STAFF_CHAT_ROLES.has(userRole)) {
       if (conv.channel === 'support') {
-        const guestName = conv.guestContact || conv.guestName || t('staff.support_guest_fallback')
-        return {
-          person: { fullName: guestName },
-          name: guestName,
-        }
+        return getSupportGuestDisplay(conv)
       }
 
       const patient = conv.medical_case?.patient || getParticipant(conv)
