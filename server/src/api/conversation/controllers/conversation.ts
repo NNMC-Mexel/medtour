@@ -192,6 +192,35 @@ async function enrichConversationsForUser(strapi: any, user: any, conversations:
   return enriched;
 }
 
+function getConversationKey(conversation: any) {
+  return conversation?.documentId || conversation?.id;
+}
+
+function mergeConversations(...groups: any[][]) {
+  const byKey = new Map<string, any>();
+  for (const group of groups) {
+    for (const conversation of group || []) {
+      const key = getConversationKey(conversation);
+      if (!key) continue;
+      byKey.set(String(key), { ...(byKey.get(String(key)) || {}), ...conversation });
+    }
+  }
+  return Array.from(byKey.values());
+}
+
+async function findUserMemberConversations(strapi: any, user: any) {
+  const populatedUser = await strapi.query('plugin::users-permissions.user').findOne({
+    where: { id: user.id },
+    populate: {
+      conversations: {
+        populate: CONVERSATION_POPULATE,
+      },
+    },
+  });
+
+  return asArray(populatedUser?.conversations);
+}
+
 async function connectConversationMembers(strapi: any, conversationId: number, participants: any[]) {
   const ids = participants.map((p) => p?.id).filter(Boolean);
   for (const participantId of ids) {
@@ -380,8 +409,13 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
       limit: Number((ctx.query?.pagination as any)?.limit) || 200,
     });
 
+    const memberConversations = Object.keys(queryFilters).length === 0
+      ? await findUserMemberConversations(strapi, user)
+      : [];
+    const candidates = mergeConversations(conversations as any[], memberConversations);
+
     const visible = [];
-    for (const conversation of conversations as any[]) {
+    for (const conversation of candidates as any[]) {
       if (await canAccessConversation(strapi, user, conversation)) visible.push(conversation);
     }
 
