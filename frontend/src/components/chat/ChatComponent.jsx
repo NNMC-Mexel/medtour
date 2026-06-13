@@ -37,6 +37,7 @@ function conversationCaseId(conversation) {
 }
 
 const STAFF_CHAT_ROLES = new Set(['manager', 'coordinator', 'admin'])
+const PATIENT_CHAT_TABS = ['managers', 'doctors']
 
 const getPersonDisplayName = (person) => {
   if (!person) return ''
@@ -67,6 +68,7 @@ function ChatComponent({ userRole = 'patient' }) {
   
   const [newMessage, setNewMessage] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab] = useState('managers')
   const [isSending, setIsSending] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const messagesEndRef = useRef(null)
@@ -147,6 +149,26 @@ function ChatComponent({ userRole = 'patient' }) {
       fetchMessages(currentConversation.documentId || currentConversation.id)
     }
   }, [currentConversation?.id, currentConversation?.documentId])
+
+  useEffect(() => {
+    if (userRole !== 'patient' || !user?.id) return undefined
+
+    const handleSupportChatUpdated = async (event) => {
+      setActiveTab('managers')
+      setSelectedConsultation(null)
+      const nextConversations = await fetchConversations()
+      const eventConversationId = event.detail?.conversationId
+      const supportConversation = nextConversations.find((conversation) => {
+        const conversationId = conversation.documentId || conversation.id
+        if (eventConversationId && String(conversationId) === String(eventConversationId)) return true
+        return conversation.channel === 'support'
+      })
+      if (supportConversation) setCurrentConversation(supportConversation)
+    }
+
+    window.addEventListener('medtour:support-chat-updated', handleSupportChatUpdated)
+    return () => window.removeEventListener('medtour:support-chat-updated', handleSupportChatUpdated)
+  }, [fetchConversations, setCurrentConversation, user?.id, userRole])
 
   useEffect(() => {
     const id = currentConversation?.documentId || currentConversation?.id
@@ -231,14 +253,37 @@ function ChatComponent({ userRole = 'patient' }) {
 
   const getConversationDisplay = (conv) => {
     if (userRole === 'patient') {
+      if (conv.channel === 'support') {
+        return {
+          person: conv.activeManager || {},
+          name: t('chat.managers_tab'),
+        }
+      }
+
+      if (conv.channel !== 'case' && !conv.medical_case) {
+        const participant = getParticipant(conv)
+        return {
+          person: participant,
+          name: getPersonDisplayName(participant) || t('chat.interlocutor'),
+        }
+      }
+
       const manager = conv.activeManager || conv.medical_case?.manager || getParticipant(conv)
       return {
         person: manager,
-        name: t('chat.manager'),
+        name: conv.channel === 'case' ? t('chat.case_managers') : t('chat.manager'),
       }
     }
 
     if (STAFF_CHAT_ROLES.has(userRole)) {
+      if (conv.channel === 'support') {
+        const guestName = conv.guestContact || conv.guestName || t('staff.support_guest_fallback')
+        return {
+          person: { fullName: guestName },
+          name: guestName,
+        }
+      }
+
       const patient = conv.medical_case?.patient || getParticipant(conv)
       return {
         person: patient,
@@ -253,9 +298,36 @@ function ChatComponent({ userRole = 'patient' }) {
     }
   }
 
+  const getConversationTab = (conv) => {
+    if (conv.channel === 'support' || conv.channel === 'case' || conv.medical_case) return 'managers'
+    return 'doctors'
+  }
+
+  const formatDateSeparator = (value) => {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    const today = new Date()
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    const diffDays = Math.round((startOfToday - startOfDate) / 86400000)
+    if (diffDays === 0) return t('chat.today')
+    if (diffDays === 1) return t('chat.yesterday')
+    return date.toLocaleDateString(dateLocale, { day: 'numeric', month: 'long', year: 'numeric' })
+  }
+
+  const shouldShowDateSeparator = (items, index, getDate) => {
+    const current = getDate(items[index])
+    const previous = index > 0 ? getDate(items[index - 1]) : null
+    if (!current) return false
+    if (!previous) return true
+    return new Date(current).toDateString() !== new Date(previous).toDateString()
+  }
+
   const filteredConversations = conversations.filter(conv => {
     const { name } = getConversationDisplay(conv)
-    return name.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesTab = userRole !== 'patient' || getConversationTab(conv) === activeTab
+    return matchesTab && name.toLowerCase().includes(searchQuery.toLowerCase())
   })
 
   return (
@@ -267,6 +339,27 @@ function ChatComponent({ userRole = 'patient' }) {
       )}>
         {/* Search */}
         <div className="p-4 border-b border-slate-100">
+          {userRole === 'patient' && (
+            <div className="mb-3 grid grid-cols-2 rounded-xl bg-slate-100 p-1">
+              {PATIENT_CHAT_TABS.map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab)
+                    setCurrentConversation(null)
+                    setSelectedConsultation(null)
+                  }}
+                  className={cn(
+                    'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    activeTab === tab ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-800',
+                  )}
+                >
+                  {tab === 'managers' ? t('chat.managers_tab') : t('chat.doctors_tab')}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
@@ -286,11 +379,24 @@ function ChatComponent({ userRole = 'patient' }) {
               <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
             </div>
           ) : filteredConversations.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-slate-500 text-sm">{t('chat.no_conversations')}</p>
-              <p className="text-slate-400 text-xs mt-1">
-                {t('chat.no_conversations_hint')}
+            <div className="px-4 py-6 text-center">
+              <p className="text-sm font-medium text-slate-700">{t('chat.no_conversations')}</p>
+              <p className="mx-auto mt-1 max-w-64 text-xs leading-5 text-slate-400">
+                {userRole === 'patient' && activeTab === 'managers'
+                  ? t('chat.no_manager_conversations_hint')
+                  : userRole === 'patient' && activeTab === 'doctors'
+                    ? t('chat.no_doctor_conversations_hint')
+                    : t('chat.no_conversations_hint')}
               </p>
+              {userRole === 'patient' && activeTab === 'managers' && (
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event('medtour:open-support-chat'))}
+                  className="mt-4 rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm shadow-teal-900/10 hover:bg-teal-700"
+                >
+                  {t('chat.start_manager_chat')}
+                </button>
+              )}
             </div>
           ) : (
             filteredConversations.map((conversation) => {
@@ -346,7 +452,7 @@ function ChatComponent({ userRole = 'patient' }) {
           )}
 
           {/* Past consultation chats */}
-          {consultationChats.length > 0 && (
+          {userRole === 'patient' && activeTab === 'doctors' && consultationChats.length > 0 && (
             <>
               <div className="px-4 py-2 border-t border-slate-100">
                 <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">{t('chat.history_title')}</p>
@@ -432,18 +538,27 @@ function ChatComponent({ userRole = 'patient' }) {
               const currentUserName = user?.fullName || user?.username || ''
               const isMe = msg.senderName === currentUserName
               return (
-                <div key={idx} className={cn('flex flex-col', isMe ? 'items-end' : 'items-start')}>
-                  <span className="text-xs text-slate-400 mb-1 px-1">{msg.senderName}</span>
-                  <div className={cn(
-                    'max-w-[70%] rounded-2xl px-4 py-3',
-                    isMe ? 'bg-teal-600 text-white rounded-br-md' : 'bg-slate-100 text-slate-900 rounded-bl-md'
-                  )}>
-                    <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                    {msg.time && (
-                      <p className={cn('text-xs mt-1', isMe ? 'text-teal-100' : 'text-slate-400')}>
-                        {new Date(msg.time).toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    )}
+                <div key={idx}>
+                  {shouldShowDateSeparator(selectedConsultation.chatLog, idx, (item) => item.time) && (
+                    <div className="flex justify-center">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
+                        {formatDateSeparator(msg.time)}
+                      </span>
+                    </div>
+                  )}
+                  <div className={cn('flex flex-col', isMe ? 'items-end' : 'items-start')}>
+                    <span className="text-xs text-slate-400 mb-1 px-1">{msg.senderName}</span>
+                    <div className={cn(
+                      'max-w-[70%] rounded-2xl px-4 py-3',
+                      isMe ? 'bg-teal-600 text-white rounded-br-md' : 'bg-slate-100 text-slate-900 rounded-bl-md'
+                    )}>
+                      <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                      {msg.time && (
+                        <p className={cn('text-xs mt-1', isMe ? 'text-teal-100' : 'text-slate-400')}>
+                          {new Date(msg.time).toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               )
@@ -473,10 +588,10 @@ function ChatComponent({ userRole = 'patient' }) {
                   ? getSpecName(participant.specialization, lang)
                   : ''
                 const statusText = userRole === 'patient'
-                  ? (managerPresence.managerOnline ? 'Manager online' : 'We will reply later')
+                  ? (managerPresence.managerOnline ? t('chat.widget_status_online') : t('chat.widget_status_later'))
                   : (currentConversation.activeManager?.fullName
-                      ? `Taken by ${currentConversation.activeManager.fullName}`
-                      : 'Shared queue')
+                      ? t('chat.taken_by', { name: currentConversation.activeManager.fullName })
+                      : t('chat.shared_queue'))
 
                 return (
                   <>
@@ -520,7 +635,7 @@ function ChatComponent({ userRole = 'patient' }) {
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 text-white text-sm hover:bg-slate-800"
                 >
                   <ShieldCheck className="w-4 h-4" />
-                  Take over
+                  {t('chat.take_over')}
                 </button>
               )}
             </div>
@@ -538,7 +653,7 @@ function ChatComponent({ userRole = 'patient' }) {
                 <p className="text-slate-400 text-sm mt-1">{t('chat.start_dialog')}</p>
               </div>
             ) : (
-              messages.map((message) => {
+              messages.map((message, index) => {
                 const isMe = message.sender?.id === user?.id || message.senderId === user?.id
                 const time = new Date(message.createdAt || message.time)
                 const attachments = message.attachments || []
@@ -546,8 +661,15 @@ function ChatComponent({ userRole = 'patient' }) {
                 const isReadByOther = Object.keys(readBy).some((key) => key !== String(user?.id))
 
                 return (
+                  <div key={message.id || message.documentId} className="space-y-4">
+                    {shouldShowDateSeparator(messages, index, (item) => item.createdAt || item.time) && (
+                      <div className="flex justify-center">
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
+                          {formatDateSeparator(message.createdAt || message.time)}
+                        </span>
+                      </div>
+                    )}
                   <div
-                    key={message.id}
                     className={cn('flex', isMe ? 'justify-end' : 'justify-start')}
                   >
                     <div className={cn(
@@ -591,6 +713,7 @@ function ChatComponent({ userRole = 'patient' }) {
                         {isMe && <CheckCheck className={cn('w-3.5 h-3.5', isReadByOther ? 'opacity-100' : 'opacity-50')} />}
                       </p>
                     </div>
+                  </div>
                   </div>
                 )
               })

@@ -16,6 +16,7 @@ import { cn } from "../../utils/helpers";
 import Button from "../ui/Button";
 import LanguageSwitcher from "../ui/LanguageSwitcher";
 import useAuthStore from "../../stores/authStore";
+import PatientChatWidget from "../chat/PatientChatWidget";
 
 function PublicLayout() {
     const { t } = useTranslation();
@@ -449,6 +450,7 @@ function PublicLayout() {
                     </div>
                 </div>
             </footer>
+            <PatientChatWidget />
         </div>
     );
 }

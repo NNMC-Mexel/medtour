@@ -65,12 +65,17 @@ async function canAccessConversation(strapi: any, user: any, conversation: any) 
   if (!user || !conversation) return false;
   if (isAdminUser(user)) return true;
 
+  const role = getUserRole(user);
   const members = asArray((conversation as any).users_permissions_users);
   if (members.some((member: any) => member?.id === user.id)) return true;
 
+  if ((conversation as any).channel === 'support' && (conversation as any).sharedQueue === true) {
+    return ['manager', 'coordinator'].includes(role);
+  }
+
   const medicalCase = (conversation as any).medical_case;
   if (!medicalCase) return false;
-  if (getUserRole(user) === 'doctor' && (conversation as any).doctorChatEnabled !== true) return false;
+  if (role === 'doctor' && (conversation as any).doctorChatEnabled !== true) return false;
   return userCanAccessMedicalCase(strapi, user, medicalCase);
 }
 

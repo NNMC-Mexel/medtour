@@ -711,6 +711,12 @@ export const conversationsAPI = {
     getForCase: (caseId) =>
         api.get(`/api/conversations/for-case/${encodeURIComponent(caseId)}`),
 
+    sendSupportMessage: (data) =>
+        api.post("/api/support-chat/message", { data }),
+
+    getSupportMessages: (conversationId, visitorId) =>
+        api.get(`/api/support-chat/${encodeURIComponent(conversationId)}/messages?visitorId=${encodeURIComponent(visitorId)}`),
+
     getMessages: (id) => {
         const query = new URLSearchParams();
         query.append("populate", "*");

@@ -216,7 +216,7 @@ function StaffDashboard() {
 
   const inbox = useMemo(() => (
     [...conversations]
-      .filter((conversation) => conversation.medical_case)
+      .filter((conversation) => conversation.medical_case || conversation.channel === 'support')
       .sort((a, b) => (b.unreadCount || 0) - (a.unreadCount || 0) || new Date(b.lastMessageAt || b.updatedAt) - new Date(a.lastMessageAt || a.updatedAt))
       .slice(0, 12)
   ), [conversations])
@@ -444,6 +444,13 @@ function StaffDashboard() {
                 <p className="text-sm text-slate-500 text-center py-8">{t('staff.no_case_chats')}</p>
               ) : inbox.map((conversation) => {
                 const item = conversation.medical_case
+                const isSupportChat = conversation.channel === 'support'
+                const title = isSupportChat
+                  ? t('staff.support_chat_fallback')
+                  : item?.caseNumber || item?.title || t('staff.case_chat_fallback')
+                const subtitle = isSupportChat
+                  ? conversation.guestContact || conversation.guestName || t('staff.support_guest_fallback')
+                  : item?.patient?.fullName || t('cases.patient_fallback')
                 return (
                   <button
                     key={conversation.documentId || conversation.id}
@@ -455,10 +462,10 @@ function StaffDashboard() {
                     className="w-full rounded-lg border border-slate-100 p-3 text-left hover:bg-slate-50"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium text-sm text-slate-900 truncate">{item?.caseNumber || item?.title || t('staff.case_chat_fallback')}</p>
+                      <p className="font-medium text-sm text-slate-900 truncate">{title}</p>
                       {conversation.unreadCount > 0 && <Badge variant="danger">{conversation.unreadCount}</Badge>}
                     </div>
-                    <p className="text-xs text-slate-500 truncate mt-1">{item?.patient?.fullName || t('cases.patient_fallback')} · {conversation.lastMessage?.content || conversation.lastMessage || t('staff.no_messages')}</p>
+                    <p className="text-xs text-slate-500 truncate mt-1">{subtitle} · {conversation.lastMessage?.content || conversation.lastMessage || t('staff.no_messages')}</p>
                   </button>
                 )
               })}

@@ -444,7 +444,17 @@ export default factories.createCoreController('api::appointment.appointment', ()
         }
       }
 
-      // Create appointment inside the lock — no one else can create for same slot
+      // Create appointment inside the lock — no one else can create for same slot.
+      //
+      // The medical_case relation is deliberately NOT part of the create data.
+      // In Strapi v5 the document service maps the case documentId to the DRAFT
+      // entity id, while validation of a published entry only accepts PUBLISHED
+      // entity ids — so create() (and publish() of a draft) consistently fails
+      // with "relation(s) ... do not exist" even though both versions of the
+      // case exist. The relation is attached right after create at the DB layer
+      // (entity ids, draft↔draft / published↔published), which bypasses that
+      // broken validation and never loses the link.
+      const linkedCaseDocId = linkedCaseRef ? String(linkedCaseRef) : null;
       const appointmentData: any = {
         dateTime: body.dateTime,
         type: body.type || 'video',
@@ -454,35 +464,57 @@ export default factories.createCoreController('api::appointment.appointment', ()
         paymentStatus: requestedPaymentStatus,
         patient: patientDocId,
         doctor: doctorDocId,
-        medical_case: body.medical_case || body.medicalCase || null,
       };
-      const createOpts: any = {
+      const populate: any = {
+        doctor: { populate: ['specialization', 'photo'] },
+        patient: { fields: ['id', 'fullName', 'email', 'phone'] },
+      };
+
+      let appointment: any = await strapi.documents('api::appointment.appointment').create({
         data: appointmentData,
         status: 'published',
-        populate: {
-          doctor: { populate: ['specialization', 'photo'] },
-          patient: { fields: ['id', 'fullName', 'email', 'phone'] },
-        },
-      };
+        populate,
+      });
 
-      let appointment: any;
-      try {
-        appointment = await strapi.documents('api::appointment.appointment').create(createOpts);
-      } catch (innerErr: any) {
-        const msg = innerErr?.message || '';
-        const isMedicalCaseErr =
-          (innerErr?.name === 'YupValidationError' || innerErr?.name === 'ValidationError') &&
-          (msg.includes('medical-case') || msg.includes('medical_case'));
-
-        if (isMedicalCaseErr && appointmentData.medical_case) {
-          // The case couldn't be linked (e.g. Strapi validation race). Retry without it.
-          strapi.log.warn(`appointment.create: medical_case ${appointmentData.medical_case} validation failed, retrying without it`);
-          appointment = await strapi.documents('api::appointment.appointment').create({
-            ...createOpts,
-            data: { ...appointmentData, medical_case: null },
+      if (linkedCaseDocId) {
+        try {
+          const caseRows = await strapi.db.query('api::medical-case.medical-case').findMany({
+            where: { documentId: linkedCaseDocId },
+            select: ['id', 'publishedAt'],
           });
-        } else {
-          throw innerErr;
+          const apptRows = await strapi.db.query('api::appointment.appointment').findMany({
+            where: { documentId: appointment.documentId },
+            select: ['id', 'publishedAt'],
+          });
+          if (!caseRows.length || !apptRows.length) {
+            throw new Error('medical case or appointment versions not found');
+          }
+          for (const apptRow of apptRows) {
+            const caseRow =
+              caseRows.find((c: any) => !!c.publishedAt === !!apptRow.publishedAt) || caseRows[0];
+            await strapi.db.query('api::appointment.appointment').update({
+              where: { id: apptRow.id },
+              data: { medical_case: caseRow.id },
+            });
+          }
+          // Re-read so the response carries the persisted link.
+          appointment = await strapi.documents('api::appointment.appointment').findOne({
+            documentId: appointment.documentId,
+            status: 'published',
+            populate: {
+              ...populate,
+              medical_case: { fields: ['id', 'documentId', 'status'] },
+            },
+          });
+        } catch (linkErr: any) {
+          // An appointment must not exist without its case link — roll back and fail.
+          strapi.log.error(
+            `appointment.create: failed to link medical_case ${linkedCaseDocId}, rolling appointment back: ${linkErr?.message}`
+          );
+          await strapi.documents('api::appointment.appointment').delete({
+            documentId: appointment.documentId,
+          });
+          throw new Error('Failed to link the appointment to the medical case');
         }
       }
 

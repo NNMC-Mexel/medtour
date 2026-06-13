@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Bell, Search, Menu, X, Loader2, CheckCheck } from 'lucide-react'
@@ -15,6 +15,7 @@ function Header({ title, subtitle, onMenuClick, isMobileMenuOpen }) {
   const location = useLocation()
   const [showSearch, setShowSearch] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  const notificationsRef = useRef(null)
 
   const notifications = useNotificationStore((s) => s.notifications)
   const unreadCount = useNotificationStore((s) => s.unreadCount)
@@ -32,6 +33,23 @@ function Header({ title, subtitle, onMenuClick, isMobileMenuOpen }) {
     startPolling()
     return () => stopPolling()
   }, [user?.id, startPolling, stopPolling])
+
+  useEffect(() => {
+    if (!showNotifications) return undefined
+
+    const handlePointerDown = (event) => {
+      if (notificationsRef.current?.contains(event.target)) return
+      setShowNotifications(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('touchstart', handlePointerDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('touchstart', handlePointerDown)
+    }
+  }, [showNotifications])
 
   const getNotificationsPath = () => {
     if (location.pathname.startsWith('/doctor')) return '/doctor/notifications'
@@ -114,7 +132,7 @@ function Header({ title, subtitle, onMenuClick, isMobileMenuOpen }) {
             )}
           </div>
 
-          <div className="relative">
+          <div ref={notificationsRef} className="relative">
             <button
               onClick={() => setShowNotifications(!showNotifications)}
               className="relative p-2.5 text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"

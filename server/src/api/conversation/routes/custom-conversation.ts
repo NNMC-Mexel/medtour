@@ -5,6 +5,20 @@
 export default {
   routes: [
     {
+      method: 'POST',
+      path: '/support-chat/message',
+      handler: 'conversation.supportMessage',
+      info: { apiName: 'conversation', type: 'content-api' },
+      config: { auth: false, policies: [] },
+    },
+    {
+      method: 'GET',
+      path: '/support-chat/:conversationId/messages',
+      handler: 'conversation.supportMessages',
+      info: { apiName: 'conversation', type: 'content-api' },
+      config: { auth: false, policies: [] },
+    },
+    {
       method: 'GET',
       path: '/conversations/for-case/:caseId',
       handler: 'conversation.forCase',

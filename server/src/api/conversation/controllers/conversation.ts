@@ -15,6 +15,9 @@ import {
 const UID = 'api::conversation.conversation' as any;
 const MESSAGE_UID = 'api::message.message' as any;
 const CASE_UID = 'api::medical-case.medical-case' as any;
+const SUPPORT_RATE_LIMIT_MAX = 20;
+const SUPPORT_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const supportRateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 const CONVERSATION_POPULATE = {
   users_permissions_users: { fields: ['id', 'documentId', 'fullName', 'email', 'userRole'], populate: { avatar: true, role: true } },
@@ -40,6 +43,52 @@ function getRelationRef(value: any) {
   if (typeof value === 'object') return value.documentId || value.id;
   return value;
 }
+
+function sanitizeText(value: unknown, maxLength = 2000) {
+  return String(value || '').trim().slice(0, maxLength);
+}
+
+async function getOptionalAuthenticatedUser(ctx: any) {
+  if (ctx.state.user) return ctx.state.user;
+
+  const authHeader = ctx.request.headers.authorization || '';
+  const token = typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : undefined;
+  if (!token) return null;
+
+  try {
+    const jwtService = strapi.plugin('users-permissions').service('jwt');
+    const payload = await jwtService.verify(token);
+    if (!payload?.id) return null;
+
+    return strapi.query('plugin::users-permissions.user').findOne({
+      where: { id: payload.id },
+      populate: { role: true, avatar: true },
+    });
+  } catch {
+    return null;
+  }
+}
+
+function checkSupportRateLimit(key: string) {
+  const now = Date.now();
+  const existing = supportRateLimitStore.get(key);
+  if (!existing || now > existing.resetAt) {
+    supportRateLimitStore.set(key, { count: 1, resetAt: now + SUPPORT_RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (existing.count >= SUPPORT_RATE_LIMIT_MAX) return false;
+  existing.count += 1;
+  return true;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of supportRateLimitStore) {
+    if (now > value.resetAt) supportRateLimitStore.delete(key);
+  }
+}, SUPPORT_RATE_LIMIT_WINDOW_MS).unref?.();
 
 async function resolveConversation(strapi: any, ref: any, populate: any = CONVERSATION_POPULATE) {
   if (!ref) return null;
@@ -94,6 +143,10 @@ async function canAccessConversation(strapi: any, user: any, conversation: any) 
   const role = getUserRole(user);
   const members = asArray((conversation as any).users_permissions_users);
   if (members.some((member: any) => member?.id === user.id)) return true;
+
+  if ((conversation as any).channel === 'support' && (conversation as any).sharedQueue === true) {
+    return ['manager', 'coordinator'].includes(role);
+  }
 
   const medicalCase = (conversation as any).medical_case;
   if (!medicalCase) return false;
@@ -159,6 +212,139 @@ function getCaseParticipants(medicalCase: any, doctorChatEnabled: boolean) {
 }
 
 export default factories.createCoreController(UID, ({ strapi }) => ({
+  async supportMessage(ctx) {
+    const authUser = await getOptionalAuthenticatedUser(ctx);
+    const body = (ctx.request.body as any)?.data || ctx.request.body || {};
+    const visitorId = sanitizeText(body.visitorId, 80);
+    const content = sanitizeText(body.content, 4000);
+    const conversationRef = sanitizeText(body.conversationId, 80);
+    const ip = ctx.request.ip || 'unknown';
+
+    if (!visitorId || visitorId.length < 12) return ctx.badRequest('visitorId is required');
+    if (!content) return ctx.badRequest('content is required');
+    if (!checkSupportRateLimit(`${ip}:${visitorId}`)) {
+      ctx.status = 429;
+      ctx.body = { error: 'Too many requests. Please try again later.' };
+      return;
+    }
+
+    let conversation: any = null;
+    if (conversationRef) {
+      conversation = await resolveConversation(strapi, conversationRef, {
+        users_permissions_users: { fields: ['id', 'documentId', 'fullName', 'email', 'userRole'] },
+        activeManager: { fields: ['id', 'documentId', 'fullName', 'email', 'userRole'] },
+      });
+      const members = asArray(conversation?.users_permissions_users);
+      const belongsToAuthUser = authUser && members.some((member: any) => member?.id === authUser.id);
+      if (conversation && (conversation.channel !== 'support' || (!belongsToAuthUser && conversation.guestId !== visitorId))) {
+        return ctx.forbidden('Support chat access denied');
+      }
+    }
+
+    const now = new Date().toISOString();
+    const userContact = sanitizeText(authUser?.phone || authUser?.email, 180);
+    const userName = sanitizeText(authUser?.fullName || authUser?.username || authUser?.email, 120);
+    const supportData = {
+      channel: 'support',
+      lifecycleStatus: 'open',
+      sharedQueue: true,
+      guestId: visitorId,
+      guestName: userName || sanitizeText(body.name, 120) || null,
+      guestContact: userContact || sanitizeText(body.contact, 180) || null,
+      guestLocale: sanitizeText(body.locale, 12) || null,
+      guestSourceUrl: sanitizeText(body.sourceUrl, 1000) || null,
+      lastMessage: content.slice(0, 500),
+      lastMessageAt: now,
+    };
+
+    if (!conversation) {
+      const filters = authUser
+        ? { channel: 'support', users_permissions_users: { id: authUser.id }, lifecycleStatus: { $ne: 'closed' } }
+        : { channel: 'support', guestId: visitorId, lifecycleStatus: { $ne: 'closed' } };
+      const existing = await strapi.documents(UID).findMany({
+        filters,
+        sort: ['updatedAt:desc'],
+        limit: 1,
+        populate: {
+          users_permissions_users: { fields: ['id', 'documentId', 'fullName', 'email', 'userRole'] },
+          activeManager: { fields: ['id', 'documentId', 'fullName', 'email', 'userRole'] },
+        },
+      });
+      conversation = existing[0] || await strapi.documents(UID).create({
+        data: supportData as any,
+        status: 'published',
+      });
+    } else {
+      conversation = await strapi.documents(UID).update({
+        documentId: conversation.documentId,
+        data: supportData as any,
+        status: 'published',
+      });
+    }
+
+    if (authUser?.id) {
+      await connectConversationMembers(strapi, conversation.id, [authUser]);
+    }
+
+    const message = await strapi.documents(MESSAGE_UID).create({
+      data: {
+        conversation: conversation.documentId,
+        content,
+        messageType: 'text',
+        ...(authUser ? { sender: authUser.documentId || authUser.id } : {}),
+        deliveredAt: now,
+        ...(authUser ? { readBy: { [String(authUser.id)]: now } } : {}),
+        metadata: {
+          actorType: authUser ? getUserRole(authUser) || 'authenticated' : 'guest',
+          visitorId,
+          contact: supportData.guestContact,
+          sourceUrl: supportData.guestSourceUrl,
+          locale: supportData.guestLocale,
+        },
+      },
+      status: 'published',
+      populate: { attachments: true, sender: { fields: ['id', 'documentId', 'fullName', 'email', 'userRole'] } },
+    });
+
+    await strapi.documents(UID).update({
+      documentId: conversation.documentId,
+      data: { lastMessage: content.slice(0, 500), lastMessageAt: now } as any,
+      status: 'published',
+    });
+
+    const populatedConversation = await strapi.documents(UID).findOne({
+      documentId: conversation.documentId,
+      populate: CONVERSATION_POPULATE,
+    });
+
+    return { data: { conversation: populatedConversation || conversation, message } };
+  },
+
+  async supportMessages(ctx) {
+    const authUser = await getOptionalAuthenticatedUser(ctx);
+    const visitorId = sanitizeText(ctx.query?.visitorId, 80);
+    if (!visitorId || visitorId.length < 12) return ctx.badRequest('visitorId is required');
+
+    const conversation = await resolveConversation(strapi, ctx.params.conversationId, {
+      users_permissions_users: { fields: ['id', 'documentId', 'fullName', 'email', 'userRole'] },
+      activeManager: { fields: ['id', 'documentId', 'fullName', 'email', 'userRole'] },
+    });
+    const members = asArray(conversation?.users_permissions_users);
+    const belongsToAuthUser = authUser && members.some((member: any) => member?.id === authUser.id);
+    if (!conversation || conversation.channel !== 'support' || (!belongsToAuthUser && conversation.guestId !== visitorId)) {
+      return ctx.notFound('Support chat not found');
+    }
+
+    const data = await strapi.documents(MESSAGE_UID).findMany({
+      filters: { conversation: { documentId: conversation.documentId } },
+      sort: ['createdAt:asc'],
+      populate: { sender: { fields: ['id', 'documentId', 'fullName', 'email', 'userRole'] }, attachments: true },
+      limit: Number((ctx.query?.pagination as any)?.limit) || 200,
+    });
+
+    return { data, meta: { pagination: { page: 1, pageSize: data.length, pageCount: 1, total: data.length } } };
+  },
+
   async find(ctx) {
     const user = ctx.state.user;
     if (!user) return ctx.forbidden('Not authenticated');
@@ -167,18 +353,23 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     let filters: any = queryFilters;
 
     if (!isAdminUser(user)) {
+      const role = getUserRole(user);
       const caseFilter = await getMedicalCaseAccessFilter(strapi, user);
       if (caseFilter === null) {
         filters = { ...queryFilters, users_permissions_users: { id: user.id } };
       } else {
+        const accessFilters: any[] = [
+          { medical_case: caseFilter },
+          { users_permissions_users: { id: user.id } },
+        ];
+        if (['manager', 'coordinator'].includes(role)) {
+          accessFilters.push({ channel: 'support', sharedQueue: true });
+        }
         filters = {
           ...queryFilters,
-          $or: [
-            { medical_case: caseFilter },
-            { users_permissions_users: { id: user.id } },
-          ],
+          $or: accessFilters,
         };
-        if (getUserRole(user) === 'doctor') filters.doctorChatEnabled = true;
+        if (role === 'doctor') filters.doctorChatEnabled = true;
       }
     }
 

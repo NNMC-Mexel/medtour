@@ -45,6 +45,21 @@
       "type": "boolean",
       "default": true
     },
+    "guestId": {
+      "type": "string"
+    },
+    "guestName": {
+      "type": "string"
+    },
+    "guestContact": {
+      "type": "string"
+    },
+    "guestLocale": {
+      "type": "string"
+    },
+    "guestSourceUrl": {
+      "type": "text"
+    },
     "doctorChatEnabled": {
       "type": "boolean",
       "default": false

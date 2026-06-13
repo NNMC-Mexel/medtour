@@ -1,34 +1,59 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { MessageCircle, Minus, Paperclip, Send, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { MessageCircle, MessageSquarePlus, Send, X } from 'lucide-react'
 import Button from '../ui/Button'
 import { cn } from '../../utils/helpers'
 import useAuthStore from '../../stores/authStore'
 import useChatStore from '../../stores/chatStore'
-import { medicalCasesAPI, normalizeResponse, openMediaInNewTab } from '../../services/api'
+import { conversationsAPI, normalizeResponse, openMediaInNewTab } from '../../services/api'
 import AuthenticatedImage from '../ui/AuthenticatedImage'
 
+const SUPPORT_VISITOR_KEY = 'medtour-support-visitor-id'
+const SUPPORT_CONVERSATION_KEY = 'medtour-support-conversation-id'
+const SUPPORT_CONTACT_KEY = 'medtour-support-contact'
+
+function getStoredValue(key) {
+  if (typeof window === 'undefined') return ''
+  return window.localStorage.getItem(key) || ''
+}
+
+function setStoredValue(key, value) {
+  if (typeof window === 'undefined') return
+  if (value) window.localStorage.setItem(key, value)
+  else window.localStorage.removeItem(key)
+}
+
+function getVisitorId() {
+  const existing = getStoredValue(SUPPORT_VISITOR_KEY)
+  if (existing) return existing
+  const generated = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+  setStoredValue(SUPPORT_VISITOR_KEY, generated)
+  return generated
+}
+
+function getMessageId(message) {
+  return message?.documentId || message?.id || message?.localId
+}
+
 function PatientChatWidget() {
+  const { t, i18n } = useTranslation()
   const { user } = useAuthStore()
+  const isPatient = !user || user.userRole === 'patient'
   const {
     conversations,
-    currentConversation,
-    messages,
     managerPresence,
-    isLoading,
-    connectSocket,
-    fetchMessages,
-    getOrCreateCaseConversation,
-    sendMessage,
-    sendTyping,
-    uploadAttachment,
+    fetchConversations,
+    upsertConversation,
   } = useChatStore()
   const [isOpen, setIsOpen] = useState(false)
-  const [activeCase, setActiveCase] = useState(null)
+  const [supportMessages, setSupportMessages] = useState([])
+  const [supportConversationId, setSupportConversationId] = useState(() => getStoredValue(SUPPORT_CONVERSATION_KEY))
+  const [visitorId] = useState(() => getVisitorId())
+  const [contact, setContact] = useState(() => getStoredValue(SUPPORT_CONTACT_KEY))
   const [draft, setDraft] = useState('')
   const [isSending, setIsSending] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const fileInputRef = useRef(null)
+  const [sendError, setSendError] = useState('')
+  const widgetRef = useRef(null)
   const endRef = useRef(null)
 
   const unreadCount = useMemo(
@@ -37,167 +62,252 @@ function PatientChatWidget() {
   )
 
   useEffect(() => {
-    connectSocket()
-    medicalCasesAPI.getAll({ sort: 'updatedAt:desc' })
-      .then((response) => {
-        const { data } = normalizeResponse(response)
-        const cases = Array.isArray(data) ? data : []
-        setActiveCase(cases.find((item) => !['COMPLETED', 'CANCELLED'].includes(item.status)) || cases[0] || null)
-      })
-      .catch(() => {})
-  }, [user?.id])
+    if (!isOpen || !user?.id) return
+    fetchConversations()
+  }, [fetchConversations, isOpen, user?.id])
 
   useEffect(() => {
-    if (!isOpen || !activeCase) return
-    const caseId = activeCase.documentId || activeCase.id
-    getOrCreateCaseConversation(caseId).then((conversation) => {
-      if (conversation) fetchMessages(conversation.documentId || conversation.id)
-    })
-  }, [isOpen, activeCase?.documentId, activeCase?.id])
+    if (!user?.id || supportConversationId) return
+    const supportConversation = conversations.find((conversation) => conversation.channel === 'support')
+    const nextId = supportConversation?.documentId || supportConversation?.id
+    if (!nextId) return
+    setSupportConversationId(nextId)
+    setStoredValue(SUPPORT_CONVERSATION_KEY, nextId)
+  }, [conversations, supportConversationId, user?.id])
+
+  useEffect(() => {
+    if (!isOpen || !supportConversationId) return
+    conversationsAPI.getSupportMessages(supportConversationId, visitorId)
+      .then((response) => {
+        const { data } = normalizeResponse(response)
+        setSupportMessages(Array.isArray(data) ? data : [])
+      })
+      .catch(() => {
+        setStoredValue(SUPPORT_CONVERSATION_KEY, '')
+        setSupportConversationId('')
+        setSupportMessages([])
+      })
+  }, [isOpen, supportConversationId, visitorId])
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length, isOpen])
+  }, [supportMessages.length, isOpen])
 
-  const conversationId = currentConversation?.documentId || currentConversation?.id
+  useEffect(() => {
+    if (!isOpen) return undefined
+
+    const handlePointerDown = (event) => {
+      if (widgetRef.current?.contains(event.target)) return
+      setIsOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('touchstart', handlePointerDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('touchstart', handlePointerDown)
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    const handleOpenSupportChat = () => {
+      setIsOpen(true)
+    }
+
+    window.addEventListener('medtour:open-support-chat', handleOpenSupportChat)
+    return () => window.removeEventListener('medtour:open-support-chat', handleOpenSupportChat)
+  }, [])
+
+  const startSupportChat = () => {
+    setSupportMessages([])
+    setSupportConversationId('')
+    setStoredValue(SUPPORT_CONVERSATION_KEY, '')
+    setDraft('')
+    setSendError('')
+  }
+
+  const openWidget = () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {})
+    }
+    setIsOpen(true)
+  }
 
   const handleSend = async (event) => {
     event.preventDefault()
-    if (!draft.trim() || !conversationId || isSending) return
+    const content = draft.trim()
+    if (!content || isSending) return
+
     setIsSending(true)
+    setSendError('')
+
+    const localMessage = {
+      localId: `local-${Date.now()}`,
+      content,
+      createdAt: new Date().toISOString(),
+      sender: user ? { id: user.id, documentId: user.documentId, fullName: user.fullName, email: user.email } : undefined,
+      metadata: { actorType: user?.userRole || 'guest' },
+    }
+    setSupportMessages((items) => [...items, localMessage])
+
     try {
-      await sendMessage(conversationId, draft.trim(), user?.id)
-      sendTyping(conversationId, false)
+      const response = await conversationsAPI.sendSupportMessage({
+        conversationId: supportConversationId || undefined,
+        visitorId,
+        content,
+        contact: user ? undefined : contact.trim(),
+        name: user?.fullName || '',
+        locale: i18n.language,
+        sourceUrl: typeof window !== 'undefined' ? window.location.href : '',
+      })
+      const { data } = normalizeResponse(response)
+      const nextConversationId = data?.conversation?.documentId || data?.conversation?.id
+      if (nextConversationId) {
+        setSupportConversationId(nextConversationId)
+        setStoredValue(SUPPORT_CONVERSATION_KEY, nextConversationId)
+      }
+      if (data?.conversation) {
+        upsertConversation({
+          ...data.conversation,
+          channel: data.conversation.channel || 'support',
+          lastMessage: data.message || data.conversation.lastMessage,
+          lastMessageAt: data.message?.createdAt || data.conversation.lastMessageAt,
+        })
+      }
+      if (!user && contact.trim()) setStoredValue(SUPPORT_CONTACT_KEY, contact.trim())
+      if (data?.message) {
+        setSupportMessages((items) => [
+          ...items.filter((item) => item.localId !== localMessage.localId),
+          data.message,
+        ])
+      }
+      if (user?.id) fetchConversations()
+      window.dispatchEvent(new CustomEvent('medtour:support-chat-updated', {
+        detail: { conversationId: nextConversationId },
+      }))
       setDraft('')
+    } catch {
+      setSupportMessages((items) => items.filter((item) => item.localId !== localMessage.localId))
+      setSendError(t('chat.widget_send_error'))
     } finally {
       setIsSending(false)
     }
   }
 
-  const handleUpload = async (event) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file || !conversationId) return
-    setIsUploading(true)
-    try {
-      await uploadAttachment(conversationId, file)
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
-  if (!user || user.userRole !== 'patient') return null
+  if (!isPatient) return null
 
   return (
-    <div className="fixed bottom-4 right-4 z-40">
+    <div ref={widgetRef} className="fixed bottom-4 right-4 z-40">
       {!isOpen ? (
         <button
           type="button"
-          onClick={() => {
-            if ('Notification' in window && Notification.permission === 'default') {
-              Notification.requestPermission().catch(() => {})
-            }
-            setIsOpen(true)
-          }}
-          className="relative w-14 h-14 rounded-full bg-teal-600 text-white shadow-lg shadow-teal-900/20 flex items-center justify-center hover:bg-teal-700"
-          aria-label="Open chat"
+          onClick={openWidget}
+          className="relative flex h-14 w-14 items-center justify-center rounded-full bg-teal-600 text-white shadow-lg shadow-teal-900/20 transition-colors hover:bg-teal-700"
+          aria-label={t('chat.widget_open')}
         >
-          <MessageCircle className="w-6 h-6" />
+          <MessageCircle className="h-6 w-6" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-rose-500 text-[11px] font-semibold flex items-center justify-center">
+            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-semibold">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
         </button>
       ) : (
-        <div className="w-[min(380px,calc(100vw-2rem))] h-[min(560px,calc(100vh-2rem))] bg-white border border-slate-200 rounded-xl shadow-2xl flex flex-col overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white">
-            <div>
-              <p className="font-semibold">MedTour chat</p>
+        <div className="flex h-[min(560px,calc(100vh-2rem))] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
+          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-4 py-3 text-white">
+            <div className="min-w-0">
+              <p className="truncate font-semibold">{t('chat.widget_title')}</p>
               <p className={cn('text-xs', managerPresence.managerOnline ? 'text-emerald-300' : 'text-slate-300')}>
-                {managerPresence.managerOnline ? 'Manager online' : 'We will reply later'}
+                {managerPresence.managerOnline ? t('chat.widget_status_online') : t('chat.widget_status_later')}
               </p>
             </div>
             <div className="flex items-center gap-1">
-              <button type="button" onClick={() => setIsOpen(false)} className="p-2 hover:bg-white/10 rounded-lg" aria-label="Minimize chat">
-                <Minus className="w-4 h-4" />
+              <button
+                type="button"
+                onClick={startSupportChat}
+                className="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium hover:bg-white/10"
+                aria-label={t('chat.widget_new_chat')}
+                title={t('chat.widget_new_chat')}
+              >
+                <MessageSquarePlus className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('chat.widget_new_chat')}</span>
               </button>
-              <Link to="/patient/chat" className="p-2 hover:bg-white/10 rounded-lg" aria-label="Open full chat">
-                <X className="w-4 h-4 rotate-45" />
-              </Link>
+              <button type="button" onClick={() => setIsOpen(false)} className="rounded-lg p-2 hover:bg-white/10" aria-label={t('chat.widget_close')} title={t('chat.widget_close')}>
+                <X className="h-4 w-4" />
+              </button>
             </div>
           </div>
 
-          {!activeCase ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
-              <p className="font-medium text-slate-900">No active case yet</p>
-              <p className="text-sm text-slate-500 mt-1">Create a MedicalCase to start secure chat with MedTour.</p>
-              <Link to="/patient/cases" className="mt-4">
-                <Button size="sm">Open cases</Button>
-              </Link>
+          {!user && (
+            <div className="border-b border-slate-100 bg-white px-4 py-3">
+              <label className="text-xs font-medium text-slate-600" htmlFor="support-contact">
+                {t('chat.widget_contact_label')}
+              </label>
+              <input
+                id="support-contact"
+                value={contact}
+                onChange={(event) => {
+                  setContact(event.target.value)
+                  setStoredValue(SUPPORT_CONTACT_KEY, event.target.value)
+                }}
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+                placeholder={t('chat.widget_contact_placeholder')}
+              />
+              <p className="mt-1 text-xs text-slate-500">{t('chat.widget_contact_hint')}</p>
             </div>
-          ) : (
-            <>
-              <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-slate-50">
-                {isLoading && messages.length === 0 ? (
-                  <p className="text-sm text-slate-500 text-center py-8">Loading chat...</p>
-                ) : messages.length === 0 ? (
-                  <p className="text-sm text-slate-500 text-center py-8">Send us a message about your case.</p>
-                ) : (
-                  messages.map((message) => {
-                    const isMe = message.sender?.id === user?.id
-                    return (
-                      <div key={message.documentId || message.id} className={cn('flex', isMe ? 'justify-end' : 'justify-start')}>
-                        <div className={cn(
-                          'max-w-[82%] rounded-xl px-3 py-2 text-sm',
-                          isMe ? 'bg-teal-600 text-white' : 'bg-white border border-slate-200 text-slate-900',
-                        )}>
-                          <p className="whitespace-pre-wrap">{message.content}</p>
-                          {(message.attachments || []).map((file) => {
-                            return (
-                              <button key={file.id || file.url} type="button" onClick={() => openMediaInNewTab(file)} className="block mt-2 text-left">
-                                {file.mime?.startsWith('image/') ? (
-                                  <AuthenticatedImage media={file} alt={file.name || 'Attachment'} className="max-h-32 rounded-lg object-cover" />
-                                ) : (
-                                  <span className={cn('text-xs underline', isMe ? 'text-teal-50' : 'text-teal-700')}>{file.name || 'Attachment'}</span>
-                                )}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )
-                  })
-                )}
-                <div ref={endRef} />
-              </div>
-
-              <form onSubmit={handleSend} className="p-3 border-t border-slate-100 flex items-center gap-2">
-                <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="p-2 rounded-lg hover:bg-slate-100 text-slate-500"
-                  disabled={isUploading}
-                  aria-label="Attach file"
-                >
-                  <Paperclip className="w-5 h-5" />
-                </button>
-                <input
-                  value={draft}
-                  onChange={(event) => {
-                    setDraft(event.target.value)
-                    if (conversationId) sendTyping(conversationId, event.target.value.trim().length > 0)
-                  }}
-                  className="flex-1 px-3 py-2 rounded-lg bg-slate-100 border-0 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  placeholder="Message"
-                />
-                <Button type="submit" size="icon" disabled={!draft.trim() || isSending || isUploading} isLoading={isSending || isUploading}>
-                  <Send className="w-4 h-4" />
-                </Button>
-              </form>
-            </>
           )}
+
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">
+            {supportMessages.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <p className="font-medium text-slate-900">{t('chat.widget_support_empty_title')}</p>
+                <p className="mt-1 max-w-72 text-sm text-slate-500">{t('chat.widget_support_empty_hint')}</p>
+              </div>
+            ) : (
+              supportMessages.map((message) => {
+                const isMe = message.sender?.id === user?.id || (!message.sender && message.metadata?.actorType === 'guest')
+                return (
+                  <div key={getMessageId(message)} className={cn('flex', isMe ? 'justify-end' : 'justify-start')}>
+                    <div className={cn(
+                      'max-w-[82%] rounded-xl px-3 py-2 text-sm',
+                      isMe ? 'bg-teal-600 text-white' : 'border border-slate-200 bg-white text-slate-900',
+                    )}>
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      {(message.attachments || []).map((file) => (
+                        <button key={file.id || file.url} type="button" onClick={() => openMediaInNewTab(file)} className="mt-2 block text-left">
+                          {file.mime?.startsWith('image/') ? (
+                            <AuthenticatedImage media={file} alt={file.name || t('chat.widget_attachment')} className="max-h-32 rounded-lg object-cover" />
+                          ) : (
+                            <span className={cn('text-xs underline', isMe ? 'text-teal-50' : 'text-teal-700')}>{file.name || t('chat.widget_attachment')}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })
+            )}
+            <div ref={endRef} />
+          </div>
+
+          {sendError && (
+            <div className="border-t border-rose-100 bg-rose-50 px-4 py-2 text-xs text-rose-700">
+              {sendError}
+            </div>
+          )}
+
+          <form onSubmit={handleSend} className="flex items-center gap-2 border-t border-slate-100 p-3">
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              className="min-w-0 flex-1 rounded-lg border-0 bg-slate-100 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal-500"
+              placeholder={t('chat.widget_message_placeholder')}
+            />
+            <Button type="submit" size="icon" disabled={!draft.trim() || isSending} isLoading={isSending}>
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
         </div>
       )}
     </div>
