@@ -4,14 +4,16 @@ import { useTranslation } from 'react-i18next'
 import {
   Eye, EyeOff, Mail, Lock, User, Phone, CreditCard, Activity,
   ArrowLeft, CheckCircle, Stethoscope, UserCircle, GraduationCap,
-  Building2, FileText
+  Building2, FileText, Globe2
 } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import CountrySelect from '../components/ui/CountrySelect'
 import { Card, CardContent } from '../components/ui/Card'
 import useAuthStore from '../stores/authStore'
 import { isValidEmail, isValidPhone, isValidIIN } from '../utils/helpers'
 import { specializationsAPI, normalizeResponse } from '../services/api'
+import { normalizeCountryValue } from '../utils/countries'
 
 const defaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Almaty'
 const languageOptions = [
@@ -66,7 +68,7 @@ function RegisterPage() {
       errors.email = t('auth.register.validation.email')
     if (!formData.phone || !isValidPhone(formData.phone))
       errors.phone = t('auth.register.validation.phone')
-    if (!formData.country || formData.country.trim().length < 2)
+    if (!normalizeCountryValue(formData.country))
       errors.country = t('auth.register.validation.country')
     setFormErrors(errors)
     return Object.keys(errors).length === 0
@@ -253,14 +255,14 @@ function RegisterPage() {
                       leftIcon={<Phone className="w-5 h-5" />}
                       required
                     />
-                    <Input
+                    <CountrySelect
                       label={t('auth.register.country')}
                       name="country"
-                      type="text"
                       placeholder={t('auth.register.country_placeholder')}
                       value={formData.country}
                       onChange={handleChange}
                       error={formErrors.country}
+                      leftIcon={<Globe2 className="w-5 h-5" />}
                       required
                     />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

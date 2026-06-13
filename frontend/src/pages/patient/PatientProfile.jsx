@@ -4,17 +4,19 @@ import { User, Mail, Phone, Calendar, CreditCard, Shield, Bell, LogOut, Language
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import CountrySelect from '../../components/ui/CountrySelect'
 import Avatar from '../../components/ui/Avatar'
 import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/Toast'
 import useAuthStore from '../../stores/authStore'
 import { formatDate, cn } from '../../utils/helpers'
+import { normalizeCountryValue } from '../../utils/countries'
 
 const getProfileFormData = (user) => ({
   fullName: user?.fullName || '',
   email: user?.email || '',
   phone: user?.phone || '',
-  country: user?.country || '',
+  country: normalizeCountryValue(user?.country || ''),
   language: user?.language || 'en',
   timezone: user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || '',
   iin: user?.iin || '',
@@ -126,12 +128,12 @@ function PatientProfile() {
 
   const profileFields = [
     { name: 'fullName', label: t('profile.full_name'), icon: User, type: 'text' },
-    { name: 'email', label: t('profile.email'), icon: Mail, type: 'email' },
+    { name: 'email', label: t('profile.email'), icon: Mail, type: 'email', readOnly: true },
     { name: 'phone', label: t('profile.phone'), icon: Phone, type: 'tel' },
     { name: 'country', label: t('profile.country'), icon: Globe2, type: 'text' },
     { name: 'language', label: t('profile.language'), icon: Languages, type: 'text' },
     { name: 'timezone', label: t('profile.timezone'), icon: Globe2, type: 'text' },
-    { name: 'iin', label: t('profile.iin'), icon: CreditCard, type: 'text' },
+    { name: 'iin', label: t('profile.iin'), icon: CreditCard, type: 'text', readOnly: true },
     { name: 'birthDate', label: t('profile.birth_date'), icon: Calendar, type: 'date' },
   ]
 
@@ -186,16 +188,29 @@ function PatientProfile() {
         <CardContent>
           <div className="grid sm:grid-cols-2 gap-4">
             {profileFields.map((field) => (
-              <Input
-                key={field.name}
-                label={field.label}
-                name={field.name}
-                type={field.type}
-                value={visibleFormData[field.name]}
-                onChange={handleChange}
-                disabled={!isEditing}
-                leftIcon={<field.icon className="w-4 h-4" />}
-              />
+              field.name === 'country' ? (
+                <CountrySelect
+                  key={field.name}
+                  label={field.label}
+                  name={field.name}
+                  value={visibleFormData[field.name]}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  leftIcon={<field.icon className="w-4 h-4" />}
+                />
+              ) : (
+                <Input
+                  key={field.name}
+                  label={field.label}
+                  name={field.name}
+                  type={field.type}
+                  value={visibleFormData[field.name]}
+                  onChange={handleChange}
+                  disabled={!isEditing || field.readOnly}
+                  className={field.readOnly ? 'disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed' : undefined}
+                  leftIcon={<field.icon className="w-4 h-4" />}
+                />
+              )
             ))}
           </div>
         </CardContent>

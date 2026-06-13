@@ -178,12 +178,10 @@ const useAuthStore = create(
           const currentUser = get().user
           const profileData = {
             fullName: data.fullName || null,
-            email: data.email || null,
             phone: data.phone || null,
             country: data.country || null,
             language: data.language || null,
             timezone: data.timezone || null,
-            iin: data.iin || null,
             birthDate: data.birthDate || null,
             i18n: data.i18n || {},
           }

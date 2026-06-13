@@ -105,13 +105,11 @@ export default (plugin) => {
   const sanitizeProfilePayload = (body: any) => {
     const allowedFields = [
       'fullName',
-      'email',
       'phone',
       'country',
       'language',
       'timezone',
       'passportNumber',
-      'iin',
       'birthDate',
       'gender',
       'i18n',
@@ -175,18 +173,6 @@ export default (plugin) => {
         where: { id: authUser.id },
       });
       if (!currentUser) return ctx.notFound('User not found');
-
-      if (data.email) {
-        const email = String(data.email).trim().toLowerCase();
-        const sameEmailUser = await strapi.query('plugin::users-permissions.user').findOne({
-          where: { email },
-        });
-        if (sameEmailUser && String(sameEmailUser.id) !== String(authUser.id)) {
-          return ctx.badRequest('Email already taken');
-        }
-        data.email = email;
-        if (currentUser.username === currentUser.email) data.username = email;
-      }
 
       const updated = await strapi.query('plugin::users-permissions.user').update({
         where: { id: authUser.id },
