@@ -279,6 +279,13 @@ const useChatStore = create((set, get) => ({
     if (id) get().joinConversation(id)
   },
 
+  upsertConversation: (conversation) => {
+    if (!conversation) return
+    set((state) => ({
+      conversations: upsertByKey(state.conversations, conversation, conversationKey),
+    }))
+  },
+
   addMessage: (message) => {
     set((state) => {
       if (state.messages.some((item) => messageKey(item) === messageKey(message))) return state

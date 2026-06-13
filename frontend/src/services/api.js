@@ -692,6 +692,13 @@ export const getBookedSlots = async (doctorId, date) => {
 // API для диалогов
 // ===========================================
 
+const SUPPORT_VISITOR_KEY = "medtour-support-visitor-id";
+
+const getSupportVisitorId = () => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem(SUPPORT_VISITOR_KEY) || "";
+};
+
 export const conversationsAPI = {
     getAll: () => {
         const query = new URLSearchParams();
@@ -699,6 +706,8 @@ export const conversationsAPI = {
         query.append("populate[medical_case][populate]", "*");
         query.append("populate[activeManager][populate]", "*");
         query.append("sort", "updatedAt:desc");
+        const supportVisitorId = getSupportVisitorId();
+        if (supportVisitorId) query.append("supportVisitorId", supportVisitorId);
 
         return api.get(`/api/conversations?${query}`);
     },
@@ -710,6 +719,12 @@ export const conversationsAPI = {
 
     getForCase: (caseId) =>
         api.get(`/api/conversations/for-case/${encodeURIComponent(caseId)}`),
+
+    sendSupportMessage: (data) =>
+        api.post("/api/support-chat/message", { data }),
+
+    getSupportMessages: (conversationId, visitorId) =>
+        api.get(`/api/support-chat/${encodeURIComponent(conversationId)}/messages?visitorId=${encodeURIComponent(visitorId)}`),
 
     getMessages: (id) => {
         const query = new URLSearchParams();

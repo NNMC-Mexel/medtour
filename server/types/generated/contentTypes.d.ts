@@ -795,6 +795,11 @@ export interface ApiConversationConversation
       Schema.Attribute.Private;
     doctorChatEnabled: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<false>;
+    guestContact: Schema.Attribute.String;
+    guestId: Schema.Attribute.String;
+    guestLocale: Schema.Attribute.String;
+    guestName: Schema.Attribute.String;
+    guestSourceUrl: Schema.Attribute.Text;
     lastMessage: Schema.Attribute.Text;
     lastMessageAt: Schema.Attribute.DateTime;
     lastReadBy: Schema.Attribute.JSON;
@@ -2282,6 +2287,7 @@ export interface PluginUsersPermissionsUser
         minLength: 6;
       }>;
     phone: Schema.Attribute.String;
+    phoneNormalized: Schema.Attribute.String & Schema.Attribute.Private;
     platformGuideCompleted: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<true>;
     platformGuideCompletedAt: Schema.Attribute.DateTime;
