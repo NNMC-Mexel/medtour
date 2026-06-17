@@ -9,7 +9,9 @@ import { cn } from '../../utils/helpers'
 import { appointmentsAPI, getBookedSlots } from '../../services/api'
 import { useToast } from '../ui/Toast'
 
-const FREE_CONSULTATIONS = import.meta.env.VITE_FREE_CONSULTATIONS === 'true'
+// Free consultations are the current production default. Set
+// VITE_FREE_CONSULTATIONS=false only when paid consultations are re-enabled.
+const FREE_CONSULTATIONS = import.meta.env.VITE_FREE_CONSULTATIONS !== 'false'
 
 const generateTimeSlots = (doctor) => {
   const workStart = doctor?.workStartTime || '09:00'
@@ -54,8 +56,6 @@ export default function CaseSlotPicker({ isOpen, onClose, doctor, caseDocId, pat
   const dateLocale = i18n.language === 'kk' ? kk : i18n.language === 'en' ? enUS : ru
 
   const isStaff = ['manager', 'coordinator', 'admin'].includes(role)
-  // In free mode patients skip payment step just like staff
-  const needsPaymentStep = !isStaff && !FREE_CONSULTATIONS
 
   const [step, setStep] = useState(1) // 1 = date/time, 2 = payment (patient only, non-free)
   const [selectedDate, setSelectedDate] = useState(null)

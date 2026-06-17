@@ -361,7 +361,9 @@ export default factories.createCoreController('api::appointment.appointment', ()
       }
     }
 
-    const isFreeConsultation = process.env.FREE_CONSULTATIONS === 'true';
+    // Free consultations are the current production default. Set
+    // FREE_CONSULTATIONS=false only when paid consultations are re-enabled.
+    const isFreeConsultation = process.env.FREE_CONSULTATIONS !== 'false';
     const isPaymentsLive = process.env.PAYMENTS_LIVE === 'true';
     const allowTestPaymentsInProduction = process.env.ALLOW_TEST_PAYMENTS_IN_PRODUCTION === 'true';
 

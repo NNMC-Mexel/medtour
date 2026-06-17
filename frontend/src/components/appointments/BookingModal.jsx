@@ -101,8 +101,9 @@ const filterPastSlots = (slots, selectedDate) => {
     });
 };
 
-// Free consultations mode: skips payment entirely, books at price=0.
-const FREE_CONSULTATIONS = import.meta.env.VITE_FREE_CONSULTATIONS === "true";
+// Free consultations are the current production default. Set
+// VITE_FREE_CONSULTATIONS=false only when paid consultations are re-enabled.
+const FREE_CONSULTATIONS = import.meta.env.VITE_FREE_CONSULTATIONS !== "false";
 
 // Режим оплаты:
 // - VITE_PAYMENTS_LIVE=true → реальные платежи (Halyk, карта)
@@ -1192,7 +1193,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
                         </div>
                         <div className='sm:ml-auto sm:text-right w-full sm:w-auto'>
                             <p className='font-bold text-slate-900'>
-                                {formatPrice(doctorPrice)}
+                                {FREE_CONSULTATIONS ? t('booking.free') : formatPrice(doctorPrice)}
                             </p>
                             <p className='text-xs text-slate-500'>
                                 {t('booking.per_consultation')}
