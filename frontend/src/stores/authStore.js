@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import api, { authAPI } from '../services/api'
 import i18n from '../i18n'
+import useConsultationStore from './consultationStore'
 
 // Decode JWT expiry without external library (no signature verification — just expiry)
 function getJwtExpiry(token) {
@@ -134,6 +135,7 @@ const useAuthStore = create(
 
       // Logout
       logout: () => {
+        useConsultationStore.getState().closeConsultation()
         set({
           user: null,
           token: null,

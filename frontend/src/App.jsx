@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { lazy, Suspense, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ToastProvider } from './components/ui/Toast'
+import ActiveConsultation from './components/consultation/ActiveConsultation'
+import ConsultationRoute from './components/consultation/ConsultationRoute'
 
 // Layouts
 import { PublicLayout, DashboardLayout } from './components/layout'
@@ -60,7 +62,6 @@ const AdminPriceList = lazy(() => import('./pages/admin/AdminPriceList'))
 const AdminGuideVideos = lazy(() => import('./pages/admin/AdminGuideVideos'))
 const AdminContent = lazy(() => import('./pages/admin/AdminContent'))
 const StaffDashboard = lazy(() => import('./pages/staff/StaffDashboard'))
-const VideoConsultation = lazy(() => import('./pages/VideoConsultation'))
 
 // Loading component
 function LoadingScreen() {
@@ -310,7 +311,7 @@ function App() {
           path="/consultation/:roomId"
           element={
             <ProtectedRoute>
-              <VideoConsultation />
+              <ConsultationRoute />
             </ProtectedRoute>
           }
         />
@@ -330,6 +331,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </Suspense>
+      <ActiveConsultation />
     </BrowserRouter>
     </ToastProvider>
   )

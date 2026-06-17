@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Mic,
@@ -72,8 +72,15 @@ const ICE_SERVERS = {
 
 const SIGNALING_SERVER = getSignalingUrl();
 
-function VideoConsultation() {
-  const { roomId } = useParams()
+function VideoConsultation({
+  roomId: roomIdProp,
+  isMinimized = false,
+  onMinimize,
+  onRestore,
+  onClose,
+} = {}) {
+  const { roomId: routeRoomId } = useParams()
+  const roomId = roomIdProp || routeRoomId
   const navigate = useNavigate()
   const { t, i18n } = useTranslation()
   const timeLocale = i18n.language === 'kk' ? 'kk-KZ' : i18n.language === 'en' ? 'en-US' : 'ru-RU'
@@ -142,12 +149,16 @@ function VideoConsultation() {
   const localVideoRef = useRef(null)
   const remoteVideoRef = useRef(null)
   const localStreamRef = useRef(null)
+  const remoteStreamRef = useRef(null)
   const peerConnectionRef = useRef(null)
   const socketRef = useRef(null)
   const videoContainerRef = useRef(null)
+  const miniWindowRef = useRef(null)
+  const miniDragRef = useRef(null)
   const activeSocketRef = useRef(null)
   const reconnectAttemptsRef = useRef(0)
   const reconnectTimerRef = useRef(null)
+  const [miniPosition, setMiniPosition] = useState(null)
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 640) {
@@ -157,6 +168,129 @@ function VideoConsultation() {
   const chatEndRef = useRef(null)
 
   const isDoctor = user?.userRole === 'doctor'
+
+  const getMiniBounds = useCallback(() => {
+    const viewportWidth = window.visualViewport?.width || window.innerWidth
+    const viewportHeight = window.visualViewport?.height || window.innerHeight
+    const rootStyles = window.getComputedStyle(document.documentElement)
+    const safeTop = parseFloat(rootStyles.getPropertyValue('--safe-top')) || 0
+    const safeRight = parseFloat(rootStyles.getPropertyValue('--safe-right')) || 0
+    const safeBottom = parseFloat(rootStyles.getPropertyValue('--safe-bottom')) || 0
+    const safeLeft = parseFloat(rootStyles.getPropertyValue('--safe-left')) || 0
+    const rect = miniWindowRef.current?.getBoundingClientRect()
+    const fallbackWidth = viewportWidth < 640 ? 224 : 320
+    const fallbackHeight = viewportWidth < 640 ? 238 : 292
+    const width = rect?.width || fallbackWidth
+    const height = rect?.height || fallbackHeight
+    const edgeGap = viewportWidth < 640 ? 12 : 20
+    const bottomNavigationGap = viewportWidth < 640 ? 76 : 0
+
+    return {
+      width,
+      height,
+      minX: edgeGap + safeLeft,
+      minY: edgeGap + safeTop,
+      maxX: Math.max(edgeGap + safeLeft, viewportWidth - width - edgeGap - safeRight),
+      maxY: Math.max(edgeGap + safeTop, viewportHeight - height - edgeGap - safeBottom - bottomNavigationGap),
+    }
+  }, [])
+
+  const clampMiniPosition = useCallback((position) => {
+    const bounds = getMiniBounds()
+    return {
+      x: Math.min(Math.max(position.x, bounds.minX), bounds.maxX),
+      y: Math.min(Math.max(position.y, bounds.minY), bounds.maxY),
+    }
+  }, [getMiniBounds])
+
+  const getInitialMiniPosition = useCallback(() => {
+    const bounds = getMiniBounds()
+    return { x: bounds.maxX, y: bounds.maxY }
+  }, [getMiniBounds])
+
+  const snapMiniToNearestEdge = useCallback((position) => {
+    const bounds = getMiniBounds()
+    const centerX = position.x + bounds.width / 2
+    const viewportWidth = window.visualViewport?.width || window.innerWidth
+    return clampMiniPosition({
+      x: centerX < viewportWidth / 2 ? bounds.minX : bounds.maxX,
+      y: position.y,
+    })
+  }, [clampMiniPosition, getMiniBounds])
+
+  const attachMediaStreams = useCallback(() => {
+    if (localVideoRef.current && localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current
+    }
+    if (remoteVideoRef.current && remoteStreamRef.current) {
+      remoteVideoRef.current.srcObject = remoteStreamRef.current
+    }
+  }, [])
+
+  useEffect(() => {
+    attachMediaStreams()
+  }, [attachMediaStreams, isMinimized, accessStatus])
+
+  useEffect(() => {
+    if (!isMinimized) return
+    const updatePosition = () => {
+      setMiniPosition((current) => clampMiniPosition(current || getInitialMiniPosition()))
+    }
+
+    window.requestAnimationFrame(updatePosition)
+    window.addEventListener('resize', updatePosition, { passive: true })
+    window.addEventListener('orientationchange', updatePosition, { passive: true })
+    window.visualViewport?.addEventListener('resize', updatePosition, { passive: true })
+    window.visualViewport?.addEventListener('scroll', updatePosition, { passive: true })
+
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('orientationchange', updatePosition)
+      window.visualViewport?.removeEventListener('resize', updatePosition)
+      window.visualViewport?.removeEventListener('scroll', updatePosition)
+    }
+  }, [clampMiniPosition, getInitialMiniPosition, isMinimized])
+
+  const handleMiniPointerDown = (event) => {
+    if (event.target.closest('button, a, input, textarea, select, label')) return
+    const startPosition = miniPosition || getInitialMiniPosition()
+    miniDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: startPosition.x,
+      originY: startPosition.y,
+      hasMoved: false,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const handleMiniPointerMove = (event) => {
+    const drag = miniDragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    const deltaX = event.clientX - drag.startX
+    const deltaY = event.clientY - drag.startY
+    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+      drag.hasMoved = true
+    }
+    setMiniPosition(clampMiniPosition({
+      x: drag.originX + deltaX,
+      y: drag.originY + deltaY,
+    }))
+  }
+
+  const handleMiniPointerUp = (event) => {
+    const drag = miniDragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    miniDragRef.current = null
+    setMiniPosition((current) => {
+      const next = current || getInitialMiniPosition()
+      return drag.hasMoved ? snapMiniToNearestEdge(next) : next
+    })
+  }
 
   // Track video container height for portrait rotation sizing
   useEffect(() => {
@@ -436,6 +570,7 @@ function VideoConsultation() {
           clearTimeout(reconnectTimerRef.current)
           setRemoteUser(null)
           setConnectionState('waiting')
+          remoteStreamRef.current = null
           if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null
           if (peerConnectionRef.current) {
             peerConnectionRef.current.close()
@@ -561,8 +696,11 @@ function VideoConsultation() {
     }
 
     pc.ontrack = (event) => {
-      if (remoteVideoRef.current && event.streams[0]) {
-        remoteVideoRef.current.srcObject = event.streams[0]
+      if (event.streams[0]) {
+        remoteStreamRef.current = event.streams[0]
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = event.streams[0]
+        }
         setConnectionState('connected')
       }
     }
@@ -648,6 +786,18 @@ function VideoConsultation() {
     }
   }
 
+  const handleMinimize = async () => {
+    if (document.fullscreenElement) {
+      try {
+        await document.exitFullscreen()
+      } catch (err) {
+        console.error('Error exiting fullscreen:', err)
+      }
+    }
+    setIsFullscreen(false)
+    onMinimize?.()
+  }
+
   const copyInviteLink = () => {
     navigator.clipboard.writeText(`${window.location.origin}/consultation/${roomId}`)
     setLinkCopied(true)
@@ -659,6 +809,7 @@ function VideoConsultation() {
     peerConnectionRef.current?.close()
     socketRef.current?.emit('leave-room')
     socketRef.current?.disconnect()
+    remoteStreamRef.current = null
   }
 
   const saveChatLog = async (chatMessages) => {
@@ -680,6 +831,7 @@ function VideoConsultation() {
     saveChatLog(messages)
     cleanupCall()
     if (isDoctor) {
+      onClose?.()
       navigate('/doctor')
     } else {
       // Patient — show rating modal
@@ -695,6 +847,7 @@ function VideoConsultation() {
       await appointmentsAPI.update(appointment.documentId, { status: 'completed' })
       socketRef.current?.emit('force-end-call')
       cleanupCall()
+      onClose?.()
       navigate('/doctor')
     } catch (err) {
       console.error('Error completing appointment:', err)
@@ -717,12 +870,14 @@ function VideoConsultation() {
     } finally {
       setIsSubmittingRating(false)
       setShowRatingModal(false)
+      onClose?.()
       navigate('/patient/appointments')
     }
   }
 
   const skipRating = () => {
     setShowRatingModal(false)
+    onClose?.()
     navigate('/patient/appointments')
   }
 
@@ -993,6 +1148,138 @@ function VideoConsultation() {
     )
   }
 
+  if (isMinimized && !showRatingModal && !showCompleteConfirm) {
+    const position = miniPosition || getInitialMiniPosition()
+    const connectionLabel = {
+      initializing: t('video.init_title'),
+      waiting: t('video.waiting_label'),
+      connecting: t('video.connecting'),
+      connected: t('video.connected'),
+      reconnecting: t('video.reconnecting'),
+      failed: t('video.failed_title'),
+    }[connectionState] || connectionState
+
+    return (
+      <div
+        ref={miniWindowRef}
+        className="fixed z-[1000] w-56 overflow-hidden rounded-2xl bg-slate-950 text-white shadow-2xl ring-1 ring-white/15 sm:w-80"
+        style={{
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          touchAction: 'none',
+          paddingBottom: 'max(0px, env(safe-area-inset-bottom))',
+        }}
+        onPointerDown={handleMiniPointerDown}
+        onPointerMove={handleMiniPointerMove}
+        onPointerUp={handleMiniPointerUp}
+        onPointerCancel={handleMiniPointerUp}
+      >
+        <div className="cursor-grab active:cursor-grabbing">
+          <div className="relative aspect-video bg-slate-900">
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              onLoadedMetadata={(e) => {
+                const { videoWidth, videoHeight } = e.target
+                setRemoteVideoPortrait(videoHeight > videoWidth)
+              }}
+              onResize={(e) => {
+                const { videoWidth, videoHeight } = e.target
+                setRemoteVideoPortrait(videoHeight > videoWidth)
+              }}
+              className={cn('h-full w-full object-contain', connectionState === 'connected' ? 'block' : 'hidden')}
+            />
+            {connectionState !== 'connected' && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
+                {connectionState === 'failed' ? (
+                  <AlertCircle className="h-8 w-8 text-rose-400" />
+                ) : (
+                  <Loader2 className="h-8 w-8 animate-spin text-teal-400" />
+                )}
+              </div>
+            )}
+            <div className="absolute left-2 top-2 flex max-w-[calc(100%-5.5rem)] items-center gap-1.5 rounded-full bg-black/55 px-2 py-1 text-[11px] font-medium backdrop-blur">
+              <span className={cn(
+                'h-2 w-2 rounded-full',
+                connectionState === 'connected' ? 'bg-emerald-400' : connectionState === 'failed' ? 'bg-rose-400' : 'bg-amber-400'
+              )} />
+              <span className="truncate">{connectionLabel}</span>
+            </div>
+            <div className="absolute bottom-2 right-2 w-16 overflow-hidden rounded-lg bg-slate-800 shadow-lg ring-1 ring-white/15 sm:w-24">
+              <div className="relative aspect-video">
+                <video ref={localVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+                {!isVideoOn && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
+                    <VideoOff className="h-4 w-4 text-slate-400" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2 p-2.5 sm:p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold leading-tight">{participant.name}</p>
+                <p className="hidden truncate text-xs text-slate-400 sm:block">{participant.role}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1 rounded-full bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-200">
+                <Clock className="h-3 w-3 text-emerald-400" />
+                {formatDuration(duration)}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-1.5">
+              <button
+                type="button"
+                onClick={toggleMute}
+                title={isMuted ? t('common.mic_on') : t('common.mic_off')}
+                aria-label={isMuted ? t('common.mic_on') : t('common.mic_off')}
+                className={cn(
+                  'flex h-9 w-9 items-center justify-center rounded-xl transition-colors sm:h-10 sm:w-10',
+                  isMuted ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-slate-800 text-white hover:bg-slate-700'
+                )}
+              >
+                {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={toggleVideo}
+                title={isVideoOn ? t('common.cam_off') : t('common.cam_on')}
+                aria-label={isVideoOn ? t('common.cam_off') : t('common.cam_on')}
+                className={cn(
+                  'flex h-9 w-9 items-center justify-center rounded-xl transition-colors sm:h-10 sm:w-10',
+                  !isVideoOn ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-slate-800 text-white hover:bg-slate-700'
+                )}
+              >
+                {isVideoOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={onRestore}
+                title={t('video.restore')}
+                aria-label={t('video.restore')}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-600 text-white transition-colors hover:bg-teal-500 sm:h-10 sm:w-10"
+              >
+                <Maximize className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={endCall}
+                title={t('common.leave_call')}
+                aria-label={t('common.leave_call')}
+                className="flex h-9 w-10 items-center justify-center rounded-xl bg-rose-500 text-white transition-colors hover:bg-rose-600 sm:h-10 sm:w-12"
+              >
+                <PhoneOff className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-[calc(var(--app-height)-var(--safe-top))] bg-slate-900 flex flex-col sm:flex-row overflow-hidden pt-[var(--safe-top)]">
       {sidebarOpen && (
@@ -1010,10 +1297,12 @@ function VideoConsultation() {
         <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-4 py-3 bg-slate-800/50">
           <div className="flex items-center gap-3 min-w-0">
             <button
-              onClick={() => navigate(-1)}
+              onClick={handleMinimize}
+              title={t('video.minimize')}
+              aria-label={t('video.minimize')}
               className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <Minimize className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-3 min-w-0">
               <div className="relative">
@@ -1039,6 +1328,8 @@ function VideoConsultation() {
             )}
             <button
               onClick={copyInviteLink}
+              title={linkCopied ? t('video.copied') : t('video.link')}
+              aria-label={linkCopied ? t('video.copied') : t('video.link')}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 text-sm transition-colors"
             >
               {linkCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <LinkIcon className="w-4 h-4" />}
@@ -1046,6 +1337,8 @@ function VideoConsultation() {
             </button>
             <button
               onClick={toggleFullscreen}
+              title={isFullscreen ? t('video.exit_fullscreen') : t('video.fullscreen')}
+              aria-label={isFullscreen ? t('video.exit_fullscreen') : t('video.fullscreen')}
               className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors"
             >
               {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
@@ -1053,6 +1346,8 @@ function VideoConsultation() {
             {!sidebarOpen && (
               <button
                 onClick={() => setSidebarOpen(true)}
+                title={t('video.open_chat')}
+                aria-label={t('video.open_chat')}
                 className="p-2 rounded-lg bg-teal-600 text-white hover:bg-teal-500 transition-colors"
               >
                 <MessageCircle className="w-4 h-4" />
@@ -1093,6 +1388,8 @@ function VideoConsultation() {
                     <code className="flex-1 text-teal-400 text-sm truncate">{window.location.href}</code>
                     <button
                       onClick={copyInviteLink}
+                      title={linkCopied ? t('video.copied') : t('video.link')}
+                      aria-label={linkCopied ? t('video.copied') : t('video.link')}
                       className={cn(
                         "p-2 rounded-lg transition-colors",
                         linkCopied ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-700 hover:bg-slate-600 text-slate-400"
@@ -1222,6 +1519,8 @@ function VideoConsultation() {
             {isDoctor && (
               <button
                 onClick={() => setShowCompleteConfirm(true)}
+                title={t('video.complete_btn')}
+                aria-label={t('video.complete_btn')}
                 className="pointer-events-auto inline-flex max-w-full items-center gap-2 rounded-full bg-slate-800/92 px-4 py-2 text-sm font-medium text-white shadow-xl ring-1 ring-white/10 backdrop-blur-xl transition-all hover:bg-emerald-600"
               >
                 <Check className="w-4 h-4" />
@@ -1261,6 +1560,15 @@ function VideoConsultation() {
               <div className="mx-1 h-8 w-px bg-slate-700" />
 
               <button
+                onClick={handleMinimize}
+                title={t('video.minimize')}
+                aria-label={t('video.minimize')}
+                className="h-12 w-12 rounded-2xl bg-slate-700 text-white flex items-center justify-center transition-all hover:bg-slate-600"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+
+              <button
                 onClick={endCall}
                 title={t('common.leave_call')}
                 aria-label={t('common.leave_call')}
@@ -1283,6 +1591,8 @@ function VideoConsultation() {
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
             <button
               onClick={() => setSidebarTab('chat')}
+              title={t('video.tab_chat')}
+              aria-label={t('video.tab_chat')}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                 sidebarTab === 'chat'
@@ -1296,6 +1606,8 @@ function VideoConsultation() {
             {isDoctor && (
               <button
                 onClick={() => setSidebarTab('notes')}
+                title={t('video.tab_notes')}
+                aria-label={t('video.tab_notes')}
                 className={cn(
                   "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                   sidebarTab === 'notes'
@@ -1310,6 +1622,8 @@ function VideoConsultation() {
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
+            title={t('common.close')}
+            aria-label={t('common.close')}
             className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -1378,6 +1692,7 @@ function VideoConsultation() {
                       : "bg-slate-100 text-slate-500 hover:text-teal-600 hover:bg-teal-50"
                   )}
                   title={t('video.attach_doc')}
+                  aria-label={t('video.attach_doc')}
                 >
                   {isUploadingChatFile
                     ? <Loader2 className="w-5 h-5 animate-spin" />
@@ -1394,6 +1709,8 @@ function VideoConsultation() {
                 <button
                   type="submit"
                   disabled={!newMessage.trim()}
+                  title={t('common.send')}
+                  aria-label={t('common.send')}
                   className={cn(
                     "p-3 rounded-xl transition-colors",
                     newMessage.trim()
@@ -1419,10 +1736,12 @@ function VideoConsultation() {
                 { id: 'prescriptions', label: t('video.tab_prescriptions'), icon: Pill },
                 { id: 'documents', label: t('video.tab_documents'), icon: FolderOpen },
               ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setNotesTab(tab.id)}
-                  className={cn(
+                  <button
+                    key={tab.id}
+                    onClick={() => setNotesTab(tab.id)}
+                    title={tab.label}
+                    aria-label={tab.label}
+                    className={cn(
                     "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                     notesTab === tab.id
                       ? "bg-teal-50 text-teal-700"
@@ -1464,6 +1783,8 @@ function VideoConsultation() {
                         <span className="text-slate-600 truncate">{diagnosisFile.name}</span>
                         <button
                           onClick={() => setDiagnosisFile(null)}
+                          title={t('common.remove')}
+                          aria-label={t('common.remove')}
                           className="ml-auto p-1 hover:bg-slate-200 rounded"
                         >
                           <X className="w-3 h-3 text-slate-400" />
@@ -1518,6 +1839,8 @@ function VideoConsultation() {
                         <span className="text-slate-600 truncate">{planFile.name}</span>
                         <button
                           onClick={() => setPlanFile(null)}
+                          title={t('common.remove')}
+                          aria-label={t('common.remove')}
                           className="ml-auto p-1 hover:bg-slate-200 rounded"
                         >
                           <X className="w-3 h-3 text-slate-400" />
@@ -1572,6 +1895,8 @@ function VideoConsultation() {
                         <span className="text-slate-600 truncate">{prescriptionsFile.name}</span>
                         <button
                           onClick={() => setPrescriptionsFile(null)}
+                          title={t('common.remove')}
+                          aria-label={t('common.remove')}
                           className="ml-auto p-1 hover:bg-slate-200 rounded"
                         >
                           <X className="w-3 h-3 text-slate-400" />
@@ -1674,6 +1999,8 @@ function VideoConsultation() {
                                           href={fileUrl}
                                           target="_blank"
                                           rel="noopener noreferrer"
+                                          title={t('common.open')}
+                                          aria-label={t('common.open')}
                                           className="p-1.5 rounded-lg text-teal-600 hover:bg-teal-50 transition-colors flex-shrink-0"
                                         >
                                           <ExternalLink className="w-4 h-4" />
@@ -1758,6 +2085,8 @@ function VideoConsultation() {
                   onClick={() => setRating(star)}
                   onMouseEnter={() => setHoverRating(star)}
                   onMouseLeave={() => setHoverRating(0)}
+                  title={t(`video.rating_${star}`)}
+                  aria-label={t(`video.rating_${star}`)}
                   className="p-1 transition-transform hover:scale-110"
                 >
                   <Star
