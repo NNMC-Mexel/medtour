@@ -53,7 +53,8 @@ MINIO_SECRET_KEY=...
 MINIO_BUCKET=medtour
 S3_REGION=us-east-1
 
-PAYMENTS_LIVE=true
+FREE_CONSULTATIONS=true
+PAYMENTS_LIVE=false
 ```
 
 Notes:
@@ -80,8 +81,9 @@ VITE_SIGNALING_SERVER=https://medtourrtc.nnmc.kz
 VITE_PRODUCTION_API_URL=https://medtourserver.nnmc.kz
 VITE_PRODUCTION_SIGNALING_URL=https://medtourrtc.nnmc.kz
 VITE_PRODUCTION_FRONTEND_HOSTS=medtour.nnmc.kz,www.medtour.nnmc.kz
-VITE_PAYMENTS_LIVE=true
-VITE_EPAY_TEST=false
+VITE_FREE_CONSULTATIONS=true
+VITE_PAYMENTS_LIVE=false
+VITE_EPAY_TEST=true
 ```
 
 If running as a Node service instead of static hosting:
@@ -107,14 +109,9 @@ NODE_ENV=production
 PORT=1341
 FRONTEND_URL=https://medtour.nnmc.kz
 APP_NAME=MedTour
-PAYMENTS_LIVE=true
-EPAY_TEST=false
-EPAY_CLIENT_ID=...
-EPAY_CLIENT_SECRET=...
-EPAY_TERMINAL_ID=...
-EPAY_QR_CLIENT_ID=...
-EPAY_QR_CLIENT_SECRET=...
-EPAY_QR_TERMINAL_ID=...
+FREE_CONSULTATIONS=true
+PAYMENTS_LIVE=false
+EPAY_TEST=true
 STRAPI_API_URL=https://medtourserver.nnmc.kz
 STRAPI_API_TOKEN=...
 REDIS_URL=redis://redis:6379

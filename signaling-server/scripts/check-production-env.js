@@ -30,11 +30,12 @@ for (const key of required) {
 }
 
 if (process.env.NODE_ENV === 'production') {
+  const freeConsultations = process.env.FREE_CONSULTATIONS !== 'false';
   const allowTestPaymentsInProduction = process.env.ALLOW_TEST_PAYMENTS_IN_PRODUCTION === 'true';
-  if (process.env.PAYMENTS_LIVE !== 'true' && !allowTestPaymentsInProduction) {
+  if (!freeConsultations && process.env.PAYMENTS_LIVE !== 'true' && !allowTestPaymentsInProduction) {
     failed = true;
-    console.error('  [FAIL] PAYMENTS_LIVE=true is required in production unless ALLOW_TEST_PAYMENTS_IN_PRODUCTION=true');
-  } else if (process.env.PAYMENTS_LIVE !== 'true') {
+    console.error('  [FAIL] PAYMENTS_LIVE=true is required in production unless FREE_CONSULTATIONS=true or ALLOW_TEST_PAYMENTS_IN_PRODUCTION=true');
+  } else if (!freeConsultations && process.env.PAYMENTS_LIVE !== 'true') {
     console.warn('  [WARN] Test payments are enabled in production; Halyk live payments are disabled');
   }
   const requiredOrigins = [
@@ -48,7 +49,7 @@ if (process.env.NODE_ENV === 'production') {
       console.error(`  [FAIL] CORS_ORIGINS must include ${origin}`);
     }
   }
-  if (process.env.PAYMENTS_LIVE === 'true') {
+  if (!freeConsultations && process.env.PAYMENTS_LIVE === 'true') {
     for (const key of paymentKeys) {
       if (!process.env[key]) {
         failed = true;

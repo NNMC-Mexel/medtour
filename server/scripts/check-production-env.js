@@ -56,10 +56,11 @@ for (const key of required) {
 
 if (process.env.NODE_ENV === 'production') {
   if (process.env.DATABASE_CLIENT !== 'postgres') fail('DATABASE_CLIENT must be postgres in production');
+  const freeConsultations = process.env.FREE_CONSULTATIONS !== 'false';
   const allowTestPaymentsInProduction = process.env.ALLOW_TEST_PAYMENTS_IN_PRODUCTION === 'true';
-  if (process.env.PAYMENTS_LIVE !== 'true' && !allowTestPaymentsInProduction) {
-    fail('PAYMENTS_LIVE=true is required in production unless ALLOW_TEST_PAYMENTS_IN_PRODUCTION=true');
-  } else if (process.env.PAYMENTS_LIVE !== 'true') {
+  if (!freeConsultations && process.env.PAYMENTS_LIVE !== 'true' && !allowTestPaymentsInProduction) {
+    fail('PAYMENTS_LIVE=true is required in production unless FREE_CONSULTATIONS=true or ALLOW_TEST_PAYMENTS_IN_PRODUCTION=true');
+  } else if (!freeConsultations && process.env.PAYMENTS_LIVE !== 'true') {
     console.warn('  [WARN] Test payments are enabled in production; live payment enforcement is disabled');
   }
   const requiredOrigins = [

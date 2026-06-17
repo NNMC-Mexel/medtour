@@ -19,13 +19,14 @@ for (const key of required) {
 }
 
 if (process.env.NODE_ENV === 'production') {
-  if (process.env.VITE_PAYMENTS_LIVE !== 'true') {
+  const freeConsultations = process.env.VITE_FREE_CONSULTATIONS !== 'false'
+  if (!freeConsultations && process.env.VITE_PAYMENTS_LIVE !== 'true') {
     failed = true
-    console.error('  [FAIL] VITE_PAYMENTS_LIVE=true is required in production')
+    console.error('  [FAIL] VITE_PAYMENTS_LIVE=true is required in production when VITE_FREE_CONSULTATIONS=false')
   }
-  if (process.env.VITE_EPAY_TEST !== 'false') {
+  if (!freeConsultations && process.env.VITE_EPAY_TEST !== 'false') {
     failed = true
-    console.error('  [FAIL] VITE_EPAY_TEST=false is required in production')
+    console.error('  [FAIL] VITE_EPAY_TEST=false is required in production when VITE_FREE_CONSULTATIONS=false')
   }
 }
 
