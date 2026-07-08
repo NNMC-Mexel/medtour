@@ -718,14 +718,22 @@ async function enforceUsersPermissionsAdvanced(strapi: Core.Strapi) {
     const pluginStore = strapi.store({ type: 'plugin', name: 'users-permissions', key: 'advanced' });
     const current = ((await pluginStore.get()) as Record<string, unknown> | null) || {};
 
-    const desiredRedirect = process.env.FRONTEND_URL
-      ? `${process.env.FRONTEND_URL.replace(/\/$/, '')}/email-confirmed`
+    const frontendUrl = process.env.FRONTEND_URL?.replace(/\/$/, '');
+    const desiredRedirect = frontendUrl
+      ? `${frontendUrl}/email-confirmed`
       : (current.email_confirmation_redirection as string | undefined) || '/email-confirmed';
+    const desiredResetPasswordUrl = frontendUrl
+      ? `${frontendUrl}/reset-password`
+      : (current.email_reset_password as string | undefined) || 'http://localhost:5173/reset-password';
 
     const next = {
       ...current,
       email_confirmation: true,
       email_confirmation_redirection: desiredRedirect,
+      // Strapi renders reset email templates as `<%= URL %>?code=<%= TOKEN %>`.
+      // If this is null/relative, Gmail turns the link into http://?code=...
+      // and users land on an invalid redirect warning.
+      email_reset_password: desiredResetPasswordUrl,
       // Defence: refuse login for blocked accounts; default-strict on
       // unique email (Strapi default is true, but we make it explicit).
       unique_email: true,
@@ -733,7 +741,7 @@ async function enforceUsersPermissionsAdvanced(strapi: Core.Strapi) {
     };
 
     await pluginStore.set({ value: next });
-    console.log('Users-permissions advanced settings enforced: email_confirmation=true');
+    console.log(`Users-permissions advanced settings enforced: email_confirmation=true, email_reset_password=${desiredResetPasswordUrl}`);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('Failed to enforce users-permissions advanced settings:', msg);
