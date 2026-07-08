@@ -521,13 +521,13 @@ function RegisterPage() {
                       />
                       <span className="text-sm text-slate-600">
                         {t('auth.register.agree_with')}{' '}
-                        <Link to="/terms" className={`text-${accentColor}-600 hover:underline`}>
+                        <a href="/terms" target="_blank" rel="noopener noreferrer" className={`text-${accentColor}-600 hover:underline`}>
                           {t('auth.register.terms')}
-                        </Link>{' '}
+                        </a>{' '}
                         {t('common.and')}{' '}
-                        <Link to="/privacy" className={`text-${accentColor}-600 hover:underline`}>
+                        <a href="/privacy" target="_blank" rel="noopener noreferrer" className={`text-${accentColor}-600 hover:underline`}>
                           {t('auth.register.privacy')}
-                        </Link>
+                        </a>
                       </span>
                     </label>
                     {formErrors.terms && <p className="text-sm text-rose-600">{formErrors.terms}</p>}
