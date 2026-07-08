@@ -163,6 +163,11 @@
   75% { transform: rotate(-3deg); }
 }
 
+@keyframes bounce-notification {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+
 /* Utility Classes */
 @layer utilities {
   .animate-fadeIn { 
@@ -184,6 +189,10 @@
   .animate-wiggle {
     animation: wiggle 0.8s ease-in-out 1;
     transform-origin: top center;
+  }
+
+  .animate-bounce {
+    animation: bounce-notification 0.6s ease-in-out 1;
   }
 
   /* Stagger Children Animation */

@@ -198,7 +198,7 @@ function PatientChatWidget() {
   if (!isPatient) return null
 
   return (
-    <div ref={widgetRef} className="fixed bottom-4 right-4 z-40">
+    <div ref={widgetRef} data-chat-widget className="fixed bottom-4 right-4 z-40">
       {!isOpen ? (
         <button
           type="button"

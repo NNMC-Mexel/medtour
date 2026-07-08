@@ -8,6 +8,7 @@ import {
   getAuthToken,
   uploadFile,
 } from '../services/api'
+import { showMessageNotification, clearNotificationReminder } from '../utils/notifications'
 
 const conversationKey = (conversation) => conversation?.documentId || conversation?.id
 const messageKey = (message) => message?.documentId || message?.id
@@ -19,16 +20,6 @@ const upsertByKey = (items, item, getKey) => {
   return exists ? items.map((existing) => (getKey(existing) === key ? { ...existing, ...item } : existing)) : [item, ...items]
 }
 
-const showBrowserUnreadNotification = (message) => {
-  if (typeof window === 'undefined' || !('Notification' in window)) return
-  if (document.visibilityState === 'visible') return
-  if (Notification.permission !== 'granted') return
-  const senderName = message?.sender?.fullName || message?.sender?.email || 'MedTour'
-  new Notification(`New message from ${senderName}`, {
-    body: message?.content || 'Attachment',
-    tag: `medtour-chat-${message?.conversation?.documentId || message?.conversation?.id || message?.id}`,
-  })
-}
 
 const useChatStore = create((set, get) => ({
   conversations: [],
@@ -70,7 +61,7 @@ const useChatStore = create((set, get) => ({
     })
     socket.on('chat:message-created', ({ conversationId, message }) => {
       const currentId = conversationKey(get().currentConversation)
-      if (String(currentId) !== String(conversationId)) showBrowserUnreadNotification(message)
+      if (String(currentId) !== String(conversationId)) showMessageNotification(message)
       set((state) => {
         const nextConversations = state.conversations.map((conversation) => {
           if (String(conversationKey(conversation)) !== String(conversationId)) return conversation
@@ -295,6 +286,7 @@ const useChatStore = create((set, get) => ({
 
   markConversationRead: async (conversationId) => {
     if (!conversationId) return
+    clearNotificationReminder(conversationId)
     try {
       const response = await conversationsAPI.markRead(conversationId)
       const readAt = response?.data?.data?.readAt || new Date().toISOString()
