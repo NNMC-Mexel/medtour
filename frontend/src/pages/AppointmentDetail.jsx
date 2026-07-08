@@ -131,6 +131,7 @@ function AppointmentDetail() {
   const saveDiagnosis = async () => {
     if (!appointment?.id) return
     setIsSavingDiagnosis(true)
+    const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
     try {
       if (existingDocIds.certificate) {
         await documentsAPI.update(existingDocIds.certificate, {
@@ -144,6 +145,7 @@ function AppointmentDetail() {
           description: diagnosisText || '',
           ...(diagnosisFile?.id && { file: diagnosisFile.id }),
           appointment: appointment.id,
+          ...(caseId && { medical_case: caseId }),
           user: appointment.patient?.id,
           doctor: appointment.doctor?.id,
         })
@@ -190,6 +192,7 @@ function AppointmentDetail() {
   const savePlan = async () => {
     if (!appointment?.id || (!planText.trim() && !planFile)) return
     setIsSavingPlan(true)
+    const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
     try {
       if (existingDocIds.other) {
         await documentsAPI.update(existingDocIds.other, {
@@ -203,6 +206,7 @@ function AppointmentDetail() {
           description: planText,
           ...(planFile?.id && { file: planFile.id }),
           appointment: appointment.id,
+          ...(caseId && { medical_case: caseId }),
           user: appointment.patient?.id,
           doctor: appointment.doctor?.id,
         })
@@ -221,6 +225,7 @@ function AppointmentDetail() {
   const savePrescriptions = async () => {
     if (!appointment?.id || (!prescriptionsText.trim() && !prescriptionsFile)) return
     setIsSavingPrescriptions(true)
+    const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
     try {
       if (existingDocIds.prescription) {
         await documentsAPI.update(existingDocIds.prescription, {
@@ -234,6 +239,7 @@ function AppointmentDetail() {
           description: prescriptionsText,
           ...(prescriptionsFile?.id && { file: prescriptionsFile.id }),
           appointment: appointment.id,
+          ...(caseId && { medical_case: caseId }),
           user: appointment.patient?.id,
           doctor: appointment.doctor?.id,
         })

@@ -195,24 +195,34 @@ export default factories.createCoreController('api::medical-document.medical-doc
       }
     }
 
-    // Resolve appointment documentId + validate doctor is the appointment's doctor
+    // Resolve appointment documentId + validate doctor is the appointment's doctor.
+    // The linked medical_case is intentionally loaded here as a fallback: the
+    // video room and appointment-detail UI save doctor conclusions against an
+    // appointment, but managers work from the case document list.
     let appointmentDocId: string | undefined;
+    let appointmentRecord: any;
     if (body.appointment) {
-      let appointmentRecord: any;
       if (typeof body.appointment === 'number') {
         appointmentRecord = await strapi.query('api::appointment.appointment').findOne({
           where: { id: body.appointment },
-          populate: { doctor: true },
+          populate: { doctor: true, patient: true, medical_case: true },
         });
       } else {
         appointmentRecord = await strapi.documents('api::appointment.appointment').findOne({
           documentId: body.appointment,
-          populate: { doctor: { fields: ['id', 'documentId'] } },
+          populate: {
+            doctor: { fields: ['id', 'documentId'] },
+            patient: { fields: ['id', 'documentId'] },
+            medical_case: { fields: ['id', 'documentId', 'status'] },
+          },
         });
       }
 
       if (!appointmentRecord) return ctx.badRequest('Appointment not found');
       appointmentDocId = appointmentRecord.documentId;
+      if (!userDocId && appointmentRecord.patient?.documentId) {
+        userDocId = appointmentRecord.patient.documentId;
+      }
 
       // If a doctor is uploading, verify they are the doctor in the linked appointment
       if (isDoctor && !isAdmin) {
@@ -224,6 +234,7 @@ export default factories.createCoreController('api::medical-document.medical-doc
         if (!doctorRecord || apptDoctorDocId !== doctorRecord.documentId) {
           return ctx.forbidden('You can only upload documents for your own appointments');
         }
+        if (!doctorDocId) doctorDocId = doctorRecord.documentId;
       }
 
       // If a patient is uploading, verify they are the patient in the linked appointment
@@ -240,16 +251,17 @@ export default factories.createCoreController('api::medical-document.medical-doc
 
     let medicalCaseDocId: string | undefined;
     let linkedCaseRecord: any;
-    if (body.medical_case) {
+    const requestedCaseRef = body.medical_case || appointmentRecord?.medical_case?.documentId || appointmentRecord?.medical_case?.id;
+    if (requestedCaseRef) {
       let caseRecord: any;
-      if (typeof body.medical_case === 'number') {
+      if (typeof requestedCaseRef === 'number') {
         caseRecord = await strapi.query('api::medical-case.medical-case' as any).findOne({
-          where: { id: body.medical_case },
+          where: { id: requestedCaseRef },
           populate: { patient: true, doctor: true },
         });
       } else {
         caseRecord = await strapi.documents('api::medical-case.medical-case' as any).findOne({
-          documentId: body.medical_case,
+          documentId: requestedCaseRef,
           populate: { patient: { fields: ['id', 'documentId'] }, doctor: { fields: ['id', 'documentId'] } },
         });
       }
@@ -257,7 +269,7 @@ export default factories.createCoreController('api::medical-document.medical-doc
       if (!caseRecord) return ctx.badRequest('Medical case not found');
       linkedCaseRecord = caseRecord;
       medicalCaseDocId = caseRecord.documentId;
-      if (isStaff && !userDocId && caseRecord.patient?.documentId) {
+      if ((isStaff || isDoctor || isAdmin) && !userDocId && caseRecord.patient?.documentId) {
         userDocId = caseRecord.patient.documentId;
       }
 
@@ -350,20 +362,22 @@ export default factories.createCoreController('api::medical-document.medical-doc
         });
       }
 
+      const isDoctorFeedback = isDoctor && appointmentDocId;
       await strapi.documents('api::case-event.case-event' as any).create({
         data: {
           medical_case: medicalCaseDocId,
           actor: user.documentId || user.id,
-          eventType: 'DOCUMENT_UPLOADED',
+          eventType: isDoctorFeedback ? 'DOCTOR_FEEDBACK_UPLOADED' : 'DOCUMENT_UPLOADED',
           fromStatus: currentCaseStatus,
           toStatus: ['NEW_LEAD', 'REGISTERED', 'WAITING_FOR_DOCUMENTS'].includes(currentCaseStatus || '')
             ? 'DOCUMENTS_UPLOADED'
             : currentCaseStatus,
-          message: 'Medical document uploaded',
+          message: isDoctorFeedback ? 'Doctor uploaded post-consultation feedback' : 'Medical document uploaded',
           metadata: {
             documentId: (document as any).documentId || (document as any).id,
             title: body.title,
             type: body.type || 'other',
+            appointmentId: appointmentDocId || null,
           },
         },
       });
@@ -384,6 +398,7 @@ export default factories.createCoreController('api::medical-document.medical-doc
       populate: {
         user: { fields: ['id', 'documentId'] },
         doctor: { populate: { users_permissions_user: { fields: ['id'] } } },
+        appointment: { populate: { medical_case: { fields: ['id', 'documentId'] } } },
         medical_case: true,
       },
     });
@@ -420,6 +435,11 @@ export default factories.createCoreController('api::medical-document.medical-doc
 
     if (Object.keys(data).length === 0) {
       return ctx.badRequest('No allowed fields to update');
+    }
+
+    const inferredCaseFromAppointment = (existing as any).appointment?.medical_case?.documentId;
+    if (!medicalCaseRef && inferredCaseFromAppointment && (isAdminUser(user) || isDoctorOwner || role === 'doctor')) {
+      data.medical_case = inferredCaseFromAppointment;
     }
 
     const updated = await strapi.documents('api::medical-document.medical-document').update({

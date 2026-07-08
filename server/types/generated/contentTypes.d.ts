@@ -647,6 +647,8 @@ export interface ApiCaseEventCaseEvent extends Struct.CollectionTypeSchema {
         'ASSIGNED',
         'DOCUMENT_UPLOADED',
         'CONSULTATION_SCHEDULED',
+        'CONSULTATION_COMPLETED',
+        'DOCTOR_FEEDBACK_UPLOADED',
         'DOCTOR_DECISION',
         'PLAN_SENT',
         'PLAN_ACCEPTED',
@@ -1151,6 +1153,7 @@ export interface ApiMedicalCaseMedicalCase extends Struct.CollectionTypeSchema {
     desiredDates: Schema.Attribute.JSON;
     diagnosis: Schema.Attribute.Text;
     doctor: Schema.Attribute.Relation<'manyToOne', 'api::doctor.doctor'>;
+    doctorDecisionNotes: Schema.Attribute.Text;
     flightDetails: Schema.Attribute.JSON;
     hotelName: Schema.Attribute.String;
     internalNotes: Schema.Attribute.Text;

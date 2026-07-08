@@ -150,6 +150,9 @@
     "internalNotes": {
       "type": "text"
     },
+    "doctorDecisionNotes": {
+      "type": "text"
+    },
     "cancellationReason": {
       "type": "text"
     },

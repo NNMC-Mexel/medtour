@@ -71,6 +71,33 @@ function formatDesiredDate(value) {
   return value.preferredArrivalDate || value.arrivalDate || value.from || ''
 }
 
+function formatFallbackEventType(type) {
+  return type ? type.replaceAll('_', ' ') : 'Event'
+}
+
+function formatEventTitle(event, t) {
+  const type = event?.eventType || 'EVENT'
+  return t(`case_detail.event_type.${type}`, { defaultValue: formatFallbackEventType(type) })
+}
+
+function formatEventMessage(event, t) {
+  const type = event?.eventType
+  if (type === 'STATUS_CHANGED') {
+    return t('case_detail.event_message.STATUS_CHANGED', {
+      from: formatStatus(event.fromStatus, t),
+      to: formatStatus(event.toStatus, t),
+    })
+  }
+  if (type === 'DOCTOR_DECISION') {
+    const decision = event?.metadata?.decision || 'unknown'
+    return t(`case_detail.event_message.DOCTOR_DECISION.${decision}`, {
+      defaultValue: event.message || event.createdAt,
+    })
+  }
+  const translated = t(`case_detail.event_message.${type}`, { defaultValue: '' })
+  return translated || event?.message || event?.createdAt || ''
+}
+
 function DetailRow({ label, value }) {
   return (
     <div className="flex justify-between gap-4 py-2 border-b border-slate-100 last:border-b-0">
@@ -860,6 +887,7 @@ function MedicalCaseDetail() {
         clinic: getRef(data?.clinic),
         doctor: getRef(data?.doctor),
         internalNotes: data?.internalNotes || '',
+        doctorDecisionNotes: data?.doctorDecisionNotes || '',
         tourismNotes: data?.tourismNotes || '',
       })
     } catch (error) {
@@ -965,7 +993,7 @@ function MedicalCaseDetail() {
   }
 
   const submitDoctorDecision = async (decision) => {
-    if (!form.internalNotes?.trim()) {
+    if (!form.doctorDecisionNotes?.trim()) {
       toast.warning(t('case_detail.toast_notes_required'))
       return
     }
@@ -977,16 +1005,16 @@ function MedicalCaseDetail() {
         : 'WAITING_FOR_DOCUMENTS'
 
     const message = decision === 'treatment_in_kazakhstan'
-      ? 'Doctor recommended treatment in Kazakhstan.'
+      ? t('case_detail.event_message.DOCTOR_DECISION.treatment_in_kazakhstan')
       : decision === 'local_treatment'
-        ? 'Doctor recommended local treatment.'
-        : 'Doctor requested more medical documents.'
+        ? t('case_detail.event_message.DOCTOR_DECISION.local_treatment')
+        : t('case_detail.event_message.DOCTOR_DECISION.needs_more_documents')
 
     setIsSaving(true)
     try {
       await medicalCasesAPI.update(id, {
         status: nextStatus,
-        internalNotes: form.internalNotes,
+        doctorDecisionNotes: form.doctorDecisionNotes,
       })
       await caseEventsAPI.create({
         medical_case: medicalCase.documentId || medicalCase.id,
@@ -1008,14 +1036,16 @@ function MedicalCaseDetail() {
   }
 
   const selectedClinicDoctors = useMemo(() => {
+    if (!['admin', 'manager'].includes(role)) return doctors
     if (!form.clinic) return doctors
     const linked = doctors.filter(doctor => getRef(doctor.clinic) === form.clinic)
     return linked.length > 0 ? linked : doctors
-  }, [doctors, form.clinic])
+  }, [doctors, form.clinic, role])
 
   const canDoctorDecide = ['doctor', 'admin', 'coordinator'].includes(role)
   const canEditTreatmentPlan = ['doctor', 'admin', 'coordinator'].includes(role)
   const canApproveTreatmentPlan = role === 'patient'
+  const canManageClinic = ['admin', 'manager'].includes(role)
   const allowedStatusOptions = useMemo(() => {
     const current = normalizeCaseStatus(medicalCase?.status) || 'NEW_LEAD'
     return [current, ...getAllowedCaseTransitions(role, current)]
@@ -1152,16 +1182,18 @@ function MedicalCaseDetail() {
                     onChange={(e) => update('status', e.target.value)}
                     options={allowedStatusOptions.map(value => ({ value, label: formatStatus(value, t) }))}
                   />
-                  <Select
-                    label={t('common.clinic')}
-                    value={form.clinic}
-                    onChange={(e) => {
-                      update('clinic', e.target.value)
-                      update('doctor', '')
-                    }}
-                    placeholder={t('case_detail.not_assigned_placeholder')}
-                    options={clinics.map(clinic => ({ value: getRef(clinic), label: clinic.name }))}
-                  />
+                  {canManageClinic && (
+                    <Select
+                      label={t('common.clinic')}
+                      value={form.clinic}
+                      onChange={(e) => {
+                        update('clinic', e.target.value)
+                        update('doctor', '')
+                      }}
+                      placeholder={t('case_detail.not_assigned_placeholder')}
+                      options={clinics.map(clinic => ({ value: getRef(clinic), label: clinic.name }))}
+                    />
+                  )}
                   <Select
                     label={t('admin_apt.col_doctor')}
                     value={form.doctor}
@@ -1198,16 +1230,16 @@ function MedicalCaseDetail() {
           {canDoctorDecide && (
             <Card>
               <CardHeader>
-                <CardTitle>Doctor decision</CardTitle>
+                <CardTitle>{t('case_detail.section_doctor_decision')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-slate-600">
-                  Use this after the initial online consultation to record the doctor's verdict or request additional documents.
+                  {t('case_detail.doctor_decision_help')}
                 </p>
                 <Textarea
-                  label="Decision notes"
-                  value={form.internalNotes}
-                  onChange={(e) => update('internalNotes', e.target.value)}
+                  label={t('case_detail.label_doctor_decision_notes')}
+                  value={form.doctorDecisionNotes}
+                  onChange={(e) => update('doctorDecisionNotes', e.target.value)}
                   rows={3}
                 />
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -1216,14 +1248,14 @@ function MedicalCaseDetail() {
                     disabled={isSaving}
                     leftIcon={<CheckCircle className="w-4 h-4" />}
                   >
-                    Treatment in Kazakhstan
+                    {t('case_detail.decision_treatment_kz')}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => submitDoctorDecision('local_treatment')}
                     disabled={isSaving}
                   >
-                    Local treatment
+                    {t('case_detail.decision_local_treatment')}
                   </Button>
                   <Button
                     variant="outline"
@@ -1281,7 +1313,9 @@ function MedicalCaseDetail() {
             </CardHeader>
             <CardContent className="space-y-4">
               <TimelineItem icon={UserRound} title={t('case_detail.manager_label')} value={medicalCase.manager?.fullName} muted={!medicalCase.manager} />
-              <TimelineItem icon={Building2} title={t('case_detail.clinic_label')} value={medicalCase.clinic?.name} muted={!medicalCase.clinic} />
+              {canManageClinic && (
+                <TimelineItem icon={Building2} title={t('case_detail.clinic_label')} value={medicalCase.clinic?.name} muted={!medicalCase.clinic} />
+              )}
               <TimelineItem icon={Stethoscope} title={t('case_detail.doctor_label')} value={medicalCase.doctor?.fullName} muted={!medicalCase.doctor} />
             </CardContent>
           </Card>
@@ -1338,8 +1372,8 @@ function MedicalCaseDetail() {
                 <div className="space-y-3">
                   {events.slice(-6).map(event => (
                     <div key={event.id || event.documentId} className="border-l-2 border-teal-200 pl-3">
-                      <p className="text-sm font-medium text-slate-900">{event.eventType?.replaceAll('_', ' ') || 'Event'}</p>
-                      <p className="text-xs text-slate-500">{event.message || event.createdAt}</p>
+                      <p className="text-sm font-medium text-slate-900">{formatEventTitle(event, t)}</p>
+                      <p className="text-xs text-slate-500">{formatEventMessage(event, t)}</p>
                     </div>
                   ))}
                 </div>

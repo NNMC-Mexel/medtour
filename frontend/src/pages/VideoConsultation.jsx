@@ -368,6 +368,9 @@ function VideoConsultation({
         query.append('populate[patient][fields][2]', 'email')
         query.append('populate[patient][fields][3]', 'phone')
         query.append('populate[patient][fields][4]', 'avatar')
+        query.append('populate[medical_case][fields][0]', 'id')
+        query.append('populate[medical_case][fields][1]', 'documentId')
+        query.append('populate[medical_case][fields][2]', 'status')
 
         const response = await api.get(`/api/appointments?${query}`)
         const apt = response.data?.data?.[0]
@@ -1000,6 +1003,7 @@ function VideoConsultation({
   const saveDiagnosis = async () => {
     if (!appointment?.id) return
     setIsSavingDiagnosis(true)
+    const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
     try {
       if (existingDocIds.certificate) {
         await documentsAPI.update(existingDocIds.certificate, {
@@ -1013,6 +1017,7 @@ function VideoConsultation({
           description: diagnosisText || '',
           file: diagnosisFile?.id,
           appointment: appointment.id,
+          ...(caseId && { medical_case: caseId }),
           user: appointment.patient?.id,
           doctor: appointment.doctor?.id,
         })
@@ -1031,6 +1036,7 @@ function VideoConsultation({
   const savePlan = async () => {
     if (!appointment?.id || (!planText.trim() && !planFile)) return
     setIsSavingPlan(true)
+    const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
     try {
       if (existingDocIds.other) {
         await documentsAPI.update(existingDocIds.other, {
@@ -1044,6 +1050,7 @@ function VideoConsultation({
           description: planText,
           ...(planFile?.id && { file: planFile.id }),
           appointment: appointment.id,
+          ...(caseId && { medical_case: caseId }),
           user: appointment.patient?.id,
           doctor: appointment.doctor?.id,
         })
@@ -1062,6 +1069,7 @@ function VideoConsultation({
   const savePrescriptions = async () => {
     if (!appointment?.id || (!prescriptionsText.trim() && !prescriptionsFile)) return
     setIsSavingPrescriptions(true)
+    const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
     try {
       if (existingDocIds.prescription) {
         await documentsAPI.update(existingDocIds.prescription, {
@@ -1075,6 +1083,7 @@ function VideoConsultation({
           description: prescriptionsText,
           ...(prescriptionsFile?.id && { file: prescriptionsFile.id }),
           appointment: appointment.id,
+          ...(caseId && { medical_case: caseId }),
           user: appointment.patient?.id,
           doctor: appointment.doctor?.id,
         })

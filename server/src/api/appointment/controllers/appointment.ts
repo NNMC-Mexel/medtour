@@ -6,6 +6,7 @@
  */
 import { factories } from '@strapi/strapi';
 import { userCanAccessMedicalCase } from '../../../utils/medtour-access';
+import { normalizeCaseStatus } from '../../../utils/medical-case-workflow';
 
 // Kazakhstan is UTC+5 with no DST (fixed offset, IANA: Asia/Almaty)
 const KZ_OFFSET_MS = 5 * 60 * 60 * 1000;
@@ -602,6 +603,7 @@ export default factories.createCoreController('api::appointment.appointment', ()
       populate: {
         patient: { fields: ['id'] },
         doctor: { populate: { users_permissions_user: { fields: ['id'] } } },
+        medical_case: { fields: ['id', 'documentId', 'status'] },
       },
     });
     if (!appointment) return ctx.notFound('Appointment not found');
@@ -664,6 +666,32 @@ export default factories.createCoreController('api::appointment.appointment', ()
       data: allowed,
       status: 'published',
     });
+
+    const linkedCase = (appointment as any).medical_case;
+    if (allowed.statuse === 'completed' && linkedCase?.documentId) {
+      const previousCaseStatus = normalizeCaseStatus(linkedCase.status);
+      const statusesToComplete = ['WAITING_PAYMENT', 'CONSULTATION_BOOKED'];
+
+      if (statusesToComplete.includes(previousCaseStatus || '')) {
+        await strapi.documents('api::medical-case.medical-case' as any).update({
+          documentId: linkedCase.documentId,
+          data: { status: 'CONSULTATION_COMPLETED' } as any,
+          status: 'published',
+        });
+
+        await strapi.documents('api::case-event.case-event' as any).create({
+          data: {
+            medical_case: linkedCase.documentId,
+            actor: user.documentId || user.id,
+            eventType: 'CONSULTATION_COMPLETED',
+            fromStatus: previousCaseStatus,
+            toStatus: 'CONSULTATION_COMPLETED',
+            message: 'Consultation completed by doctor',
+            metadata: { appointmentId: documentId },
+          },
+        });
+      }
+    }
 
     strapi.log.info(JSON.stringify({
       audit: 'APPOINTMENT_UPDATED',

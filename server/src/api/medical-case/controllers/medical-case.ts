@@ -47,7 +47,7 @@ const FIELD_ALLOWLIST_BY_ROLE: Record<string, string[]> = {
     'currentTreatment',
     'tourismRequested',
   ],
-  doctor: ['status', 'internalNotes'],
+  doctor: ['status', 'doctorDecisionNotes'],
   manager: [
     'status',
     'manager',
@@ -68,24 +68,26 @@ const FIELD_ALLOWLIST_BY_ROLE: Record<string, string[]> = {
     'tourismRequested',
     'tourismNotes',
     'internalNotes',
+    'doctorDecisionNotes',
     'cancellationReason',
   ],
   coordinator: [
     'status',
-    'clinic',
     'doctor',
     'coordinator',
     'treatmentCategory',
     'urgency',
     'currentTreatment',
     'internalNotes',
+    'doctorDecisionNotes',
     'cancellationReason',
   ],
   admin: ['*'],
 };
 
 async function resolveUserDocumentId(strapi: any, value: any) {
-  if (!value) return undefined;
+  if (value === null) return null;
+  if (value === undefined || value === '') return undefined;
   if (typeof value === 'number') {
     const found = await strapi.query('plugin::users-permissions.user').findOne({ where: { id: value } });
     return found?.documentId;
@@ -108,6 +110,15 @@ function pickAllowedFields(data: Record<string, any>, role: string) {
 
 function hasAssignmentChange(data: Record<string, any>) {
   return ['manager', 'coordinator', 'clinic', 'doctor'].some((key) => Object.prototype.hasOwnProperty.call(data, key));
+}
+
+function redactCaseForRole(medicalCase: any, role: string) {
+  if (['manager', 'admin'].includes(role)) return medicalCase;
+  if (Array.isArray(medicalCase)) {
+    return medicalCase.map((item) => redactCaseForRole(item, role));
+  }
+  if (!medicalCase || typeof medicalCase !== 'object') return medicalCase;
+  return { ...medicalCase, clinic: null };
 }
 
 async function createCaseEvent(strapi: any, payload: Record<string, any>) {
@@ -158,6 +169,35 @@ async function ensureCaseConversation(strapi: any, medicalCase: any) {
   return created;
 }
 
+async function includeAppointmentDocuments(strapi: any, medicalCase: any) {
+  const appointments = Array.isArray(medicalCase?.appointments) ? medicalCase.appointments : [];
+  const appointmentDocumentIds = appointments
+    .map((appointment: any) => appointment?.documentId)
+    .filter(Boolean);
+
+  if (appointmentDocumentIds.length === 0) return medicalCase;
+
+  try {
+    const appointmentDocs = await strapi.documents('api::medical-document.medical-document' as any).findMany({
+      filters: { appointment: { documentId: { $in: appointmentDocumentIds } } },
+      populate: ['file', 'user', 'doctor', 'appointment', 'medical_case', 'sharedWithDoctors'],
+    });
+    const seen = new Set((medicalCase.medical_documents || []).map((doc: any) => doc.documentId || doc.id));
+    const mergedDocs = [...(medicalCase.medical_documents || [])];
+    for (const doc of appointmentDocs as any[]) {
+      const docKey = doc.documentId || doc.id;
+      if (!seen.has(docKey)) {
+        seen.add(docKey);
+        mergedDocs.push(doc);
+      }
+    }
+    return { ...medicalCase, medical_documents: mergedDocs };
+  } catch (error) {
+    strapi.log.warn(`medical-case includeAppointmentDocuments failed for ${medicalCase.documentId}: ${(error as any)?.message}`);
+    return medicalCase;
+  }
+}
+
 export default factories.createCoreController('api::medical-case.medical-case' as any, () => ({
   async find(ctx) {
     const user = ctx.state.user;
@@ -174,9 +214,10 @@ export default factories.createCoreController('api::medical-case.medical-case' a
       sort: (ctx.query?.sort as any) || ['createdAt:desc'],
       populate: DEFAULT_POPULATE,
     });
+    const role = getUserRole(user);
 
     return {
-      data,
+      data: redactCaseForRole(data, role),
       meta: { pagination: { page: 1, pageSize: data.length, pageCount: 1, total: data.length } },
     };
   },
@@ -196,7 +237,8 @@ export default factories.createCoreController('api::medical-case.medical-case' a
 
     const medicalCase = cases[0];
     if (!medicalCase) return ctx.notFound('Medical case not found');
-    return { data: medicalCase };
+    const role = getUserRole(user);
+    return { data: redactCaseForRole(await includeAppointmentDocuments(strapi, medicalCase), role) };
   },
 
   async create(ctx) {
@@ -253,7 +295,7 @@ export default factories.createCoreController('api::medical-case.medical-case' a
     // Notify staff about the new lead (async — don't block response)
     sendNewLeadEmailToStaff(strapi, created as any).catch(() => {});
 
-    return { data: created };
+    return { data: redactCaseForRole(created, role) };
   },
 
   async update(ctx) {
@@ -291,6 +333,13 @@ export default factories.createCoreController('api::medical-case.medical-case' a
         const allowed = getAllowedCaseTransitions(role, fromStatus).join(', ') || 'none';
         return ctx.badRequest(`Invalid status transition ${fromStatus} -> ${toStatus}. Allowed for ${role}: ${allowed}`);
       }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(data, 'manager')) {
+      data.manager = await resolveUserDocumentId(strapi, data.manager);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, 'coordinator')) {
+      data.coordinator = await resolveUserDocumentId(strapi, data.coordinator);
     }
 
     const updated = await strapi.documents('api::medical-case.medical-case' as any).update({
@@ -336,6 +385,6 @@ export default factories.createCoreController('api::medical-case.medical-case' a
       });
     }
 
-    return { data: updated };
+    return { data: redactCaseForRole(updated, role) };
   },
 }));

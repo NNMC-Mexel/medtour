@@ -18,6 +18,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Badge from '../../components/ui/Badge'
 import Button from '../../components/ui/Button'
+import { useToast } from '../../components/ui/Toast'
 import useAuthStore from '../../stores/authStore'
 import useChatStore from '../../stores/chatStore'
 import { caseEventsAPI, doctorsAPI, medicalCasesAPI, normalizeResponse } from '../../services/api'
@@ -54,12 +55,21 @@ function getUnreadByCase(conversations, item) {
   return { conversation, count: conversation?.unreadCount || 0 }
 }
 
-function CaseCard({ item, role, doctors, conversations, onClaim, onAssignDoctor, onChangeStatus, onOpenChat, onRequestDocs }) {
+function staffDisplayName(person) {
+  return person?.fullName || person?.username || person?.email || ''
+}
+
+function CaseCard({ item, role, doctors, conversations, claimingCaseId, onClaim, onAssignDoctor, onChangeStatus, onOpenChat, onRequestDocs }) {
   const { t } = useTranslation()
   const status = normalizeCaseStatus(item.status)
   const sla = getCaseSla(item)
   const allowedTransitions = getAllowedCaseTransitions(role, status)
   const { count: unreadCount } = getUnreadByCase(conversations, item)
+  const claimField = role === 'coordinator' ? 'coordinator' : 'manager'
+  const assignedStaff = item[claimField]
+  const assignedStaffName = staffDisplayName(assignedStaff)
+  const hasClaimForRole = Boolean(assignedStaff)
+  const isClaiming = String(claimingCaseId || '') === String(getCaseId(item))
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
@@ -81,11 +91,21 @@ function CaseCard({ item, role, doctors, conversations, onClaim, onAssignDoctor,
 
       <div className="text-xs text-slate-500 space-y-1">
         <p>{t('staff.manager_label')}: {item.manager?.fullName || t('staff.shared_queue')}</p>
+        <p>{t('staff.coordinator_label')}: {item.coordinator?.fullName || t('staff.not_assigned')}</p>
         <p>{t('staff.doctor_label')}: {item.doctor?.fullName || t('staff.not_assigned')}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <Button size="sm" variant="secondary" onClick={() => onClaim(item)} leftIcon={<UserCheck className="w-4 h-4" />}>{t('staff.claim')}</Button>
+        <Button
+          size="sm"
+          variant={hasClaimForRole ? 'outline' : 'secondary'}
+          isLoading={isClaiming}
+          onClick={() => onClaim(item)}
+          className={cn(hasClaimForRole && 'bg-teal-50 text-teal-700 hover:bg-teal-100')}
+          leftIcon={<UserCheck className="w-4 h-4" />}
+        >
+          {assignedStaffName || t('staff.claim')}
+        </Button>
         <Button size="sm" variant="secondary" onClick={() => onOpenChat(item)} leftIcon={<MessageCircle className="w-4 h-4" />}>{t('nav.chat')}</Button>
       </div>
 
@@ -122,6 +142,7 @@ function CaseCard({ item, role, doctors, conversations, onClaim, onAssignDoctor,
 function StaffDashboard() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const toast = useToast()
   const { user } = useAuthStore()
   const role = user?.userRole || 'manager'
   const base = roleBase(role)
@@ -148,6 +169,7 @@ function StaffDashboard() {
     slaOverdue: false,
   })
   const [isLoading, setIsLoading] = useState(true)
+  const [claimingCaseId, setClaimingCaseId] = useState(null)
   const [error, setError] = useState('')
 
   const loadWorkspace = async () => {
@@ -245,7 +267,38 @@ function StaffDashboard() {
   }
 
   const handleClaim = async (item) => {
-    await handleCaseUpdate(item, role === 'coordinator' ? { coordinator: user.documentId || user.id } : { manager: user.documentId || user.id })
+    const caseId = getCaseId(item)
+    const claimField = role === 'coordinator' ? 'coordinator' : 'manager'
+    const currentUser = {
+      id: user?.id,
+      documentId: user?.documentId,
+      fullName: user?.fullName || user?.username || user?.email,
+      email: user?.email,
+    }
+    const payload = role === 'coordinator'
+      ? { coordinator: user?.documentId || user?.id }
+      : { manager: user?.documentId || user?.id }
+
+    if (role === 'manager' && normalizeCaseStatus(item.status) === 'NEW_LEAD') {
+      payload.status = 'REGISTERED'
+    }
+
+    setClaimingCaseId(caseId)
+    updateCaseLocal({
+      ...item,
+      ...('status' in payload ? { status: payload.status } : {}),
+      [claimField]: currentUser,
+    })
+
+    try {
+      await handleCaseUpdate(item, payload)
+      toast.success(role === 'coordinator' ? t('case_detail.toast_claimed_coordinator') : t('case_detail.toast_claimed_manager'))
+    } catch (err) {
+      updateCaseLocal(item)
+      toast.error(err?.response?.data?.error?.message || t('case_detail.toast_claim_error'))
+    } finally {
+      setClaimingCaseId(null)
+    }
   }
 
   const handleAssignDoctor = async (item, doctorId) => {
@@ -321,7 +374,7 @@ function StaffDashboard() {
   }
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="min-w-0 space-y-6 animate-fadeIn">
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{role === 'coordinator' ? t('staff.coordinator_title') : t('staff.manager_title')}</h1>
@@ -394,12 +447,12 @@ function StaffDashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid xl:grid-cols-[1fr_360px] gap-6">
-        <Card>
+      <div className="grid min-w-0 xl:grid-cols-[minmax(0,1fr)_360px] gap-6">
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>{t('staff.crm_board')}</CardTitle>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
+          <CardContent className="min-w-0 overflow-x-auto">
             <div className="flex gap-4 min-w-max pb-2">
               {boardColumns.map((column) => (
                 <div key={column.status} className="w-72 shrink-0">
@@ -418,6 +471,7 @@ function StaffDashboard() {
                             role={role}
                             doctors={doctors}
                             conversations={conversations}
+                            claimingCaseId={claimingCaseId}
                             onClaim={handleClaim}
                             onAssignDoctor={handleAssignDoctor}
                             onChangeStatus={handleChangeStatus}
@@ -434,7 +488,7 @@ function StaffDashboard() {
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><MessageCircle className="w-5 h-5" />{t('staff.shared_chat_inbox')}</CardTitle>

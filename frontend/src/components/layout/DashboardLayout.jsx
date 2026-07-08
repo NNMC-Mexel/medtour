@@ -187,14 +187,14 @@ function DashboardLayout({ navItems }) {
       </div>
 
       {/* Main Content */}
-      <div className="lg:ml-64 min-h-[var(--app-height)] flex flex-col">
+      <div className="lg:ml-64 min-w-0 min-h-[var(--app-height)] flex flex-col">
         <Header
           title={title}
           subtitle={subtitle}
           onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           isMobileMenuOpen={isMobileMenuOpen}
         />
-        <main className={cn('flex-1 min-h-0 p-4 sm:p-6', user?.userRole === 'patient' && 'pb-24 sm:pb-6')}>
+        <main className={cn('flex-1 min-w-0 min-h-0 overflow-x-hidden p-4 sm:p-6', user?.userRole === 'patient' && 'pb-24 sm:pb-6')}>
           <Outlet />
         </main>
       </div>
