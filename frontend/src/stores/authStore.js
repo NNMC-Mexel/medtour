@@ -43,6 +43,36 @@ function getAuthErrorMessage(error, fallback = 'Ошибка входа') {
   return message || fallback
 }
 
+function getRegisterErrorMessage(error, fallback = 'Ошибка регистрации') {
+  const status = error.response?.status
+  const message = error.response?.data?.error?.message || ''
+  const normalized = String(message).toLowerCase()
+
+  if (status === 429) {
+    return i18n.t('auth.login.error_too_many')
+  }
+  if (normalized.includes('email is already taken') || normalized.includes('email already exists') || normalized.includes('email is already registered')) {
+    return i18n.t('auth.register.error.email_exists')
+  }
+  if (normalized.includes('username is already taken') || normalized.includes('username already exists')) {
+    return i18n.t('auth.register.error.username_exists')
+  }
+  if (normalized.includes('email or username') || normalized.includes('username or email')) {
+    return i18n.t('auth.register.error.email_username_exists')
+  }
+  if (normalized.includes('already exists') || normalized.includes('duplicate')) {
+    return i18n.t('auth.register.error.duplicate')
+  }
+  if (normalized.includes('invalid email')) {
+    return i18n.t('auth.register.error.invalid_email')
+  }
+  if (normalized.includes('password')) {
+    return i18n.t('auth.register.error.password_required')
+  }
+
+  return message || fallback
+}
+
 const useAuthStore = create(
   persist(
     (set, get) => ({
@@ -127,7 +157,7 @@ const useAuthStore = create(
 
           return { success: true, user }
         } catch (error) {
-          const message = error.response?.data?.error?.message || 'Ошибка регистрации'
+          const message = getRegisterErrorMessage(error)
           set({ error: message, isLoading: false })
           return { success: false, error: message }
         }

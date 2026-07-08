@@ -212,6 +212,15 @@
         "license": "Enter license number",
         "experience": "Enter work experience",
         "education": "Enter education"
+      },
+      "error": {
+        "email_exists": "This email address is already registered.",
+        "username_exists": "This username is already taken.",
+        "email_username_exists": "Email or username is already taken.",
+        "duplicate": "This account already exists.",
+        "invalid_email": "Please enter a valid email address.",
+        "password_required": "Password is required.",
+        "registration_failed": "Registration failed. Please try again."
       }
     },
     "forgot_password": {
