@@ -24,6 +24,43 @@ const languageOptions = [
   { value: 'kk', label: 'Қазақша' },
 ]
 
+const REGISTER_CACHE_KEY = 'medtour-register-cache'
+
+const saveRegisterCache = (formData, step, agreedToTerms) => {
+  const cacheData = {
+    formData: {
+      ...formData,
+      password: '', // Don't save password for security
+      confirmPassword: '', // Don't save confirm password
+    },
+    step,
+    agreedToTerms,
+    timestamp: Date.now(),
+  }
+  localStorage.setItem(REGISTER_CACHE_KEY, JSON.stringify(cacheData))
+}
+
+const loadRegisterCache = () => {
+  try {
+    const cached = localStorage.getItem(REGISTER_CACHE_KEY)
+    if (!cached) return null
+    const data = JSON.parse(cached)
+    // Only use cache if it's less than 30 minutes old
+    if (Date.now() - data.timestamp > 30 * 60 * 1000) {
+      localStorage.removeItem(REGISTER_CACHE_KEY)
+      return null
+    }
+    return data
+  } catch (e) {
+    console.error('Error loading register cache:', e)
+    return null
+  }
+}
+
+const clearRegisterCache = () => {
+  localStorage.removeItem(REGISTER_CACHE_KEY)
+}
+
 function RegisterPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -54,7 +91,20 @@ function RegisterPage() {
       }
     }
     fetchSpecializations()
+
+    // Load cached data if available
+    const cached = loadRegisterCache()
+    if (cached) {
+      setFormData(cached.formData)
+      setStep(cached.step)
+      setAgreedToTerms(cached.agreedToTerms)
+    }
   }, [])
+
+  // Save cache when form data or step changes
+  useEffect(() => {
+    saveRegisterCache(formData, step, agreedToTerms)
+  }, [formData, step, agreedToTerms])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -130,6 +180,14 @@ function RegisterPage() {
     }
   }
 
+  const handleBackStep = () => {
+    if (step > 1) {
+      setStep(step - 1)
+    } else {
+      navigate('/')
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!validateStep2()) return
@@ -159,6 +217,9 @@ function RegisterPage() {
 
     const result = await register(userData)
     if (!result.success) return
+
+    // Clear cache on successful registration
+    clearRegisterCache()
 
     if (result.requiresEmailConfirmation) {
       // Backend created the account but kept confirmed=false until the user
@@ -201,7 +262,7 @@ function RegisterPage() {
         <div className="w-full max-w-md">
           <div className="flex items-center justify-between mb-8">
             <button
-              onClick={() => navigate('/')}
+              onClick={handleBackStep}
               className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -395,7 +456,7 @@ function RegisterPage() {
                       leftIcon={<Building2 className="w-5 h-5" />}
                     />
                     <div className="flex gap-3">
-                      <Button type="button" variant="secondary" className="flex-1" onClick={() => setStep(1)}>
+                      <Button type="button" variant="secondary" className="flex-1" onClick={handleBackStep}>
                         {t('common.back')}
                       </Button>
                       <Button type="button" className="flex-1" onClick={handleNextStep}>
@@ -483,11 +544,17 @@ function RegisterPage() {
                         variant="secondary"
                         className="flex-1"
                         size="lg"
-                        onClick={() => setStep(userType === 'doctor' ? 2 : 1)}
+                        onClick={handleBackStep}
                       >
                         {t('common.back')}
                       </Button>
-                      <Button type="submit" className="flex-1" size="lg" isLoading={isLoading}>
+                      <Button
+                        type="submit"
+                        className="flex-1"
+                        size="lg"
+                        isLoading={isLoading}
+                        onClick={() => clearRegisterCache()}
+                      >
                         {t('auth.register.submit')}
                       </Button>
                     </div>
