@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Eye, EyeOff, Mail, Lock, Activity, ArrowLeft, Stethoscope, UserCircle } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
+import LanguageSwitcher from '../components/ui/LanguageSwitcher'
 import { Card, CardContent } from '../components/ui/Card'
 import useAuthStore from '../stores/authStore'
 
@@ -60,13 +61,16 @@ function LoginPage() {
       {/* Left Side - Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 mb-8"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            {t('auth.login.back_home')}
-          </Link>
+          <div className="flex items-center justify-between mb-8">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              {t('auth.login.back_home')}
+            </Link>
+            <LanguageSwitcher variant="light" />
+          </div>
 
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-slate-900 mb-2">{t('auth.login.title')}</h1>

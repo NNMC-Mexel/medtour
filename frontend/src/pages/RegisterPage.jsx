@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -9,11 +9,13 @@ import {
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import CountrySelect from '../components/ui/CountrySelect'
+import LanguageSwitcher from '../components/ui/LanguageSwitcher'
 import { Card, CardContent } from '../components/ui/Card'
 import useAuthStore from '../stores/authStore'
-import { isValidEmail, isValidPhone, isValidIIN } from '../utils/helpers'
+import { isValidEmail, isValidIIN } from '../utils/helpers'
 import { specializationsAPI, normalizeResponse } from '../services/api'
 import { normalizeCountryValue } from '../utils/countries'
+import { formatPhoneForCountry, getPhoneRule, isValidPhoneForCountry } from '../utils/phone'
 
 const defaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Almaty'
 const languageOptions = [
@@ -39,6 +41,7 @@ function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [formErrors, setFormErrors] = useState({})
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const phoneRule = useMemo(() => getPhoneRule(formData.country), [formData.country])
 
   useEffect(() => {
     const fetchSpecializations = async () => {
@@ -60,16 +63,37 @@ function RegisterPage() {
     if (error) clearError()
   }
 
+  const handleCountryChange = (e) => {
+    const value = normalizeCountryValue(e.target.value)
+    const nextPhoneRule = getPhoneRule(value)
+    setFormData((prev) => ({
+      ...prev,
+      country: value,
+      phone: nextPhoneRule?.emptyValue || '',
+    }))
+    setFormErrors((prev) => ({ ...prev, country: null, phone: null }))
+    if (error) clearError()
+  }
+
+  const handlePhoneChange = (e) => {
+    const phone = formatPhoneForCountry(e.target.value, formData.country)
+    setFormData((prev) => ({ ...prev, phone }))
+    if (formErrors.phone) setFormErrors((prev) => ({ ...prev, phone: null }))
+    if (error) clearError()
+  }
+
   const validateStep1 = () => {
     const errors = {}
     if (!formData.fullName || formData.fullName.length < 3)
       errors.fullName = t('auth.register.validation.full_name')
     if (!formData.email || !isValidEmail(formData.email))
       errors.email = t('auth.register.validation.email')
-    if (!formData.phone || !isValidPhone(formData.phone))
-      errors.phone = t('auth.register.validation.phone')
     if (!normalizeCountryValue(formData.country))
       errors.country = t('auth.register.validation.country')
+    if (!normalizeCountryValue(formData.country))
+      errors.phone = t('auth.register.validation.phone_country_first')
+    else if (!formData.phone || !isValidPhoneForCountry(formData.phone, formData.country))
+      errors.phone = t('auth.register.validation.phone')
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -175,13 +199,16 @@ function RegisterPage() {
       {/* Left Side - Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
-          <button
-            onClick={() => navigate('/')}
-            className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 mb-8"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            {step > 1 ? t('common.back') : t('auth.login.back_home')}
-          </button>
+          <div className="flex items-center justify-between mb-8">
+            <button
+              onClick={() => navigate('/')}
+              className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              {step > 1 ? t('common.back') : t('auth.login.back_home')}
+            </button>
+            <LanguageSwitcher variant="light" />
+          </div>
 
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2">
@@ -244,25 +271,30 @@ function RegisterPage() {
                       leftIcon={<Mail className="w-5 h-5" />}
                       required
                     />
-                    <Input
-                      label={t('auth.register.phone')}
-                      name="phone"
-                      type="tel"
-                      placeholder="+44 20 7946 0958"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      error={formErrors.phone}
-                      leftIcon={<Phone className="w-5 h-5" />}
-                      required
-                    />
                     <CountrySelect
                       label={t('auth.register.country')}
                       name="country"
                       placeholder={t('auth.register.country_placeholder')}
                       value={formData.country}
-                      onChange={handleChange}
+                      onChange={handleCountryChange}
                       error={formErrors.country}
                       leftIcon={<Globe2 className="w-5 h-5" />}
+                      required
+                    />
+                    <Input
+                      label={t('auth.register.phone')}
+                      name="phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      placeholder={phoneRule?.template || t('auth.register.phone_country_placeholder')}
+                      value={formData.phone}
+                      onChange={handlePhoneChange}
+                      error={formErrors.phone}
+                      hint={phoneRule ? t('auth.register.phone_template_hint', { template: phoneRule.template }) : t('auth.register.phone_select_country_hint')}
+                      leftIcon={<Phone className="w-5 h-5" />}
+                      maxLength={phoneRule?.template?.length}
+                      disabled={!phoneRule}
                       required
                     />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
