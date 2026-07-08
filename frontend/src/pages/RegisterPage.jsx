@@ -9,12 +9,14 @@ import {
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import CountrySelect from '../components/ui/CountrySelect'
+import TimeZoneSelect from '../components/ui/TimeZoneSelect'
 import LanguageSwitcher from '../components/ui/LanguageSwitcher'
 import { Card, CardContent } from '../components/ui/Card'
 import useAuthStore from '../stores/authStore'
 import { isValidEmail, isValidIIN } from '../utils/helpers'
 import { specializationsAPI, normalizeResponse } from '../services/api'
 import { normalizeCountryValue } from '../utils/countries'
+import { getDefaultTimezoneForCountry } from '../utils/timezones'
 import { formatPhoneForCountry, getPhoneRule, isValidPhoneForCountry } from '../utils/phone'
 
 const defaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Almaty'
@@ -116,10 +118,12 @@ function RegisterPage() {
   const handleCountryChange = (e) => {
     const value = normalizeCountryValue(e.target.value)
     const nextPhoneRule = getPhoneRule(value)
+    const defaultTimezone = getDefaultTimezoneForCountry(value)
     setFormData((prev) => ({
       ...prev,
       country: value,
       phone: nextPhoneRule?.emptyValue || '',
+      timezone: defaultTimezone,
     }))
     setFormErrors((prev) => ({ ...prev, country: null, phone: null }))
     if (error) clearError()
@@ -374,11 +378,9 @@ function RegisterPage() {
                           ))}
                         </select>
                       </div>
-                      <Input
+                      <TimeZoneSelect
                         label={t('auth.register.timezone')}
                         name="timezone"
-                        type="text"
-                        placeholder="Asia/Almaty"
                         value={formData.timezone}
                         onChange={handleChange}
                       />

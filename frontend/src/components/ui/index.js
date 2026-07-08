@@ -1,6 +1,7 @@
 export { default as Button } from './Button'
 export { default as Input } from './Input'
 export { default as CountrySelect } from './CountrySelect'
+export { default as TimeZoneSelect } from './TimeZoneSelect'
 export { default as Select } from './Select'
 export { default as Textarea } from './Textarea'
 export { default as Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './Card'
