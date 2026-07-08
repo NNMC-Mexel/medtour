@@ -229,7 +229,7 @@ function VideoConsultation({
 
   useEffect(() => {
     attachMediaStreams()
-  }, [attachMediaStreams, isMinimized, accessStatus])
+  }, [attachMediaStreams])
 
   useEffect(() => {
     if (!isMinimized) return
@@ -699,10 +699,16 @@ function VideoConsultation({
     }
 
     pc.ontrack = (event) => {
-      if (event.streams[0]) {
-        remoteStreamRef.current = event.streams[0]
+      // Handle cases where event.streams is empty (some browsers/conditions)
+      // by creating a stream from the track if needed
+      let stream = event.streams?.[0]
+      if (!stream && event.track) {
+        stream = new MediaStream([event.track])
+      }
+      if (stream) {
+        remoteStreamRef.current = stream
         if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0]
+          remoteVideoRef.current.srcObject = stream
         }
         setConnectionState('connected')
       }
