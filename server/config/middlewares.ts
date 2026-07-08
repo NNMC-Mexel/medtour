@@ -56,6 +56,7 @@ export default ({ env }) => {
               'http://localhost:3000',
               'http://localhost:1342',
               'http://localhost:1343',
+              'http://localhost:1347',
             ],
       },
     },

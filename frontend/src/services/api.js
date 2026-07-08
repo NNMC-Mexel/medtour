@@ -617,6 +617,7 @@ export const appointmentsAPI = {
         const strapiData = {
             dateTime: data.dateTime,
             type: data.type || "video",
+            consultationPurpose: data.consultationPurpose || "initial_case_review",
             consultationLanguage: data.language || data.consultationLanguage || "en",
             statuse: data.status || "confirmed",
             price: data.price,

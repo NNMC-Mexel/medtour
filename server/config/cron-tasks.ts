@@ -6,7 +6,7 @@
  */
 import { sendSlaOverdueEmail } from '../src/utils/case-email';
 
-const NO_SHOW_GRACE_MIN = 15;
+const CONSULTATION_JOIN_AFTER_BUFFER_MIN = 5;
 const CASE_SLA_HOURS: Record<string, number> = {
   NEW_LEAD: 2,
   REGISTERED: 4,
@@ -51,15 +51,28 @@ export default {
   markNoShowAppointments: {
     task: async ({ strapi }: { strapi: any }) => {
       try {
-        const cutoff = new Date(Date.now() - NO_SHOW_GRACE_MIN * 60 * 1000);
+        const now = Date.now();
 
-        // 1. Mark pending/confirmed appointments that passed the grace window as no_show
-        const overdue = await strapi.documents('api::appointment.appointment').findMany({
+        // 1. Mark pending/confirmed appointments as no_show only after the same
+        // server-side join window has closed. Otherwise cron can block users
+        // while the video room still allows entry.
+        const candidates = await strapi.documents('api::appointment.appointment').findMany({
           filters: {
             statuse: { $in: ['pending', 'confirmed'] },
-            dateTime: { $lt: cutoff.toISOString() },
+            dateTime: { $lt: new Date(now).toISOString() },
           },
-          fields: ['documentId'],
+          populate: { doctor: { fields: ['consultationDuration'] } },
+          fields: ['documentId', 'dateTime'],
+          limit: 500,
+        });
+
+        const overdue = candidates.filter((appt: any) => {
+          if (!appt.dateTime) return false;
+          const duration = Number((appt.doctor as any)?.consultationDuration) || 30;
+          const windowEnd =
+            new Date(appt.dateTime).getTime() +
+            (duration + CONSULTATION_JOIN_AFTER_BUFFER_MIN) * 60 * 1000;
+          return now > windowEnd;
         });
 
         if (overdue.length > 0) {
@@ -86,11 +99,12 @@ export default {
           limit: 500,
         });
 
-        const now = Date.now();
         const toClose: any[] = stuckInProgress.filter((appt: any) => {
           if (!appt.dateTime) return false;
           const duration = Number((appt.doctor as any)?.consultationDuration) || 30;
-          const windowEnd = new Date(appt.dateTime).getTime() + (duration + 5) * 60 * 1000;
+          const windowEnd =
+            new Date(appt.dateTime).getTime() +
+            (duration + CONSULTATION_JOIN_AFTER_BUFFER_MIN) * 60 * 1000;
           return now > windowEnd;
         });
 

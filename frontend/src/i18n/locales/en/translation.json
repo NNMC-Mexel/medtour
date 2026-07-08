@@ -72,7 +72,10 @@
     "patient_subtitle": "Current prices for consultations and support services.",
     "empty": "The price list has not been filled yet.",
     "cta": "Submit a request",
-    "view_all": "View all"
+    "view_all": "View all",
+    "category_default": "Price list",
+    "more": "Details",
+    "less": "Collapse"
   },
   "nav": {
     "home": "Home",
@@ -577,6 +580,7 @@
     "modal_title": "Book appointment",
     "complete_title": "Appointment created!",
     "complete_desc": "Consultation with {{name}}",
+    "payment_description": "Consultation with {{name}}",
     "kaspi_title": "🏦 Payment via Kaspi QR",
     "kaspi_amount": "Transfer {{price}} via Kaspi.kz to the clinic account.",
     "kaspi_note": "After payment, the appointment will be confirmed by the administrator within 30 minutes.",
@@ -1832,7 +1836,11 @@
     "treatment_plans_count": "Treatment plans",
     "doctor_notes_section": "Doctor notes",
     "book_consultation_btn": "Book time slot",
+    "book_follow_up_btn": "Book follow-up",
+    "doctor_feedback_section": "Doctor feedback",
+    "doctor_feedback_empty": "The doctor has not added a conclusion, prescriptions, or manager notes yet.",
     "patient_book_prompt": "A doctor has been assigned. Please select a convenient time for your consultation.",
+    "patient_follow_up_prompt": "The consultation is completed. You can book a follow-up consultation if needed.",
     "plan_status_draft": "Draft",
     "plan_status_sent": "Sent",
     "plan_status_accepted": "Accepted",

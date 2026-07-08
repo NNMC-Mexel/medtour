@@ -67,8 +67,8 @@ const DENIED_EXTENSIONS = new Set<string>([
   '.swf',
 ]);
 
-const MAX_FILE_BYTES = 50 * 1024 * 1024;       // 50 MB per file
-const MAX_TOTAL_BYTES = 200 * 1024 * 1024;     // 200 MB per request
+const MAX_FILE_BYTES = 300 * 1024 * 1024;      // 300 MB per file (matches frontend validation)
+const MAX_TOTAL_BYTES = 300 * 1024 * 1024;     // 300 MB per request
 
 function lastExtension(name: string): string {
   const idx = name.lastIndexOf('.');

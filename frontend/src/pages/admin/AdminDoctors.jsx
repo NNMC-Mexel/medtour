@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Camera, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { Camera, Check, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -73,6 +73,7 @@ function AdminDoctors({ readonly = false }) {
   const [removePhoto, setRemovePhoto] = useState(false)
   const [cropModalOpen, setCropModalOpen] = useState(false)
   const [cropImageSrc, setCropImageSrc] = useState(null)
+  const [doctorSaveState, setDoctorSaveState] = useState('idle')
 
   const extractUser = (value) => {
     if (!value) return null
@@ -174,6 +175,7 @@ function AdminDoctors({ readonly = false }) {
     setPhotoFile(null)
     setPhotoPreview('')
     setRemovePhoto(false)
+    setDoctorSaveState('idle')
     setIsModalOpen(true)
   }
 
@@ -208,6 +210,7 @@ function AdminDoctors({ readonly = false }) {
     setPhotoFile(null)
     setPhotoPreview(getMediaUrl(doctor.photo) || '')
     setRemovePhoto(false)
+    setDoctorSaveState('idle')
     setIsModalOpen(true)
   }
 
@@ -290,6 +293,7 @@ function AdminDoctors({ readonly = false }) {
     }
 
     setIsSaving(true)
+    setDoctorSaveState('idle')
     try {
       const payload = toPayload(form)
       if (photoFile) {
@@ -333,6 +337,9 @@ function AdminDoctors({ readonly = false }) {
         })
       }
 
+      setDoctorSaveState('saved')
+      toast.success(t('common.saved'))
+      await new Promise(resolve => setTimeout(resolve, 700))
       setIsModalOpen(false)
       setEditingDoctor(null)
       setForm(defaultForm)
@@ -491,8 +498,13 @@ function AdminDoctors({ readonly = false }) {
             <Button variant='secondary' onClick={() => setIsModalOpen(false)} disabled={isSaving}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleSave} isLoading={isSaving}>
-              {editingDoctor ? t('admin_doc.save') : t('admin_doc.create')}
+            <Button
+              onClick={handleSave}
+              isLoading={isSaving}
+              variant={doctorSaveState === 'saved' ? 'success' : 'primary'}
+              leftIcon={doctorSaveState === 'saved' ? <Check className='w-4 h-4' /> : null}
+            >
+              {doctorSaveState === 'saved' ? t('common.saved') : editingDoctor ? t('admin_doc.save') : t('admin_doc.create')}
             </Button>
           </>
         }

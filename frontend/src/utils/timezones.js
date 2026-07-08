@@ -266,7 +266,7 @@ export function getTimezoneLabel(timezone) {
       hour12: false,
     })
 
-    const parts = formatter.formatToParts(new Date())
+    formatter.formatToParts(new Date())
     const offset = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'longOffset' })
       .formatToParts(new Date())
       .find(p => p.type === 'timeZoneName')

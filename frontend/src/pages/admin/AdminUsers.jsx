@@ -66,11 +66,13 @@ function AdminUsers() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [createForm, setCreateForm] = useState(defaultCreateForm)
   const [isCreating, setIsCreating] = useState(false)
+  const [createSaveState, setCreateSaveState] = useState('idle')
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [editForm, setEditForm] = useState(defaultEditForm)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [editSaveState, setEditSaveState] = useState('idle')
 
   useEffect(() => {
     fetchUsers()
@@ -128,6 +130,7 @@ function AdminUsers() {
     if (createForm.password !== createForm.confirmPassword) return toast.warning(t('admin_users.err_password_mismatch'))
 
     setIsCreating(true)
+    setCreateSaveState('idle')
     try {
       const payload = {
         username: createForm.username.trim(),
@@ -140,6 +143,9 @@ function AdminUsers() {
       }
 
       await api.post('/api/users', payload)
+      setCreateSaveState('saved')
+      toast.success(t('common.saved'))
+      await new Promise(resolve => setTimeout(resolve, 700))
       setIsCreateModalOpen(false)
       setCreateForm(defaultCreateForm)
       await fetchUsers()
@@ -153,6 +159,7 @@ function AdminUsers() {
 
   const openEditModal = (user) => {
     setEditingUser(user)
+    setEditSaveState('idle')
     setEditForm({
       fullName: user.fullName || '',
       username: user.username || '',
@@ -174,6 +181,7 @@ function AdminUsers() {
     if (editForm.password !== editForm.confirmPassword) return toast.warning(t('admin_users.err_password_mismatch'))
 
     setIsSavingEdit(true)
+    setEditSaveState('idle')
     try {
       const payload = {
         fullName: editForm.fullName.trim(),
@@ -191,6 +199,9 @@ function AdminUsers() {
           ? { ...u, fullName: payload.fullName, username: payload.username, email: payload.email, phone: payload.phone }
           : u
       ))
+      setEditSaveState('saved')
+      toast.success(t('common.saved'))
+      await new Promise(resolve => setTimeout(resolve, 700))
       setIsEditModalOpen(false)
       setEditingUser(null)
       setEditForm(defaultEditForm)
@@ -237,13 +248,13 @@ function AdminUsers() {
           <Button
             variant="secondary"
             leftIcon={<UserPlus className="w-4 h-4" />}
-            onClick={() => { setCreateForm({ ...defaultCreateForm, userRole: 'admin' }); setIsCreateModalOpen(true) }}
+            onClick={() => { setCreateForm({ ...defaultCreateForm, userRole: 'admin' }); setCreateSaveState('idle'); setIsCreateModalOpen(true) }}
           >
             {t('admin_users.add_admin_btn')}
           </Button>
           <Button
             leftIcon={<UserPlus className="w-4 h-4" />}
-            onClick={() => { setCreateForm({ ...defaultCreateForm, userRole: 'manager' }); setIsCreateModalOpen(true) }}
+            onClick={() => { setCreateForm({ ...defaultCreateForm, userRole: 'manager' }); setCreateSaveState('idle'); setIsCreateModalOpen(true) }}
           >
             {t('admin_users.add_manager_btn')}
           </Button>
@@ -444,8 +455,13 @@ function AdminUsers() {
             >
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleEditUser} isLoading={isSavingEdit}>
-              {t('common.save')}
+            <Button
+              onClick={handleEditUser}
+              isLoading={isSavingEdit}
+              variant={editSaveState === 'saved' ? 'success' : 'primary'}
+              leftIcon={editSaveState === 'saved' ? <Check className="w-4 h-4" /> : null}
+            >
+              {editSaveState === 'saved' ? t('common.saved') : t('common.save')}
             </Button>
           </>
         }
@@ -520,16 +536,21 @@ function AdminUsers() {
       {/* Create Staff Modal */}
       <Modal
         isOpen={isCreateModalOpen}
-        onClose={() => { setIsCreateModalOpen(false); setCreateForm(defaultCreateForm) }}
+        onClose={() => { setIsCreateModalOpen(false); setCreateForm(defaultCreateForm); setCreateSaveState('idle') }}
         title={createForm.userRole === 'manager' ? t('admin_users.create_manager_title') : t('admin_users.create_admin_title')}
         size="md"
         footer={
           <>
-            <Button variant="secondary" onClick={() => { setIsCreateModalOpen(false); setCreateForm(defaultCreateForm) }} disabled={isCreating}>
+            <Button variant="secondary" onClick={() => { setIsCreateModalOpen(false); setCreateForm(defaultCreateForm); setCreateSaveState('idle') }} disabled={isCreating}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleCreateStaff} isLoading={isCreating}>
-              {t('admin_users.create_btn')}
+            <Button
+              onClick={handleCreateStaff}
+              isLoading={isCreating}
+              variant={createSaveState === 'saved' ? 'success' : 'primary'}
+              leftIcon={createSaveState === 'saved' ? <Check className="w-4 h-4" /> : null}
+            >
+              {createSaveState === 'saved' ? t('common.saved') : t('admin_users.create_btn')}
             </Button>
           </>
         }

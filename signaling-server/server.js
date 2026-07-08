@@ -818,7 +818,7 @@ async function verifySocketToken(token) {
 const roomAccessCache = new Map()
 const ROOM_ACCESS_TTL = 60 * 1000
 
-async function fetchAppointmentRoom(roomId) {
+async function fetchAppointmentRoom(roomId, userToken) {
   if (!roomId) return null
   const now = Date.now()
   const cached = roomAccessCache.get(roomId)
@@ -830,8 +830,9 @@ async function fetchAppointmentRoom(roomId) {
     `&populate[patient][fields][0]=id` +
     `&populate[doctor][populate][users_permissions_user][fields][0]=id` +
     `&populate[doctor][fields][0]=userId`
+  const lookupToken = process.env.STRAPI_API_TOKEN || userToken
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${process.env.STRAPI_API_TOKEN || ''}` },
+    headers: lookupToken ? { Authorization: `Bearer ${lookupToken}` } : {},
   }).catch(() => null)
   if (!res?.ok) return null
   const data = await res.json().catch(() => null)
@@ -1041,7 +1042,7 @@ io.on('connection', (socket) => {
     }
 
     // Authorize: fetch appointment and ensure this user is patient or doctor of it.
-    const access = await fetchAppointmentRoom(roomId)
+    const access = await fetchAppointmentRoom(roomId, socket.verifiedToken)
     if (!access) {
       socket.emit('join-room-error', { reason: 'Room not found' })
       return

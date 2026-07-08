@@ -70,6 +70,15 @@ const specializationIcons = {
     default: Stethoscope,
 };
 
+const fallbackSpecializations = [
+    { key: 'general_practitioner', icon: Stethoscope, label: { ru: 'Терапевт', en: 'General Practitioner', kk: 'Терапевт' } },
+    { key: 'cardiologist', icon: Heart, label: { ru: 'Кардиолог', en: 'Cardiologist', kk: 'Кардиолог' } },
+    { key: 'neurologist', icon: Brain, label: { ru: 'Невролог', en: 'Neurologist', kk: 'Невролог' } },
+    { key: 'ophthalmologist', icon: Eye, label: { ru: 'Офтальмолог', en: 'Ophthalmologist', kk: 'Офтальмолог' } },
+    { key: 'pediatrician', icon: Baby, label: { ru: 'Педиатр', en: 'Pediatrician', kk: 'Педиатр' } },
+    { key: 'endocrinologist', icon: Pill, label: { ru: 'Эндокринолог', en: 'Endocrinologist', kk: 'Эндокринолог' } },
+];
+
 function mergeLandingConfig(base, incoming) {
     return {
         ...base,
@@ -481,11 +490,25 @@ function LandingPage() {
         },
     }), [t]);
 
-    const testimonials = useMemo(() => [
-        { name: "Айгерим К.", text: t('landing.testimonials.review_0'), rating: 5, avatar: "АК" },
-        { name: "Арман Б.", text: t('landing.testimonials.review_1'), rating: 5, avatar: "АБ" },
-        { name: "Динара М.", text: t('landing.testimonials.review_2'), rating: 5, avatar: "ДМ" },
-    ], [t]);
+    const testimonials = useMemo(() => {
+        const names = i18n.language === 'ru'
+            ? [
+                { name: "Айгерим К.", avatar: "АК" },
+                { name: "Арман Б.", avatar: "АБ" },
+                { name: "Динара М.", avatar: "ДМ" },
+            ]
+            : [
+                { name: "Aigerim K.", avatar: "AK" },
+                { name: "Arman B.", avatar: "AB" },
+                { name: "Dinara M.", avatar: "DM" },
+            ];
+
+        return names.map((item, index) => ({
+            ...item,
+            text: t(`landing.testimonials.review_${index}`),
+            rating: 5,
+        }));
+    }, [t, i18n.language]);
 
     const handleCardMouseMove = (e) => {
         if (!cardRef.current) return;
@@ -538,8 +561,11 @@ function LandingPage() {
     const config = useMemo(() => {
         const localizedConfig =
             storedLandingConfig?.i18n?.[i18n.language] ||
-            storedLandingConfig?.i18n?.[DEFAULT_CONTENT_LOCALE] ||
-            (storedLandingConfig?.hero ? storedLandingConfig : null);
+            (
+                i18n.language === DEFAULT_CONTENT_LOCALE && storedLandingConfig?.hero
+                    ? storedLandingConfig
+                    : null
+            );
 
         return mergeLandingConfig(defaultLandingConfig, localizedConfig);
     }, [defaultLandingConfig, storedLandingConfig, i18n.language]);
@@ -743,17 +769,16 @@ function LandingPage() {
                         </div>
                     ) : (
                         <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6'>
-                            {Object.entries(specializationIcons)
-                                .filter(([k]) => k !== "default")
-                                .map(([name, Icon]) => (
-                                    <Link key={name} to='/register' className='group'>
+                            {fallbackSpecializations
+                                .map(({ key, icon: Icon, label }) => (
+                                    <Link key={key} to='/register' className='group'>
                                         <Card hover className='text-center transition-all group-hover:border-teal-500'>
                                             <CardContent className='py-8'>
                                                 <div className='w-16 h-16 mx-auto mb-4 bg-teal-100 rounded-2xl flex items-center justify-center group-hover:bg-teal-500 transition-colors'>
                                                     <Icon className='w-8 h-8 text-teal-600 group-hover:text-white transition-colors' />
                                                 </div>
                                                 <h3 className='font-medium text-slate-900 group-hover:text-teal-600 transition-colors'>
-                                                    {name}
+                                                    {label[i18n.language] || label.en}
                                                 </h3>
                                             </CardContent>
                                         </Card>

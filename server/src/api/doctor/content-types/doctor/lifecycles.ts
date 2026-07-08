@@ -30,6 +30,16 @@ export default {
   },
 
   async beforeUpdate(event) {
-    await assertActiveDoctorHasLicense(event.params.data, event.params.where?.documentId);
+    const data = event.params.data || {};
+
+    // Only validate when the update actually touches activation status or the
+    // license itself. Unrelated updates (schedule, profile, etc.) must not be
+    // blocked by a pre-existing active-without-license state.
+    const touchesLicenseOrActive = 'isActive' in data || 'licenseNumber' in data;
+    if (!touchesLicenseOrActive) {
+      return;
+    }
+
+    await assertActiveDoctorHasLicense(data, event.params.where?.documentId);
   },
 };

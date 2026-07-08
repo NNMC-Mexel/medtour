@@ -29,7 +29,6 @@ function DoctorCard({ doctor, basePath = '' }) {
   const rating = Math.min(doctor.rating || 0, 5)
   const reviewsCount = doctor.reviewsCount || 0
   const experience = doctor.experience || 0
-  const price = doctor.price || 0
   const specialization = getSpecName(doctor.specialization, i18n.language) || t('common.specialist')
   const isOnline = isDoctorOnline(doctor)
 

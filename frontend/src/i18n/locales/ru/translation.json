@@ -72,7 +72,10 @@
     "patient_subtitle": "Актуальные цены на консультации и сервис сопровождения.",
     "empty": "Прайскурант пока не заполнен.",
     "cta": "Оставить заявку",
-    "view_all": "Посмотреть все"
+    "view_all": "Посмотреть все",
+    "category_default": "Прайс",
+    "more": "Подробнее",
+    "less": "Свернуть"
   },
   "nav": {
     "home": "Главная",
@@ -577,6 +580,7 @@
     "modal_title": "Запись к врачу",
     "complete_title": "Запись создана!",
     "complete_desc": "Консультация с {{name}}",
+    "payment_description": "Консультация у {{name}}",
     "kaspi_title": "🏦 Оплата через Kaspi QR",
     "kaspi_amount": "Переведите {{price}} через Kaspi.kz на реквизиты клиники.",
     "kaspi_note": "После оплаты запись будет подтверждена администратором в течение 30 минут.",
@@ -1832,7 +1836,11 @@
     "treatment_plans_count": "Планы лечения",
     "doctor_notes_section": "Заметки врача",
     "book_consultation_btn": "Забронировать время",
+    "book_follow_up_btn": "Записать повторно",
+    "doctor_feedback_section": "Что написал врач",
+    "doctor_feedback_empty": "Врач пока не добавил заключение, назначения или заметки для менеджера.",
     "patient_book_prompt": "Врач назначен. Выберите удобное время для консультации.",
+    "patient_follow_up_prompt": "Консультация завершена. При необходимости можно выбрать время повторной консультации.",
     "plan_status_draft": "Черновик",
     "plan_status_sent": "Отправлен",
     "plan_status_accepted": "Принят",

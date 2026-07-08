@@ -10,12 +10,12 @@ import { formatPrice } from '../../utils/pricing'
 import { useCurrencyStore } from '../../stores/currencyStore'
 
 function getLocalizedField(item, field, lang) {
-  return item?.i18n?.[lang]?.[field] || item?.[field] || ''
+  return item?.i18n?.[lang]?.[field] || (lang === 'ru' ? item?.[field] : '') || ''
 }
 
-function groupByCategory(items, lang) {
+function groupByCategory(items, lang, t) {
   return (items || []).reduce((acc, item) => {
-    const category = getLocalizedField(item, 'category', lang) || 'Прайс'
+    const category = getLocalizedField(item, 'category', lang) || t('pricing.category_default')
     if (!acc[category]) acc[category] = []
     acc[category].push(item)
     return acc
@@ -23,6 +23,7 @@ function groupByCategory(items, lang) {
 }
 
 function PriceCard({ item, lang, compact = false, currency = 'KZT' }) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const title = getLocalizedField(item, 'title', lang)
   const description = getLocalizedField(item, 'description', lang)
@@ -70,7 +71,7 @@ function PriceCard({ item, lang, compact = false, currency = 'KZT' }) {
             className='mt-4 flex items-center gap-2 text-teal-600 hover:text-teal-700 font-medium text-sm transition-colors'
           >
             <ChevronDown className={cn('h-4 w-4 transition-transform', expanded && 'rotate-180')} />
-            {expanded ? 'Свернуть' : 'Подробнее'}
+            {expanded ? t('pricing.less') : t('pricing.more')}
           </button>
         )}
 
@@ -151,8 +152,8 @@ function PriceListSection({
   }, [items, limit, loadFailed])
 
   const groupedItems = useMemo(
-    () => groupByCategory(visibleItems, i18n.language),
-    [visibleItems, i18n.language],
+    () => groupByCategory(visibleItems, i18n.language, t),
+    [visibleItems, i18n.language, t],
   )
 
   return (

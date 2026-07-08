@@ -6,7 +6,6 @@ import {
     Clock,
     Video,
     Users,
-    DollarSign,
     Star,
     ChevronRight,
     Loader2,
@@ -24,7 +23,6 @@ import useAuthStore from "../../stores/authStore";
 import api, { normalizeResponse, getMediaUrl, getServerNow } from "../../services/api";
 import {
     formatRelativeDate,
-    formatPrice,
     formatDate,
     getLocalizedField,
 } from "../../utils/helpers";

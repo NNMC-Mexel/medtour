@@ -26,6 +26,38 @@ const DEFAULT_POPULATE = {
 
 const STAFF_ROLES = ['manager', 'coordinator', 'admin'];
 
+const CASE_FIELDS_BY_ROLE: Record<string, string[]> = {
+  doctor: [
+    'id',
+    'documentId',
+    'caseNumber',
+    'title',
+    'status',
+    'treatmentCategory',
+    'urgency',
+    'diagnosis',
+    'symptoms',
+    'currentTreatment',
+    'doctorDecisionNotes',
+    'createdAt',
+    'updatedAt',
+  ],
+};
+
+const DOCTOR_DOCUMENT_FIELDS = [
+  'id',
+  'documentId',
+  'title',
+  'type',
+  'description',
+  'reviewStatus',
+  'reviewNotes',
+  'dueDate',
+  'createdAt',
+  'updatedAt',
+  'file',
+];
+
 const FIELD_ALLOWLIST_BY_ROLE: Record<string, string[]> = {
   patient: [
     'title',
@@ -108,6 +140,13 @@ function pickAllowedFields(data: Record<string, any>, role: string) {
   return Object.fromEntries(Object.entries(data).filter(([key]) => allowed.includes(key)));
 }
 
+function pickObjectFields(value: any, fields: string[]) {
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(fields
+    .filter((field) => Object.prototype.hasOwnProperty.call(value, field))
+    .map((field) => [field, value[field]]));
+}
+
 function hasAssignmentChange(data: Record<string, any>) {
   return ['manager', 'coordinator', 'clinic', 'doctor'].some((key) => Object.prototype.hasOwnProperty.call(data, key));
 }
@@ -118,6 +157,51 @@ function redactCaseForRole(medicalCase: any, role: string) {
     return medicalCase.map((item) => redactCaseForRole(item, role));
   }
   if (!medicalCase || typeof medicalCase !== 'object') return medicalCase;
+  if (role === 'doctor') {
+    return {
+      ...pickObjectFields(medicalCase, CASE_FIELDS_BY_ROLE.doctor),
+      patient: medicalCase.patient
+        ? pickObjectFields(medicalCase.patient, ['id', 'documentId', 'fullName'])
+        : null,
+      doctor: medicalCase.doctor || null,
+      medical_documents: Array.isArray(medicalCase.medical_documents)
+        ? medicalCase.medical_documents.map((doc: any) => pickObjectFields(doc, DOCTOR_DOCUMENT_FIELDS))
+        : [],
+      appointments: Array.isArray(medicalCase.appointments)
+        ? medicalCase.appointments.map((appointment: any) => pickObjectFields(appointment, [
+          'id',
+          'documentId',
+          'dateTime',
+          'type',
+          'statuse',
+          'consultationPurpose',
+        ]))
+        : [],
+      treatment_plans: medicalCase.treatment_plans || [],
+      case_events: Array.isArray(medicalCase.case_events)
+        ? medicalCase.case_events.map((event: any) => ({
+          ...pickObjectFields(event, [
+            'id',
+            'documentId',
+            'eventType',
+            'fromStatus',
+            'toStatus',
+            'message',
+            'metadata',
+            'createdAt',
+          ]),
+          actor: event.actor ? pickObjectFields(event.actor, ['id', 'documentId', 'fullName', 'userRole']) : null,
+        }))
+        : [],
+      manager: null,
+      coordinator: null,
+      clinic: null,
+      trip_checklist: null,
+      visa_requests: [],
+      tourism_packages: [],
+      conversation: null,
+    };
+  }
   return { ...medicalCase, clinic: null };
 }
 

@@ -50,7 +50,16 @@ const filterPastSlots = (slots, date) => {
 }
 
 // role: 'patient' | 'manager' | 'coordinator' | 'admin' | ...
-export default function CaseSlotPicker({ isOpen, onClose, doctor, caseDocId, patientId, role = 'patient', onBooked }) {
+export default function CaseSlotPicker({
+  isOpen,
+  onClose,
+  doctor,
+  caseDocId,
+  patientId,
+  role = 'patient',
+  consultationPurpose = 'initial_case_review',
+  onBooked,
+}) {
   const { t, i18n } = useTranslation()
   const toast = useToast()
   const dateLocale = i18n.language === 'kk' ? kk : i18n.language === 'en' ? enUS : ru
@@ -124,6 +133,7 @@ export default function CaseSlotPicker({ isOpen, onClose, doctor, caseDocId, pat
         doctor: doctor.id,
         dateTime: dateTime.toISOString(),
         type: 'video',
+        consultationPurpose,
         status: 'pending',
         paymentStatus: 'pending',
         medical_case: caseDocId,
@@ -151,6 +161,7 @@ export default function CaseSlotPicker({ isOpen, onClose, doctor, caseDocId, pat
         doctor: doctor.id,
         dateTime: dateTime.toISOString(),
         type: 'video',
+        consultationPurpose,
         status: 'confirmed',
         paymentStatus: 'paid',
         price: 0,

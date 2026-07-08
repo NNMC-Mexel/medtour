@@ -5,12 +5,81 @@
  * - Admin видит всё
  */
 import { factories } from '@strapi/strapi';
-import { userCanAccessMedicalCase } from '../../../utils/medtour-access';
+import { getUserRole, userCanAccessMedicalCase } from '../../../utils/medtour-access';
 import { normalizeCaseStatus } from '../../../utils/medical-case-workflow';
 
 // Kazakhstan is UTC+5 with no DST (fixed offset, IANA: Asia/Almaty)
 const KZ_OFFSET_MS = 5 * 60 * 60 * 1000;
 const KZ_OFFSET_MIN = 5 * 60;
+
+function sameId(a: unknown, b: unknown) {
+  return a != null && b != null && String(a) === String(b);
+}
+
+function isAppointmentDoctor(doctor: any, userId: unknown) {
+  return sameId(doctor?.users_permissions_user?.id, userId) || sameId(doctor?.userId, userId);
+}
+
+function appointmentPopulateForRole(role: string) {
+  const canSeePatientContact = ['admin', 'manager', 'coordinator'].includes(role);
+  return {
+    doctor: { populate: ['specialization', 'photo', 'users_permissions_user'] },
+    patient: {
+      fields: canSeePatientContact
+        ? ['id', 'documentId', 'fullName', 'email', 'phone']
+        : ['id', 'documentId', 'fullName'],
+    },
+    medical_documents: { populate: ['file'] },
+    medical_case: {
+      fields: [
+        'id',
+        'documentId',
+        'caseNumber',
+        'title',
+        'status',
+        'treatmentCategory',
+        'urgency',
+        'diagnosis',
+        'symptoms',
+        'currentTreatment',
+        'doctorDecisionNotes',
+      ],
+    },
+  } as any;
+}
+
+function redactAppointmentForRole(appointment: any, role: string) {
+  if (!appointment || typeof appointment !== 'object') return appointment;
+  if (role === 'doctor') {
+    return {
+      ...appointment,
+      patient: appointment.patient
+        ? {
+          id: appointment.patient.id,
+          documentId: appointment.patient.documentId,
+          fullName: appointment.patient.fullName,
+        }
+        : null,
+    };
+  }
+  return appointment;
+}
+
+async function userCanAccessAppointment(strapi: any, user: any, appointment: any) {
+  const role = getUserRole(user);
+  if (role === 'admin') return true;
+  if (role === 'patient') {
+    return sameId(appointment?.patient?.documentId, user.documentId) || sameId(appointment?.patient?.id, user.id);
+  }
+  if (role === 'doctor') {
+    return isAppointmentDoctor(appointment?.doctor, user.id);
+  }
+  if (['manager', 'coordinator'].includes(role)) {
+    const caseRef = appointment?.medical_case?.documentId || appointment?.medical_case?.id;
+    return caseRef ? userCanAccessMedicalCase(strapi, user, caseRef) : false;
+  }
+  return false;
+}
 
 // ── Slot mutex: prevents two concurrent creates for the same doctor+time ──
 const slotLocks = new Map<string, Promise<void>>();
@@ -101,11 +170,8 @@ export default factories.createCoreController('api::appointment.appointment', ()
     if (!user && !isApiToken) return ctx.forbidden('Not authenticated');
 
     const isAdmin = isApiToken || user?.role?.type === 'admin' || user?.userRole === 'admin';
-    const populate = {
-      doctor: { populate: ['specialization', 'photo'] },
-      patient: { fields: ['id', 'fullName'] },
-      medical_case: true,
-    } as any;
+    const role = user ? getUserRole(user) : 'admin';
+    const populate = appointmentPopulateForRole(role);
     const sort = (ctx.query?.sort as any) || ['dateTime:desc'];
 
     // Parse filters from query params
@@ -143,10 +209,19 @@ export default factories.createCoreController('api::appointment.appointment', ()
       const isDoctor = user.role?.type === 'doctor' || user.userRole === 'doctor';
 
       if (isDoctor) {
-        // Находим doctor запись по users_permissions_user (id)
-        const doctorRecord = await strapi
-          .query('api::doctor.doctor')
-          .findOne({ where: { users_permissions_user: user.id } });
+        // New records use users_permissions_user; older seeded records may
+        // still carry only userId. Keep both paths so consultations remain joinable.
+        const doctorRecords = await strapi.documents('api::doctor.doctor').findMany({
+          filters: {
+            $or: [
+              { users_permissions_user: { id: user.id } },
+              { userId: user.id },
+            ],
+          },
+          fields: ['documentId'],
+          limit: 1,
+        });
+        const doctorRecord = doctorRecords?.[0];
 
         if (!doctorRecord?.documentId) {
           return { data: [], meta: { pagination: { page: 1, pageSize: 0, pageCount: 0, total: 0 } } };
@@ -159,7 +234,7 @@ export default factories.createCoreController('api::appointment.appointment', ()
           populate,
         });
         return {
-          data,
+          data: data.map((appointment: any) => redactAppointmentForRole(appointment, role)),
           meta: { pagination: { page: 1, pageSize: data.length, pageCount: 1, total: data.length } },
         };
       } else {
@@ -174,7 +249,7 @@ export default factories.createCoreController('api::appointment.appointment', ()
           populate,
         });
         return {
-          data,
+          data: data.map((appointment: any) => redactAppointmentForRole(appointment, role)),
           meta: { pagination: { page: 1, pageSize: data.length, pageCount: 1, total: data.length } },
         };
       }
@@ -187,7 +262,7 @@ export default factories.createCoreController('api::appointment.appointment', ()
     });
 
     return {
-      data,
+      data: data.map((appointment: any) => redactAppointmentForRole(appointment, role)),
       meta: {
         pagination: {
           page: 1,
@@ -204,12 +279,8 @@ export default factories.createCoreController('api::appointment.appointment', ()
     if (!user) return ctx.forbidden('Not authenticated');
 
     const { id } = ctx.params;
-    const populate = {
-      doctor: { populate: ['specialization', 'photo'] },
-      patient: { fields: ['id', 'fullName'] },
-      medical_documents: { populate: ['file'] },
-      medical_case: true,
-    } as any;
+    const role = getUserRole(user);
+    const populate = appointmentPopulateForRole(role);
 
     const appointment = await strapi.documents('api::appointment.appointment').findOne({
       documentId: id,
@@ -220,7 +291,11 @@ export default factories.createCoreController('api::appointment.appointment', ()
       return ctx.notFound('Appointment not found');
     }
 
-    return { data: appointment };
+    if (!(await userCanAccessAppointment(strapi, user, appointment))) {
+      return ctx.notFound('Appointment not found');
+    }
+
+    return { data: redactAppointmentForRole(appointment, role) };
   },
 
   async create(ctx) {
@@ -255,6 +330,12 @@ export default factories.createCoreController('api::appointment.appointment', ()
     const ALLOWED_TYPES = ['video', 'chat'];
     const appointmentType = body.type || 'video';
     if (!ALLOWED_TYPES.includes(appointmentType)) return ctx.badRequest('type must be video or chat');
+
+    const ALLOWED_PURPOSES = ['initial_case_review', 'follow_up', 'pre_treatment', 'post_treatment'];
+    const consultationPurpose = body.consultationPurpose || 'initial_case_review';
+    if (!ALLOWED_PURPOSES.includes(consultationPurpose)) {
+      return ctx.badRequest('Invalid consultationPurpose value');
+    }
 
     if (!body.doctor) return ctx.badRequest('doctor is required');
     if (!body.roomId || typeof body.roomId !== 'string' || body.roomId.length > 128) {
@@ -356,7 +437,13 @@ export default factories.createCoreController('api::appointment.appointment', ()
       if (assignedDoctorDocId !== doctorDocId) {
         return ctx.forbidden('Patients can only book time with the doctor assigned to their MedTour case.');
       }
-      const allowedCaseStatuses = ['DOCTOR_ASSIGNED', 'WAITING_PATIENT_CONFIRMATION', 'UNDER_REVIEW', 'DOCUMENTS_UPLOADED'];
+      const allowedCaseStatuses = [
+        'DOCTOR_ASSIGNED',
+        'WAITING_PATIENT_CONFIRMATION',
+        'UNDER_REVIEW',
+        'DOCUMENTS_UPLOADED',
+        'CONSULTATION_COMPLETED',
+      ];
       if (!allowedCaseStatuses.includes(medicalCase?.status)) {
         return ctx.forbidden('Consultation time can only be selected while the case is waiting for booking.');
       }
@@ -461,6 +548,7 @@ export default factories.createCoreController('api::appointment.appointment', ()
       const appointmentData: any = {
         dateTime: body.dateTime,
         type: body.type || 'video',
+        consultationPurpose,
         statuse: requestedStatus,
         price: actualPrice,
         roomId: body.roomId,
@@ -602,14 +690,14 @@ export default factories.createCoreController('api::appointment.appointment', ()
       documentId,
       populate: {
         patient: { fields: ['id'] },
-        doctor: { populate: { users_permissions_user: { fields: ['id'] } } },
+        doctor: { fields: ['userId'], populate: { users_permissions_user: { fields: ['id'] } } },
         medical_case: { fields: ['id', 'documentId', 'status'] },
       },
     });
     if (!appointment) return ctx.notFound('Appointment not found');
 
     const isPatient = appointment.patient?.id === user.id;
-    const isDoctorParticipant = appointment.doctor?.users_permissions_user?.id === user.id;
+    const isDoctorParticipant = isAppointmentDoctor(appointment.doctor, user.id);
 
     if (!isPatient && !isDoctorParticipant) return ctx.forbidden('Not a participant');
 
@@ -795,7 +883,7 @@ export default factories.createCoreController('api::appointment.appointment', ()
       filters: { roomId },
       populate: {
         doctor: {
-          fields: ['id', 'consultationDuration'],
+          fields: ['id', 'consultationDuration', 'userId'],
           populate: { users_permissions_user: { fields: ['id'] } },
         },
         patient: { fields: ['id'] },
@@ -806,8 +894,8 @@ export default factories.createCoreController('api::appointment.appointment', ()
     if (!appointment) return ctx.notFound('Appointment not found');
 
     const isAdmin = user.role?.type === 'admin' || user.userRole === 'admin';
-    const isPatientParticipant = appointment.patient?.id === user.id;
-    const isDoctorParticipant = appointment.doctor?.users_permissions_user?.id === user.id;
+    const isPatientParticipant = sameId(appointment.patient?.id, user.id);
+    const isDoctorParticipant = isAppointmentDoctor(appointment.doctor, user.id);
 
     if (!isAdmin && !isPatientParticipant && !isDoctorParticipant) {
       return ctx.forbidden('Not a participant of this appointment');

@@ -35,6 +35,8 @@ setInterval(() => {
 
 export default (config, { strapi }) => {
   return async (ctx, next) => {
+    if (ctx.method === 'OPTIONS') return next()
+
     const path = ctx.request.path
     let limit = LIMITS[path]
     let bucket = path

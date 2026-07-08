@@ -28,6 +28,7 @@ const STAFF_UPDATE_FIELDS = [
   'title',
   'type',
   'description',
+  'file',
   'reviewStatus',
   'reviewNotes',
   'requestedLanguage',

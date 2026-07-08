@@ -374,6 +374,7 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
   const toast = useToast()
   const currentPlan = plans[0] || null
   const [isSaving, setIsSaving] = useState(false)
+  const [saveState, setSaveState] = useState('idle')
   const [form, setForm] = useState({
     status: currentPlan?.status || 'DRAFT',
     treatmentNeeded: currentPlan?.treatmentNeeded ?? true,
@@ -404,7 +405,10 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
     })
   }, [currentPlan?.documentId, currentPlan?.id])
 
-  const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
+  const update = (key, value) => {
+    setSaveState('idle')
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
 
   const save = async () => {
     setIsSaving(true)
@@ -446,6 +450,7 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
       }
 
       toast.success(t('case_detail.toast_plan_saved'))
+      setSaveState('saved')
       onChanged?.()
     } catch (error) {
       toast.error(error?.response?.data?.error?.message || t('case_detail.toast_plan_error'))
@@ -521,7 +526,9 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
                 label={t('case_detail.plan_status_label')}
                 value={form.status}
                 onChange={(e) => update('status', e.target.value)}
-                options={['DRAFT', 'SENT', 'ACCEPTED', 'DECLINED', 'EXPIRED'].map(value => ({ value, label: t(`case_detail.plan_status_${value.toLowerCase()}`, { defaultValue: value }) }))}
+                options={[form.status, 'DRAFT', 'SENT', 'EXPIRED']
+                  .filter((value, index, values) => values.indexOf(value) === index)
+                  .map(value => ({ value, label: t(`case_detail.plan_status_${value.toLowerCase()}`, { defaultValue: value }) }))}
               />
               <Input
                 label={t('case_detail.plan_duration_label')}
@@ -539,8 +546,13 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
             <Textarea label={t('case_detail.plan_procedures')} value={form.proceduresText} onChange={(e) => update('proceduresText', e.target.value)} rows={4} />
             <Textarea label={t('case_detail.plan_recommendations')} value={form.recommendations} onChange={(e) => update('recommendations', e.target.value)} rows={3} />
             <div className="flex justify-end">
-              <Button onClick={save} disabled={isSaving} leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}>
-                {t('common.save')}
+              <Button
+                onClick={save}
+                disabled={isSaving}
+                variant={saveState === 'saved' ? 'success' : 'primary'}
+                leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : saveState === 'saved' ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+              >
+                {saveState === 'saved' ? t('common.saved') : t('common.save')}
               </Button>
             </div>
           </>
@@ -582,6 +594,58 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
   )
 }
 
+function DoctorFeedbackSummary({ medicalCase, plans }) {
+  const { t } = useTranslation()
+  const doctorDocs = (medicalCase.medical_documents || []).filter(doc => {
+    const hasDoctor = !!doc.doctor
+    const hasAppointment = !!doc.appointment
+    const hasClinicalType = ['certificate', 'prescription', 'other'].includes(doc.type)
+    return (hasDoctor || hasAppointment) && hasClinicalType && (doc.description || doc.file)
+  })
+  const planNotes = (plans || []).filter(plan => plan.doctorDecisionNotes || plan.diagnosisSummary || plan.recommendations)
+  const hasCaseNotes = !!medicalCase.doctorDecisionNotes?.trim()
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('case_detail.doctor_feedback_section')}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!hasCaseNotes && doctorDocs.length === 0 && planNotes.length === 0 ? (
+          <p className="text-sm text-slate-500">{t('case_detail.doctor_feedback_empty')}</p>
+        ) : (
+          <>
+            {hasCaseNotes && (
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-sm font-medium text-slate-900 mb-1">{t('case_detail.label_doctor_decision_notes')}</p>
+                <p className="text-sm text-slate-600 whitespace-pre-wrap">{medicalCase.doctorDecisionNotes}</p>
+              </div>
+            )}
+            {planNotes.map(plan => (
+              <div key={plan.documentId || plan.id} className="rounded-xl bg-slate-50 p-4 space-y-2">
+                <p className="text-sm font-medium text-slate-900">{plan.title || t('case_detail.section_treatment_plan')}</p>
+                {plan.doctorDecisionNotes && <p className="text-sm text-slate-600 whitespace-pre-wrap">{plan.doctorDecisionNotes}</p>}
+                {plan.diagnosisSummary && <p className="text-xs text-slate-500 whitespace-pre-wrap">{plan.diagnosisSummary}</p>}
+                {plan.recommendations && <p className="text-xs text-slate-500 whitespace-pre-wrap">{plan.recommendations}</p>}
+              </div>
+            ))}
+            {doctorDocs.map(doc => (
+              <div key={doc.documentId || doc.id} className="flex items-start gap-3 rounded-xl border border-slate-100 p-4">
+                <FileText className="w-5 h-5 text-teal-600 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-900">{doc.title || t('documents.type_other')}</p>
+                  {doc.description && <p className="text-sm text-slate-600 whitespace-pre-wrap mt-1">{doc.description}</p>}
+                  {doc.file && <p className="text-xs text-slate-500 mt-1">{doc.file.name || t('documents.file_label')}</p>}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 function jsonArrayToLines(value, key = 'label') {
   if (!Array.isArray(value)) return ''
   return value.map(item => {
@@ -609,6 +673,7 @@ function LogisticsWorkspace({ medicalCase, checklists, visas, tourism, canEdit, 
   const { t } = useTranslation()
   const toast = useToast()
   const [isSaving, setIsSaving] = useState(false)
+  const [savedAction, setSavedAction] = useState('')
   const currentChecklist = checklists[0] || null
   const currentVisa = visas[0] || null
   const currentTourism = tourism[0] || null
@@ -682,6 +747,7 @@ function LogisticsWorkspace({ medicalCase, checklists, visas, tourism, canEdit, 
         await tripChecklistsAPI.create(payload)
       }
       toast.success(t('case_detail.toast_logistics_saved'))
+      setSavedAction('trip')
       onChanged?.()
     } catch (error) {
       toast.error(error?.response?.data?.error?.message || t('case_detail.toast_logistics_error'))
@@ -707,6 +773,7 @@ function LogisticsWorkspace({ medicalCase, checklists, visas, tourism, canEdit, 
         await visaRequestsAPI.create(payload)
       }
       toast.success(t('case_detail.toast_logistics_saved'))
+      setSavedAction('visa')
       onChanged?.()
     } catch (error) {
       toast.error(error?.response?.data?.error?.message || t('case_detail.toast_logistics_error'))
@@ -734,6 +801,7 @@ function LogisticsWorkspace({ medicalCase, checklists, visas, tourism, canEdit, 
         await tourismPackagesAPI.create(payload)
       }
       toast.success(t('case_detail.toast_logistics_saved'))
+      setSavedAction('tourism')
       onChanged?.()
     } catch (error) {
       toast.error(error?.response?.data?.error?.message || t('case_detail.toast_logistics_error'))
@@ -771,24 +839,30 @@ function LogisticsWorkspace({ medicalCase, checklists, visas, tourism, canEdit, 
           <Select
             label={t('case_detail.logistics_status_label')}
             value={tripForm.status}
-            onChange={(e) => setTripForm(prev => ({ ...prev, status: e.target.value }))}
+            onChange={(e) => { setSavedAction(''); setTripForm(prev => ({ ...prev, status: e.target.value })) }}
             options={['OPEN', 'IN_PROGRESS', 'COMPLETED'].map(value => ({ value, label: t(`case_detail.logistics_${value.toLowerCase()}`, { defaultValue: value }) }))}
           />
           <Textarea
             label={t('case_detail.trip_items_label')}
             value={tripForm.itemsText}
-            onChange={(e) => setTripForm(prev => ({ ...prev, itemsText: e.target.value }))}
+            onChange={(e) => { setSavedAction(''); setTripForm(prev => ({ ...prev, itemsText: e.target.value })) }}
             rows={4}
             placeholder={t('case_detail.trip_items_placeholder')}
           />
           <Textarea
             label={t('case_detail.logistics_notes_label')}
             value={tripForm.managerNotes}
-            onChange={(e) => setTripForm(prev => ({ ...prev, managerNotes: e.target.value }))}
+            onChange={(e) => { setSavedAction(''); setTripForm(prev => ({ ...prev, managerNotes: e.target.value })) }}
             rows={2}
           />
-          <Button size="sm" onClick={saveTrip} disabled={isSaving} leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}>
-            {t('case_detail.save_trip_btn')}
+          <Button
+            size="sm"
+            onClick={saveTrip}
+            disabled={isSaving}
+            variant={savedAction === 'trip' ? 'success' : 'primary'}
+            leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : savedAction === 'trip' ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          >
+            {savedAction === 'trip' ? t('common.saved') : t('case_detail.save_trip_btn')}
           </Button>
         </div>
 
@@ -798,25 +872,31 @@ function LogisticsWorkspace({ medicalCase, checklists, visas, tourism, canEdit, 
             {t('case_detail.visa_request')}
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
-            <Input label={t('case_detail.visa_country_label')} value={visaForm.country} onChange={(e) => setVisaForm(prev => ({ ...prev, country: e.target.value }))} />
-            <Input label={t('case_detail.visa_type_label')} value={visaForm.visaType} onChange={(e) => setVisaForm(prev => ({ ...prev, visaType: e.target.value }))} />
+            <Input label={t('case_detail.visa_country_label')} value={visaForm.country} onChange={(e) => { setSavedAction(''); setVisaForm(prev => ({ ...prev, country: e.target.value })) }} />
+            <Input label={t('case_detail.visa_type_label')} value={visaForm.visaType} onChange={(e) => { setSavedAction(''); setVisaForm(prev => ({ ...prev, visaType: e.target.value })) }} />
           </div>
           <Select
             label={t('case_detail.logistics_status_label')}
             value={visaForm.status}
-            onChange={(e) => setVisaForm(prev => ({ ...prev, status: e.target.value }))}
+            onChange={(e) => { setSavedAction(''); setVisaForm(prev => ({ ...prev, status: e.target.value })) }}
             options={['NOT_STARTED', 'DOCS_REQUESTED', 'DOCS_RECEIVED', 'INVITATION_PREPARING', 'INVITATION_SENT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'NOT_REQUIRED'].map(value => ({ value, label: t(`case_detail.visa_status_${value.toLowerCase()}`, { defaultValue: value }) }))}
           />
           <Textarea
             label={t('case_detail.visa_required_docs_label')}
             value={visaForm.requiredDocsText}
-            onChange={(e) => setVisaForm(prev => ({ ...prev, requiredDocsText: e.target.value }))}
+            onChange={(e) => { setSavedAction(''); setVisaForm(prev => ({ ...prev, requiredDocsText: e.target.value })) }}
             rows={3}
             placeholder={t('case_detail.visa_required_docs_placeholder')}
           />
-          <Textarea label={t('case_detail.logistics_notes_label')} value={visaForm.notes} onChange={(e) => setVisaForm(prev => ({ ...prev, notes: e.target.value }))} rows={2} />
-          <Button size="sm" onClick={saveVisa} disabled={isSaving} leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}>
-            {t('case_detail.save_visa_btn')}
+          <Textarea label={t('case_detail.logistics_notes_label')} value={visaForm.notes} onChange={(e) => { setSavedAction(''); setVisaForm(prev => ({ ...prev, notes: e.target.value })) }} rows={2} />
+          <Button
+            size="sm"
+            onClick={saveVisa}
+            disabled={isSaving}
+            variant={savedAction === 'visa' ? 'success' : 'primary'}
+            leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : savedAction === 'visa' ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          >
+            {savedAction === 'visa' ? t('common.saved') : t('case_detail.save_visa_btn')}
           </Button>
         </div>
 
@@ -826,23 +906,29 @@ function LogisticsWorkspace({ medicalCase, checklists, visas, tourism, canEdit, 
             {t('case_detail.tourism_package')}
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
-            <Input label={t('case_detail.tourism_title_label')} value={tourismForm.title} onChange={(e) => setTourismForm(prev => ({ ...prev, title: e.target.value }))} />
-            <Input label={t('case_detail.tourism_city_label')} value={tourismForm.city} onChange={(e) => setTourismForm(prev => ({ ...prev, city: e.target.value }))} />
+            <Input label={t('case_detail.tourism_title_label')} value={tourismForm.title} onChange={(e) => { setSavedAction(''); setTourismForm(prev => ({ ...prev, title: e.target.value })) }} />
+            <Input label={t('case_detail.tourism_city_label')} value={tourismForm.city} onChange={(e) => { setSavedAction(''); setTourismForm(prev => ({ ...prev, city: e.target.value })) }} />
           </div>
           <div className="grid sm:grid-cols-3 gap-3">
             <Select
               label={t('case_detail.logistics_status_label')}
               value={tourismForm.status}
-              onChange={(e) => setTourismForm(prev => ({ ...prev, status: e.target.value }))}
+              onChange={(e) => { setSavedAction(''); setTourismForm(prev => ({ ...prev, status: e.target.value })) }}
               options={['DRAFT', 'OFFERED', 'ACCEPTED', 'DECLINED', 'BOOKED', 'COMPLETED', 'CANCELLED'].map(value => ({ value, label: t(`case_detail.tourism_status_${value.toLowerCase()}`, { defaultValue: value }) }))}
             />
-            <Input label={t('case_detail.plan_cost_label')} type="number" value={tourismForm.totalCost} onChange={(e) => setTourismForm(prev => ({ ...prev, totalCost: e.target.value }))} />
-            <Select label={t('case_detail.plan_currency_label')} value={tourismForm.currency} onChange={(e) => setTourismForm(prev => ({ ...prev, currency: e.target.value }))} options={['USD', 'EUR', 'GBP', 'KZT'].map(value => ({ value, label: value }))} />
+            <Input label={t('case_detail.plan_cost_label')} type="number" value={tourismForm.totalCost} onChange={(e) => { setSavedAction(''); setTourismForm(prev => ({ ...prev, totalCost: e.target.value })) }} />
+            <Select label={t('case_detail.plan_currency_label')} value={tourismForm.currency} onChange={(e) => { setSavedAction(''); setTourismForm(prev => ({ ...prev, currency: e.target.value })) }} options={['USD', 'EUR', 'GBP', 'KZT'].map(value => ({ value, label: value }))} />
           </div>
-          <Textarea label={t('case_detail.tourism_desc_label')} value={tourismForm.description} onChange={(e) => setTourismForm(prev => ({ ...prev, description: e.target.value }))} rows={3} />
-          <Textarea label={t('case_detail.logistics_notes_label')} value={tourismForm.notes} onChange={(e) => setTourismForm(prev => ({ ...prev, notes: e.target.value }))} rows={2} />
-          <Button size="sm" onClick={saveTourism} disabled={isSaving} leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}>
-            {t('case_detail.save_tourism_btn')}
+          <Textarea label={t('case_detail.tourism_desc_label')} value={tourismForm.description} onChange={(e) => { setSavedAction(''); setTourismForm(prev => ({ ...prev, description: e.target.value })) }} rows={3} />
+          <Textarea label={t('case_detail.logistics_notes_label')} value={tourismForm.notes} onChange={(e) => { setSavedAction(''); setTourismForm(prev => ({ ...prev, notes: e.target.value })) }} rows={2} />
+          <Button
+            size="sm"
+            onClick={saveTourism}
+            disabled={isSaving}
+            variant={savedAction === 'tourism' ? 'success' : 'primary'}
+            leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : savedAction === 'tourism' ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          >
+            {savedAction === 'tourism' ? t('common.saved') : t('case_detail.save_tourism_btn')}
           </Button>
         </div>
       </CardContent>
@@ -859,6 +945,10 @@ function MedicalCaseDetail() {
   const role = user?.userRole || 'patient'
   const base = roleBase(role)
   const canManage = ['admin', 'manager', 'coordinator'].includes(role)
+  const isDoctorRole = role === 'doctor'
+  const canViewPatientContact = ['admin', 'manager', 'coordinator', 'patient'].includes(role)
+  const canViewBusinessFields = ['admin', 'manager'].includes(role)
+  const canViewTravel = ['admin', 'manager', 'patient'].includes(role)
 
   const [medicalCase, setMedicalCase] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -875,6 +965,7 @@ function MedicalCaseDetail() {
   const [ledger, setLedger] = useState([])
   const [form, setForm] = useState({})
   const [showSlotPicker, setShowSlotPicker] = useState(false)
+  const [caseSaveState, setCaseSaveState] = useState('idle')
 
   const loadCase = async () => {
     setIsLoading(true)
@@ -901,15 +992,31 @@ function MedicalCaseDetail() {
 
   const loadReferenceData = async () => {
     try {
+      if (isDoctorRole) {
+        const [plansRes, eventsRes] = await Promise.all([
+          treatmentPlansAPI.getByCase(id),
+          caseEventsAPI.getByCase(id),
+        ])
+        setPlans(normalizeResponse(plansRes).data || [])
+        setEvents(normalizeResponse(eventsRes).data || [])
+        setClinics([])
+        setDoctors([])
+        setChecklists([])
+        setVisas([])
+        setTourism([])
+        setLedger([])
+        return
+      }
+
       const requests = [
         clinicsAPI.getAll(),
         doctorsAPI.getAll({ includeInactive: true }),
         treatmentPlansAPI.getByCase(id),
-        tripChecklistsAPI.getByCase(id),
-        visaRequestsAPI.getByCase(id),
-        tourismPackagesAPI.getByCase(id),
+        canViewTravel ? tripChecklistsAPI.getByCase(id) : Promise.resolve({ data: { data: [] } }),
+        canViewTravel ? visaRequestsAPI.getByCase(id) : Promise.resolve({ data: { data: [] } }),
+        canViewTravel ? tourismPackagesAPI.getByCase(id) : Promise.resolve({ data: { data: [] } }),
         caseEventsAPI.getByCase(id),
-        financeLedgerAPI.getAll({ caseId: id }),
+        canManage ? financeLedgerAPI.getAll({ caseId: id }) : Promise.resolve({ data: { data: [] } }),
       ]
 
       if (role === 'admin') {
@@ -940,7 +1047,10 @@ function MedicalCaseDetail() {
     loadReferenceData()
   }, [id])
 
-  const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
+  const update = (key, value) => {
+    setCaseSaveState('idle')
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
 
   const save = async () => {
     setIsSaving(true)
@@ -967,6 +1077,7 @@ function MedicalCaseDetail() {
 
       await medicalCasesAPI.update(id, payload)
       toast.success(t('case_detail.toast_case_updated'))
+      setCaseSaveState('saved')
       await loadCase()
     } catch (error) {
       toast.error(error?.response?.data?.error?.message || t('case_detail.toast_case_error'))
@@ -1037,6 +1148,27 @@ function MedicalCaseDetail() {
     }
   }
 
+  const openSlotPicker = async () => {
+    if (canManage && form.doctor && form.doctor !== getRef(medicalCase?.doctor)) {
+      setIsSaving(true)
+      try {
+        await medicalCasesAPI.update(id, {
+          doctor: form.doctor,
+          clinic: form.clinic || null,
+        })
+        toast.success(t('case_detail.toast_case_updated'))
+        await loadCase()
+      } catch (error) {
+        toast.error(error?.response?.data?.error?.message || t('case_detail.toast_case_error'))
+        setIsSaving(false)
+        return
+      } finally {
+        setIsSaving(false)
+      }
+    }
+    setShowSlotPicker(true)
+  }
+
   const selectedClinicDoctors = useMemo(() => {
     if (!['admin', 'manager'].includes(role)) return doctors
     if (!form.clinic) return doctors
@@ -1060,10 +1192,17 @@ function MedicalCaseDetail() {
     if (!docRef) return null
     return doctors.find(d => getRef(d) === docRef) || medicalCase?.doctor || null
   }, [doctors, medicalCase?.doctor])
+  const bookingDoctor = useMemo(() => {
+    if (canManage && form.doctor) {
+      return doctors.find(d => getRef(d) === form.doctor) || assignedDoctor
+    }
+    return assignedDoctor
+  }, [assignedDoctor, canManage, doctors, form.doctor])
 
   const caseStatus = normalizeCaseStatus(medicalCase?.status)
-  const BOOKING_STATUSES = ['DOCTOR_ASSIGNED', 'WAITING_PATIENT_CONFIRMATION', 'UNDER_REVIEW', 'DOCUMENTS_UPLOADED']
-  const canBookSlot = assignedDoctor && BOOKING_STATUSES.includes(caseStatus)
+  const BOOKING_STATUSES = ['DOCTOR_ASSIGNED', 'WAITING_PATIENT_CONFIRMATION', 'UNDER_REVIEW', 'DOCUMENTS_UPLOADED', 'CONSULTATION_COMPLETED']
+  const isFollowUpBooking = caseStatus === 'CONSULTATION_COMPLETED'
+  const canBookSlot = bookingDoctor && BOOKING_STATUSES.includes(caseStatus)
   const canBookAsStaff = canManage && canBookSlot
   const canBookAsPatient = role === 'patient' && !!assignedDoctor && BOOKING_STATUSES.includes(caseStatus)
 
@@ -1113,12 +1252,17 @@ function MedicalCaseDetail() {
               </Button>
             )}
             {canBookAsStaff && (
-              <Button variant="outline" onClick={() => setShowSlotPicker(true)} leftIcon={<Calendar className="w-4 h-4" />}>
-                {t('case_detail.book_consultation_btn')}
+              <Button variant="outline" onClick={openSlotPicker} disabled={isSaving} leftIcon={<Calendar className="w-4 h-4" />}>
+                {isFollowUpBooking ? t('case_detail.book_follow_up_btn') : t('case_detail.book_consultation_btn')}
               </Button>
             )}
-            <Button onClick={save} disabled={isSaving} leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}>
-              {t('case_detail.save_changes')}
+            <Button
+              onClick={save}
+              disabled={isSaving}
+              variant={caseSaveState === 'saved' ? 'success' : 'primary'}
+              leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : caseSaveState === 'saved' ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+            >
+              {caseSaveState === 'saved' ? t('common.saved') : t('case_detail.save_changes')}
             </Button>
           </div>
         )}
@@ -1130,9 +1274,11 @@ function MedicalCaseDetail() {
 
       {canBookAsPatient && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-teal-50 border border-teal-200 rounded-xl">
-          <p className="text-sm text-teal-800">{t('case_detail.patient_book_prompt')}</p>
-          <Button onClick={() => setShowSlotPicker(true)} leftIcon={<Calendar className="w-4 h-4" />} className="shrink-0 w-full sm:w-auto">
-            {t('case_detail.book_consultation_btn')}
+          <p className="text-sm text-teal-800">
+            {isFollowUpBooking ? t('case_detail.patient_follow_up_prompt') : t('case_detail.patient_book_prompt')}
+          </p>
+          <Button onClick={openSlotPicker} leftIcon={<Calendar className="w-4 h-4" />} className="shrink-0 w-full sm:w-auto">
+            {isFollowUpBooking ? t('case_detail.book_follow_up_btn') : t('case_detail.book_consultation_btn')}
           </Button>
         </div>
       )}
@@ -1147,26 +1293,34 @@ function MedicalCaseDetail() {
               <div>
                 <h3 className="font-semibold text-slate-900 mb-3">{t('cases.patient_fallback')}</h3>
                 <DetailRow label={t('case_detail.label_name')} value={medicalCase.patient?.fullName} />
-                <DetailRow label={t('case_detail.label_email')} value={medicalCase.patient?.email} />
-                <DetailRow label={t('case_detail.label_phone')} value={medicalCase.patient?.phone} />
-                <DetailRow label={t('case_detail.label_country')} value={medicalCase.country || medicalCase.patient?.country} />
-                <DetailRow label={t('case_detail.label_language')} value={medicalCase.language || medicalCase.patient?.language} />
-                <DetailRow label={t('case_detail.label_timezone')} value={medicalCase.timezone || medicalCase.patient?.timezone} />
-                <DetailRow label={t('case_detail.label_contact')} value={medicalCase.preferredContact} />
+                {canViewPatientContact && (
+                  <>
+                    <DetailRow label={t('case_detail.label_email')} value={medicalCase.patient?.email} />
+                    <DetailRow label={t('case_detail.label_phone')} value={medicalCase.patient?.phone} />
+                    <DetailRow label={t('case_detail.label_country')} value={medicalCase.country || medicalCase.patient?.country} />
+                    <DetailRow label={t('case_detail.label_language')} value={medicalCase.language || medicalCase.patient?.language} />
+                    <DetailRow label={t('case_detail.label_timezone')} value={medicalCase.timezone || medicalCase.patient?.timezone} />
+                    <DetailRow label={t('case_detail.label_contact')} value={medicalCase.preferredContact} />
+                  </>
+                )}
               </div>
               <div>
                 <h3 className="font-semibold text-slate-900 mb-3">{t('cases.treatment_dir_label')}</h3>
                 <DetailRow label={t('case_detail.label_direction')} value={medicalCase.treatmentCategory} />
                 <DetailRow label={t('case_detail.label_urgency')} value={medicalCase.urgency ? t(`urgency.${medicalCase.urgency}`) : '—'} />
-                <DetailRow label={t('case_detail.label_arrival')} value={formatDesiredDate(medicalCase.desiredDates)} />
-                <DetailRow label={t('case_detail.label_budget')} value={medicalCase.budgetRange} />
-                <DetailRow label={t('case_detail.label_lead_source')} value={medicalCase.leadSource} />
-                <DetailRow label={t('case_detail.label_lead_campaign')} value={medicalCase.leadCampaign} />
-                <DetailRow label={t('case_detail.label_visa')} value={medicalCase.visaSupportNeeded ? t('case_detail.label_visa_needed') : t('case_detail.label_visa_not')} />
+                {!isDoctorRole && <DetailRow label={t('case_detail.label_arrival')} value={formatDesiredDate(medicalCase.desiredDates)} />}
+                {canViewBusinessFields && (
+                  <>
+                    <DetailRow label={t('case_detail.label_budget')} value={medicalCase.budgetRange} />
+                    <DetailRow label={t('case_detail.label_lead_source')} value={medicalCase.leadSource} />
+                    <DetailRow label={t('case_detail.label_lead_campaign')} value={medicalCase.leadCampaign} />
+                    <DetailRow label={t('case_detail.label_visa')} value={medicalCase.visaSupportNeeded ? t('case_detail.label_visa_needed') : t('case_detail.label_visa_not')} />
+                  </>
+                )}
                 <DetailRow label={t('case_detail.label_diagnosis')} value={medicalCase.diagnosis} />
                 <DetailRow label={t('case_detail.label_symptoms')} value={medicalCase.symptoms} />
                 <DetailRow label={t('case_detail.label_current_treatment')} value={medicalCase.currentTreatment} />
-                <DetailRow label={t('case_detail.label_tourism')} value={medicalCase.tourismRequested ? t('case_detail.label_tourism_requested') : t('case_detail.label_tourism_not')} />
+                {canViewBusinessFields && <DetailRow label={t('case_detail.label_tourism')} value={medicalCase.tourismRequested ? t('case_detail.label_tourism_requested') : t('case_detail.label_tourism_not')} />}
               </div>
             </CardContent>
           </Card>
@@ -1274,6 +1428,10 @@ function MedicalCaseDetail() {
 
           <CaseDocumentsPanel medicalCase={medicalCase} onUploaded={loadCase} />
 
+          {canManage && (
+            <DoctorFeedbackSummary medicalCase={medicalCase} plans={plans} />
+          )}
+
           <TreatmentPlanPanel
             medicalCase={medicalCase}
             plans={plans}
@@ -1309,7 +1467,8 @@ function MedicalCaseDetail() {
         </div>
 
         <div className="space-y-6">
-          <Card>
+          {!isDoctorRole && (
+            <Card>
             <CardHeader>
               <CardTitle>{t('case_detail.section_assignments')}</CardTitle>
             </CardHeader>
@@ -1320,19 +1479,22 @@ function MedicalCaseDetail() {
               )}
               <TimelineItem icon={Stethoscope} title={t('case_detail.doctor_label')} value={medicalCase.doctor?.fullName} muted={!medicalCase.doctor} />
             </CardContent>
-          </Card>
+            </Card>
+          )}
 
-          <LogisticsWorkspace
-            medicalCase={medicalCase}
-            checklists={checklists}
-            visas={visas}
-            tourism={tourism}
-            canEdit={['admin', 'manager'].includes(role)}
-            onChanged={async () => {
-              await loadCase()
-              await loadReferenceData()
-            }}
-          />
+          {canViewTravel && (
+            <LogisticsWorkspace
+              medicalCase={medicalCase}
+              checklists={checklists}
+              visas={visas}
+              tourism={tourism}
+              canEdit={['admin', 'manager'].includes(role)}
+              onChanged={async () => {
+                await loadCase()
+                await loadReferenceData()
+              }}
+            />
+          )}
 
           {canManage && (
             <Card>
@@ -1388,10 +1550,11 @@ function MedicalCaseDetail() {
       <CaseSlotPicker
         isOpen={showSlotPicker}
         onClose={() => setShowSlotPicker(false)}
-        doctor={assignedDoctor}
+        doctor={bookingDoctor}
         caseDocId={medicalCase?.documentId || medicalCase?.id}
         patientId={medicalCase?.patient?.id}
         role={role}
+        consultationPurpose={isFollowUpBooking ? 'follow_up' : 'initial_case_review'}
         onBooked={() => { loadCase(); loadReferenceData() }}
       />
     </div>

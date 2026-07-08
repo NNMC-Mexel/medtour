@@ -26,7 +26,7 @@ import Avatar from '../components/ui/Avatar'
 import Badge from '../components/ui/Badge'
 import useAuthStore from '../stores/authStore'
 import { useTranslation } from 'react-i18next'
-import { appointmentsAPI, documentsAPI, uploadFile, getMediaUrl } from '../services/api'
+import { appointmentsAPI, documentsAPI, uploadFile, getMediaUrl, openMediaInNewTab } from '../services/api'
 import { getSpecName } from '../utils/helpers'
 
 // 48-hour window for post-consultation notes
@@ -112,6 +112,14 @@ function AppointmentDetail() {
 
   const backPath = isDoctor ? '/doctor' : '/patient/appointments'
 
+  const openAttachment = async (media) => {
+    try {
+      await openMediaInNewTab(media)
+    } catch (error) {
+      console.error('Could not open attachment:', error)
+    }
+  }
+
   // ── Save functions ──────────────────────────────────────────────
 
   const handleDiagnosisFile = async (e) => {
@@ -132,6 +140,9 @@ function AppointmentDetail() {
     if (!appointment?.id) return
     setIsSavingDiagnosis(true)
     const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
+    const appointmentRef = appointment.documentId || appointment.id
+    const patientRef = appointment.patient?.documentId || appointment.patient?.id
+    const doctorRef = appointment.doctor?.documentId || appointment.doctor?.id
     try {
       if (existingDocIds.certificate) {
         await documentsAPI.update(existingDocIds.certificate, {
@@ -144,10 +155,10 @@ function AppointmentDetail() {
           type: 'certificate',
           description: diagnosisText || '',
           ...(diagnosisFile?.id && { file: diagnosisFile.id }),
-          appointment: appointment.id,
+          appointment: appointmentRef,
           ...(caseId && { medical_case: caseId }),
-          user: appointment.patient?.id,
-          doctor: appointment.doctor?.id,
+          user: patientRef,
+          doctor: doctorRef,
         })
         const newDoc = res.data?.data
         if (newDoc) setExistingDocIds(prev => ({ ...prev, certificate: newDoc.documentId || newDoc.id }))
@@ -193,6 +204,9 @@ function AppointmentDetail() {
     if (!appointment?.id || (!planText.trim() && !planFile)) return
     setIsSavingPlan(true)
     const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
+    const appointmentRef = appointment.documentId || appointment.id
+    const patientRef = appointment.patient?.documentId || appointment.patient?.id
+    const doctorRef = appointment.doctor?.documentId || appointment.doctor?.id
     try {
       if (existingDocIds.other) {
         await documentsAPI.update(existingDocIds.other, {
@@ -205,10 +219,10 @@ function AppointmentDetail() {
           type: 'other',
           description: planText,
           ...(planFile?.id && { file: planFile.id }),
-          appointment: appointment.id,
+          appointment: appointmentRef,
           ...(caseId && { medical_case: caseId }),
-          user: appointment.patient?.id,
-          doctor: appointment.doctor?.id,
+          user: patientRef,
+          doctor: doctorRef,
         })
         const newDoc = res.data?.data
         if (newDoc) setExistingDocIds(prev => ({ ...prev, other: newDoc.documentId || newDoc.id }))
@@ -226,6 +240,9 @@ function AppointmentDetail() {
     if (!appointment?.id || (!prescriptionsText.trim() && !prescriptionsFile)) return
     setIsSavingPrescriptions(true)
     const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
+    const appointmentRef = appointment.documentId || appointment.id
+    const patientRef = appointment.patient?.documentId || appointment.patient?.id
+    const doctorRef = appointment.doctor?.documentId || appointment.doctor?.id
     try {
       if (existingDocIds.prescription) {
         await documentsAPI.update(existingDocIds.prescription, {
@@ -238,10 +255,10 @@ function AppointmentDetail() {
           type: 'prescription',
           description: prescriptionsText,
           ...(prescriptionsFile?.id && { file: prescriptionsFile.id }),
-          appointment: appointment.id,
+          appointment: appointmentRef,
           ...(caseId && { medical_case: caseId }),
-          user: appointment.patient?.id,
-          doctor: appointment.doctor?.id,
+          user: patientRef,
+          doctor: doctorRef,
         })
         const newDoc = res.data?.data
         if (newDoc) setExistingDocIds(prev => ({ ...prev, prescription: newDoc.documentId || newDoc.id }))
@@ -493,14 +510,13 @@ function AppointmentDetail() {
                         <Paperclip className="w-4 h-4 text-slate-400" />
                         <span>{diagnosisFile.name || t('appointment_detail.file_attached')}</span>
                         {diagnosisFile.url && (
-                          <a
-                            href={getMediaUrl(diagnosisFile)}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onClick={() => openAttachment(diagnosisFile)}
                             className="text-teal-600 hover:underline"
                           >
                             {t('appointment_detail.open')}
-                          </a>
+                          </button>
                         )}
                       </div>
                     )}
@@ -548,7 +564,7 @@ function AppointmentDetail() {
                         <Paperclip className="w-4 h-4 text-slate-400" />
                         <span>{planFile.name || t('appointment_detail.file_attached')}</span>
                         {planFile.url && (
-                          <a href={getMediaUrl(planFile)} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">{t('appointment_detail.open')}</a>
+                          <button type="button" onClick={() => openAttachment(planFile)} className="text-teal-600 hover:underline">{t('appointment_detail.open')}</button>
                         )}
                       </div>
                     )}
@@ -596,7 +612,7 @@ function AppointmentDetail() {
                         <Paperclip className="w-4 h-4 text-slate-400" />
                         <span>{prescriptionsFile.name || t('appointment_detail.file_attached')}</span>
                         {prescriptionsFile.url && (
-                          <a href={getMediaUrl(prescriptionsFile)} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">{t('appointment_detail.open')}</a>
+                          <button type="button" onClick={() => openAttachment(prescriptionsFile)} className="text-teal-600 hover:underline">{t('appointment_detail.open')}</button>
                         )}
                       </div>
                     )}
@@ -676,7 +692,6 @@ function AppointmentDetail() {
               ) : (
                 <div className="space-y-3">
                   {documents.map((doc) => {
-                    const fileUrl = doc.file?.url ? getMediaUrl(doc.file) : null
                     return (
                       <div
                         key={doc.id}
@@ -701,15 +716,14 @@ function AppointmentDetail() {
                             </p>
                           )}
                         </div>
-                        {fileUrl && (
-                          <a
-                            href={fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        {doc.file?.url && (
+                          <button
+                            type="button"
+                            onClick={() => openAttachment(doc.file)}
                             className="p-2 rounded-lg text-teal-600 hover:bg-teal-50 transition-colors shrink-0"
                           >
                             <ExternalLink className="w-4 h-4" />
-                          </a>
+                          </button>
                         )}
                       </div>
                     )
@@ -743,19 +757,19 @@ function AppointmentDetail() {
                     <span className="text-sm text-slate-700">{specName}</span>
                   </div>
                 )}
-                {(isDoctor ? appointment.patient?.phone : appointment.doctor?.phone) && (
+                {!isDoctor && appointment.doctor?.phone && (
                   <div className="flex items-center gap-3">
                     <Phone className="w-4 h-4 text-slate-400" />
                     <span className="text-sm text-slate-700">
-                      {isDoctor ? appointment.patient.phone : appointment.doctor.phone}
+                      {appointment.doctor.phone}
                     </span>
                   </div>
                 )}
-                {(isDoctor ? appointment.patient?.email : appointment.doctor?.email) && (
+                {!isDoctor && appointment.doctor?.email && (
                   <div className="flex items-center gap-3">
                     <Mail className="w-4 h-4 text-slate-400" />
                     <span className="text-sm text-slate-700">
-                      {isDoctor ? appointment.patient.email : appointment.doctor.email}
+                      {appointment.doctor.email}
                     </span>
                   </div>
                 )}

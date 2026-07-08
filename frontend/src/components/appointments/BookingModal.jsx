@@ -262,6 +262,12 @@ function BookingModal({ isOpen, onClose, doctor }) {
     const doctorSpecialization = getSpecName(doctor?.specialization, i18n.language)
         || t('booking.specialist_fallback');
     const doctorPrice = doctor?.price || 0;
+    const isSlotTakenMessage = (message = "") => {
+        const lower = message.toLowerCase();
+        return lower.includes("забронировано") || lower.includes("занято") || lower.includes("booked") || lower.includes("taken");
+    };
+    const getDisplayError = (message) =>
+        isSlotTakenMessage(message) ? t('booking.slot_taken_booked') : message;
 
     useEffect(() => {
         const loadSlots = async () => {
@@ -522,9 +528,10 @@ function BookingModal({ isOpen, onClose, doctor }) {
                 setIsComplete(true);
             } else {
                 const msg = result.error || t('booking.err_create');
-                toast.error(msg);
-                setError(msg);
-                if (msg.includes("забронировано") || msg.includes("занято")) {
+                const displayMsg = getDisplayError(msg);
+                toast.error(displayMsg);
+                setError(displayMsg);
+                if (isSlotTakenMessage(msg)) {
                     setBookedSlots((prev) => [...prev, selectedTime]);
                     setSelectedTime(null);
                     setStep(1);
@@ -609,8 +616,8 @@ function BookingModal({ isOpen, onClose, doctor }) {
                 amount: doctorPrice,
                 currency: "KZT",
                 terminal: terminalId,
-                language: "RU",
-                description: `Консультация у ${doctorName}`,
+                language: i18n.language === "en" ? "EN" : "RU",
+                description: t('booking.payment_description', { name: doctorName }),
                 accountId: String(user.id),
                 name: user.fullName || user.username || "",
                 email: user.email || "",
@@ -772,9 +779,10 @@ function BookingModal({ isOpen, onClose, doctor }) {
                 setIsComplete(true);
             } else {
                 const msg = result.error || t('booking.err_create');
-                toast.error(msg);
-                setError(msg);
-                if (msg.includes("забронировано") || msg.includes("занято")) {
+                const displayMsg = getDisplayError(msg);
+                toast.error(displayMsg);
+                setError(displayMsg);
+                if (isSlotTakenMessage(msg)) {
                     setBookedSlots((prev) => [...prev, selectedTime]);
                     setSelectedTime(null);
                     setStep(1);
@@ -814,9 +822,10 @@ function BookingModal({ isOpen, onClose, doctor }) {
                 setIsComplete(true);
             } else {
                 const msg = result.error || t('booking.err_create');
-                toast.error(msg);
-                setError(msg);
-                if (msg.includes("забронировано") || msg.includes("занято")) {
+                const displayMsg = getDisplayError(msg);
+                toast.error(displayMsg);
+                setError(displayMsg);
+                if (isSlotTakenMessage(msg)) {
                     setBookedSlots((prev) => [...prev, selectedTime]);
                     setSelectedTime(null);
                     setStep(1);

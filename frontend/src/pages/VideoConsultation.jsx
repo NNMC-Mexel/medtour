@@ -51,20 +51,21 @@ const _TURN_URL  = import.meta.env.VITE_TURN_URL     || ''; // turn:host:3478
 const _TURN_TCP  = import.meta.env.VITE_TURN_URL_TCP || ''; // turn:host:443?transport=tcp
 
 const _TURN_INTERNAL = import.meta.env.VITE_TURN_INTERNAL || '';
+const _HAS_TURN_CREDENTIALS = Boolean(_TURN_USER && _TURN_CRED);
 
 const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     // TURN внутренний IP (для пользователей в кампусе — обходит hairpin NAT)
-    ...(_TURN_INTERNAL ? [{ urls: _TURN_INTERNAL,                          username: _TURN_USER, credential: _TURN_CRED }] : []),
-    ...(_TURN_INTERNAL ? [{ urls: _TURN_INTERNAL + '?transport=tcp',       username: _TURN_USER, credential: _TURN_CRED }] : []),
+    ...(_TURN_INTERNAL && _HAS_TURN_CREDENTIALS ? [{ urls: _TURN_INTERNAL,                          username: _TURN_USER, credential: _TURN_CRED }] : []),
+    ...(_TURN_INTERNAL && _HAS_TURN_CREDENTIALS ? [{ urls: _TURN_INTERNAL + '?transport=tcp',       username: _TURN_USER, credential: _TURN_CRED }] : []),
     // TURN UDP публичный (основной для внешних пользователей)
-    ...(_TURN_URL ? [{ urls: _TURN_URL,                          username: _TURN_USER, credential: _TURN_CRED }] : []),
+    ...(_TURN_URL && _HAS_TURN_CREDENTIALS ? [{ urls: _TURN_URL,                          username: _TURN_USER, credential: _TURN_CRED }] : []),
     // TURN TCP публичный
-    ...(_TURN_URL ? [{ urls: _TURN_URL + '?transport=tcp',       username: _TURN_USER, credential: _TURN_CRED }] : []),
+    ...(_TURN_URL && _HAS_TURN_CREDENTIALS ? [{ urls: _TURN_URL + '?transport=tcp',       username: _TURN_USER, credential: _TURN_CRED }] : []),
     // TURNS TLS (резерв для строгих корпоративных файрволов)
-    ...(_TURN_TCP ? [{ urls: _TURN_TCP,                          username: _TURN_USER, credential: _TURN_CRED }] : []),
+    ...(_TURN_TCP && _HAS_TURN_CREDENTIALS ? [{ urls: _TURN_TCP,                          username: _TURN_USER, credential: _TURN_CRED }] : []),
     // ВНИМАНИЕ: публичный open relay удалён — медицинские данные не должны
     // проходить через сторонние серверы. Настройте VITE_TURN_URL для production.
   ],
@@ -158,6 +159,7 @@ function VideoConsultation({
   const activeSocketRef = useRef(null)
   const reconnectAttemptsRef = useRef(0)
   const reconnectTimerRef = useRef(null)
+  const pendingIceCandidatesRef = useRef([])
   const [miniPosition, setMiniPosition] = useState(null)
 
   useEffect(() => {
@@ -543,6 +545,7 @@ function VideoConsultation({
 
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(offer))
+            await flushPendingIceCandidates(pc)
             const answer = await pc.createAnswer()
             await pc.setLocalDescription(answer)
             socket.emit('answer', { targetSocketId: senderSocketId, answer })
@@ -554,17 +557,14 @@ function VideoConsultation({
         socket.on('answer', async ({ answer }) => {
           try {
             await peerConnectionRef.current?.setRemoteDescription(new RTCSessionDescription(answer))
+            await flushPendingIceCandidates(peerConnectionRef.current)
           } catch (err) {
             console.error('Error setting remote description:', err)
           }
         })
 
         socket.on('ice-candidate', async ({ candidate }) => {
-          try {
-            await peerConnectionRef.current?.addIceCandidate(new RTCIceCandidate(candidate))
-          } catch (err) {
-            console.error('Error adding ICE candidate:', err)
-          }
+          await addIceCandidateSafely(candidate)
         })
 
         socket.on('user-left', () => {
@@ -682,6 +682,7 @@ function VideoConsultation({
   const createPeerConnection = (socket, targetSocketId) => {
     if (peerConnectionRef.current) peerConnectionRef.current.close()
     activeSocketRef.current = socket
+    pendingIceCandidatesRef.current = []
 
     console.log('[WebRTC] ICE servers config:', JSON.stringify(ICE_SERVERS, null, 2))
     const pc = new RTCPeerConnection(ICE_SERVERS)
@@ -753,6 +754,33 @@ function VideoConsultation({
     }
 
     return pc
+  }
+
+  const flushPendingIceCandidates = async (pc = peerConnectionRef.current) => {
+    if (!pc?.remoteDescription) return
+    const pending = pendingIceCandidatesRef.current
+    pendingIceCandidatesRef.current = []
+    for (const candidate of pending) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate))
+      } catch (err) {
+        console.error('Error adding queued ICE candidate:', err)
+      }
+    }
+  }
+
+  const addIceCandidateSafely = async (candidate) => {
+    const pc = peerConnectionRef.current
+    if (!pc || !candidate) return
+    if (!pc.remoteDescription) {
+      pendingIceCandidatesRef.current.push(candidate)
+      return
+    }
+    try {
+      await pc.addIceCandidate(new RTCIceCandidate(candidate))
+    } catch (err) {
+      console.error('Error adding ICE candidate:', err)
+    }
   }
 
   useEffect(() => {
@@ -1010,11 +1038,14 @@ function VideoConsultation({
     if (!appointment?.id) return
     setIsSavingDiagnosis(true)
     const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
+    const appointmentRef = appointment.documentId || appointment.id
+    const patientRef = appointment.patient?.documentId || appointment.patient?.id
+    const doctorRef = appointment.doctor?.documentId || appointment.doctor?.id
     try {
       if (existingDocIds.certificate) {
         await documentsAPI.update(existingDocIds.certificate, {
           description: diagnosisText || '',
-          file: diagnosisFile?.id,
+          ...(diagnosisFile?.id && { file: diagnosisFile.id }),
         })
       } else {
         const res = await documentsAPI.create({
@@ -1022,10 +1053,10 @@ function VideoConsultation({
           type: 'certificate',
           description: diagnosisText || '',
           file: diagnosisFile?.id,
-          appointment: appointment.id,
+          appointment: appointmentRef,
           ...(caseId && { medical_case: caseId }),
-          user: appointment.patient?.id,
-          doctor: appointment.doctor?.id,
+          user: patientRef,
+          doctor: doctorRef,
         })
         const newDoc = res.data?.data
         if (newDoc) setExistingDocIds(prev => ({ ...prev, certificate: newDoc.documentId || newDoc.id }))
@@ -1043,6 +1074,9 @@ function VideoConsultation({
     if (!appointment?.id || (!planText.trim() && !planFile)) return
     setIsSavingPlan(true)
     const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
+    const appointmentRef = appointment.documentId || appointment.id
+    const patientRef = appointment.patient?.documentId || appointment.patient?.id
+    const doctorRef = appointment.doctor?.documentId || appointment.doctor?.id
     try {
       if (existingDocIds.other) {
         await documentsAPI.update(existingDocIds.other, {
@@ -1055,10 +1089,10 @@ function VideoConsultation({
           type: 'other',
           description: planText,
           ...(planFile?.id && { file: planFile.id }),
-          appointment: appointment.id,
+          appointment: appointmentRef,
           ...(caseId && { medical_case: caseId }),
-          user: appointment.patient?.id,
-          doctor: appointment.doctor?.id,
+          user: patientRef,
+          doctor: doctorRef,
         })
         const newDoc = res.data?.data
         if (newDoc) setExistingDocIds(prev => ({ ...prev, other: newDoc.documentId || newDoc.id }))
@@ -1076,6 +1110,9 @@ function VideoConsultation({
     if (!appointment?.id || (!prescriptionsText.trim() && !prescriptionsFile)) return
     setIsSavingPrescriptions(true)
     const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
+    const appointmentRef = appointment.documentId || appointment.id
+    const patientRef = appointment.patient?.documentId || appointment.patient?.id
+    const doctorRef = appointment.doctor?.documentId || appointment.doctor?.id
     try {
       if (existingDocIds.prescription) {
         await documentsAPI.update(existingDocIds.prescription, {
@@ -1088,10 +1125,10 @@ function VideoConsultation({
           type: 'prescription',
           description: prescriptionsText,
           ...(prescriptionsFile?.id && { file: prescriptionsFile.id }),
-          appointment: appointment.id,
+          appointment: appointmentRef,
           ...(caseId && { medical_case: caseId }),
-          user: appointment.patient?.id,
-          doctor: appointment.doctor?.id,
+          user: patientRef,
+          doctor: doctorRef,
         })
         const newDoc = res.data?.data
         if (newDoc) setExistingDocIds(prev => ({ ...prev, prescription: newDoc.documentId || newDoc.id }))
@@ -1107,7 +1144,7 @@ function VideoConsultation({
 
   if (accessStatus === 'checking') {
     return (
-      <div className="min-h-[calc(var(--app-height)-var(--safe-top))] bg-slate-900 flex flex-col items-center justify-center text-white px-6 pt-[var(--safe-top)]">
+      <div className="fixed inset-0 z-[900] bg-slate-900 flex flex-col items-center justify-center text-white px-6 pt-[var(--safe-top)]">
         <Loader2 className="w-10 h-10 animate-spin text-teal-400 mb-4" />
         <p className="text-slate-200">{t('video.checking')}</p>
       </div>
@@ -1147,7 +1184,7 @@ function VideoConsultation({
     }
     const { title, detail } = reasonMap[accessDenyInfo?.reason] || reasonMap.error
     return (
-      <div className="min-h-[calc(var(--app-height)-var(--safe-top))] bg-slate-900 flex flex-col items-center justify-center text-white px-6 pt-[var(--safe-top)]">
+      <div className="fixed inset-0 z-[900] bg-slate-900 flex flex-col items-center justify-center text-white px-6 pt-[var(--safe-top)]">
         <div className="max-w-md w-full bg-slate-800/70 rounded-2xl p-6 border border-slate-700 text-center">
           <AlertCircle className="w-10 h-10 text-amber-400 mx-auto mb-3" />
           <h2 className="text-xl font-semibold mb-2">{title}</h2>
@@ -1296,7 +1333,7 @@ function VideoConsultation({
   }
 
   return (
-    <div className="h-[calc(var(--app-height)-var(--safe-top))] bg-slate-900 flex flex-col sm:flex-row overflow-hidden pt-[var(--safe-top)]">
+    <div className="fixed inset-x-0 top-0 z-[900] h-[calc(var(--app-height)-var(--safe-top))] bg-slate-900 flex flex-col sm:flex-row overflow-hidden pt-[var(--safe-top)]">
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-20 bg-slate-900/40 backdrop-blur-sm sm:hidden"
