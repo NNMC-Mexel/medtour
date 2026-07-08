@@ -197,19 +197,6 @@ function DoctorDashboard() {
                 <Card>
                     <CardContent>
                         <div className='flex items-center justify-between mb-2'>
-                            <div className='w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center'>
-                                <DollarSign className='w-5 h-5 text-white' />
-                            </div>
-                        </div>
-                        <p className='text-2xl font-bold text-slate-900'>
-                            {formatPrice(stats.monthlyEarnings)}
-                        </p>
-                        <p className='text-sm text-slate-500'>{t('doctor.stat_monthly_earnings')}</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent>
-                        <div className='flex items-center justify-between mb-2'>
                             <div className='w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center'>
                                 <Star className='w-5 h-5 text-white' />
                             </div>

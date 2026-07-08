@@ -383,19 +383,6 @@ function DoctorProfile() {
                                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                                     <div>
                                         <label className='block text-sm font-medium text-slate-700 mb-1'>
-                                            {t('doctor_profile.price')}
-                                        </label>
-                                        <Input
-                                            type='number'
-                                            name='price'
-                                            value={formData.price}
-                                            onChange={handleChange}
-                                            min='0'
-                                            step='500'
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className='block text-sm font-medium text-slate-700 mb-1'>
                                             {t('doctor_profile.duration')}
                                         </label>
                                         <Input

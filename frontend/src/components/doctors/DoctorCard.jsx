@@ -94,13 +94,6 @@ function DoctorCard({ doctor, basePath = '' }) {
           </div>
         </div>
 
-        {/* Bottom row: Price */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-          <div>
-            <p className="text-xl font-bold text-slate-900">{price.toLocaleString('ru-RU')} ₸</p>
-            <p className="text-xs text-slate-500">{t('common.price_per_consultation')}</p>
-          </div>
-        </div>
       </div>
 
       {/* Desktop Layout (horizontal) */}
@@ -168,16 +161,6 @@ function DoctorCard({ doctor, basePath = '' }) {
           )}
         </div>
 
-        {/* Price and Action Section */}
-        <div className="flex-shrink-0 flex flex-col items-end justify-between py-1">
-          <div className="text-right">
-            <p className="text-2xl font-bold text-slate-900">
-              {price.toLocaleString('ru-RU')} ₸
-            </p>
-            <p className="text-xs text-slate-500">{t('common.price_per_consultation')}</p>
-          </div>
-
-        </div>
       </div>
     </div>
   )
