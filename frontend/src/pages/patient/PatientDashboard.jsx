@@ -91,11 +91,36 @@ function PatientDashboard() {
 
   const recentConversations = conversations.slice(0, 3)
 
+  const hasMedicalCase = medicalCases.length > 0
+  const CONSULTATION_AVAILABLE_STATUSES = [
+    'DOCTOR_ASSIGNED',
+    'WAITING_PATIENT_CONFIRMATION',
+    'WAITING_PAYMENT',
+    'CONSULTATION_BOOKED',
+    'CONSULTATION_COMPLETED',
+    'LOCAL_TREATMENT',
+    'TREATMENT_IN_KAZAKHSTAN',
+    'TRAVEL_PREPARATION',
+    'ARRIVED_TO_KAZAKHSTAN',
+    'IN_TREATMENT',
+    'RECOVERY',
+    'COMPLETED',
+  ]
+  const hasConsultationAccess = medicalCases.some(item =>
+    !!item.doctor || CONSULTATION_AVAILABLE_STATUSES.includes(normalizeCaseStatus(item.status))
+  )
+
   const quickActions = [
-    { label: t('patient.quick_book'), icon: Activity, to: '/patient/cases', color: 'bg-teal-500' },
-    { label: t('patient.quick_appointments'), icon: Clock, to: '/patient/appointments', color: 'bg-sky-500' },
-    { label: t('patient.quick_messages'), icon: MessageCircle, to: '/patient/chat', color: 'bg-violet-500' },
-    { label: t('patient.quick_documents'), icon: FileText, to: '/patient/documents', color: 'bg-amber-500' },
+    { label: t('patient.quick_book'), icon: Activity, to: '/patient/cases?create=1', color: 'bg-teal-500' },
+    ...(hasConsultationAccess
+      ? [{ label: t('patient.quick_appointments'), icon: Clock, to: '/patient/appointments', color: 'bg-sky-500' }]
+      : []),
+    ...(hasMedicalCase
+      ? [
+          { label: t('patient.quick_messages'), icon: MessageCircle, to: '/patient/chat', color: 'bg-violet-500' },
+          { label: t('patient.quick_documents'), icon: FileText, to: '/patient/documents', color: 'bg-amber-500' },
+        ]
+      : []),
   ]
 
   const isLoading = appointmentsLoading || documentsLoading
@@ -119,7 +144,7 @@ function PatientDashboard() {
             {t('patient.health_overview')}
           </p>
         </div>
-        <Link to="/patient/cases" className="hidden sm:block">
+        <Link to="/patient/cases?create=1" className="hidden sm:block">
           <Button rightIcon={<ChevronRight className="w-4 h-4" />}>
             {t('patient.book_appointment')}
           </Button>
@@ -192,7 +217,7 @@ function PatientDashboard() {
                 )}
               </div>
             </div>
-            <Link to="/patient/cases">
+            <Link to={medicalCases.length > 0 ? '/patient/cases' : '/patient/cases?create=1'}>
               <Button rightIcon={<ChevronRight className="w-4 h-4" />}>
                 {medicalCases.length > 0 ? t('patient.case_open_btn') : t('patient.case_start_btn')}
               </Button>

@@ -412,8 +412,8 @@ export default (plugin) => {
             requiresEmailConfirmation: true,
             emailDelivered: !confirmationEmailFailed,
             message: confirmationEmailFailed
-              ? 'Registration successful, but we could not send the confirmation email right now. Please use "resend confirmation" or contact support.'
-              : 'Registration successful. Please check your email to confirm your account before logging in.',
+              ? 'Registration successful, but we could not send the confirmation email right now. Please use "resend confirmation" or contact support. If the email arrives later, check your inbox and Spam folder.'
+              : 'Registration successful. Please check your inbox and Spam folder to confirm your account before logging in.',
           };
 
           ctx.status = 200;

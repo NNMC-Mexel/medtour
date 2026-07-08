@@ -12,6 +12,7 @@ function VerifyEmailSentPage() {
   const email = location.state?.email
   const emailDelivered = location.state?.emailDelivered !== false
   const message = location.state?.message
+  const shouldShowServerMessage = Boolean(message && !emailDelivered)
   const [isSending, setIsSending] = useState(false)
   const [sendStatus, setSendStatus] = useState(null)
   const [resendCooldown, setResendCooldown] = useState(email ? 60 : 0)
@@ -94,7 +95,7 @@ function VerifyEmailSentPage() {
               <p className="font-medium text-slate-900 mb-6 break-all">{email}</p>
             ) : null}
 
-            {message ? (
+            {shouldShowServerMessage ? (
               <p className="text-sm text-slate-600 mb-6">{message}</p>
             ) : (
               <p className="text-sm text-slate-600 mb-6">

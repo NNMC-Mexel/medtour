@@ -56,8 +56,31 @@ const iconMap = {
   document: FileText,
 }
 
+function getLanguageKey(language) {
+  const normalized = String(language || 'en').toLowerCase()
+  if (normalized.startsWith('ru')) return 'ru'
+  if (normalized.startsWith('kk') || normalized.startsWith('kz')) return 'kk'
+  return 'en'
+}
+
 function getLocalizedField(item, field, lang) {
-  return item?.i18n?.[lang]?.[field] || item?.[field] || ''
+  const language = getLanguageKey(lang)
+  return item?.i18n?.[language]?.[field] || item?.[field] || ''
+}
+
+function getLocalizedMedia(item, field, lang) {
+  const language = getLanguageKey(lang)
+  return item?.i18n?.[language]?.[field] || null
+}
+
+function getGuideVideoSource(item, lang) {
+  const language = getLanguageKey(lang)
+  const locale = item?.i18n?.[language] || {}
+  return locale.videoUrl || getMediaUrl(locale.videoFile) || item?.videoUrl || getMediaUrl(item?.videoFile) || ''
+}
+
+function getGuidePoster(item, lang) {
+  return getMediaUrl(getLocalizedMedia(item, 'poster', lang)) || getMediaUrl(item?.poster) || ''
 }
 
 function PatientGuide() {
@@ -82,8 +105,8 @@ function PatientGuide() {
           title: getLocalizedField(item, 'title', i18n.language),
           description: getLocalizedField(item, 'description', i18n.language),
           icon: iconMap[item.icon] || PlayCircle,
-          src: item.videoUrl || getMediaUrl(item.videoFile) || '',
-          poster: getMediaUrl(item.poster) || '',
+          src: getGuideVideoSource(item, i18n.language),
+          poster: getGuidePoster(item, i18n.language),
         }))
 
         if (!ignore && mapped.length > 0) {

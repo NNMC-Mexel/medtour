@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react'
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Activity, ClipboardList, FileText, MessageCircle, User } from 'lucide-react'
 import Sidebar from './Sidebar'
@@ -8,6 +8,8 @@ import { cn } from '../../utils/helpers'
 import useAuthStore from '../../stores/authStore'
 import PatientChatWidget from '../chat/PatientChatWidget'
 import { PATIENT_BOTTOM_NAV_ITEMS } from '../../utils/constants'
+import { medicalCasesAPI, normalizeResponse } from '../../services/api'
+import { normalizeCaseStatus } from '../../utils/medicalCaseWorkflow'
 
 const bottomIconMap = {
   activity: Activity,
@@ -17,22 +19,146 @@ const bottomIconMap = {
   user: User,
 }
 
+const ALWAYS_AVAILABLE_PATIENT_PATHS = new Set([
+  '/patient',
+  '/patient/cases',
+  '/patient/guide',
+  '/patient/profile',
+])
+
+const CONSULTATION_AVAILABLE_STATUSES = new Set([
+  'DOCTOR_ASSIGNED',
+  'WAITING_PATIENT_CONFIRMATION',
+  'WAITING_PAYMENT',
+  'CONSULTATION_BOOKED',
+  'CONSULTATION_COMPLETED',
+  'LOCAL_TREATMENT',
+  'TREATMENT_IN_KAZAKHSTAN',
+  'TRAVEL_PREPARATION',
+  'ARRIVED_TO_KAZAKHSTAN',
+  'IN_TREATMENT',
+  'RECOVERY',
+  'COMPLETED',
+])
+
+const PLAN_TRIP_AVAILABLE_STATUSES = new Set([
+  'WAITING_PATIENT_CONFIRMATION',
+  'WAITING_PAYMENT',
+  'CONSULTATION_COMPLETED',
+  'LOCAL_TREATMENT',
+  'TREATMENT_IN_KAZAKHSTAN',
+  'TRAVEL_PREPARATION',
+  'ARRIVED_TO_KAZAKHSTAN',
+  'IN_TREATMENT',
+  'RECOVERY',
+  'COMPLETED',
+])
+
+function getPatientNavAccess(cases) {
+  const items = Array.isArray(cases) ? cases : []
+  const hasCase = items.length > 0
+  const hasConsultationAccess = items.some((item) => (
+    Boolean(item.doctor) || CONSULTATION_AVAILABLE_STATUSES.has(normalizeCaseStatus(item.status))
+  ))
+  const hasPlanTripAccess = items.some((item) => PLAN_TRIP_AVAILABLE_STATUSES.has(normalizeCaseStatus(item.status)))
+
+  return {
+    hasCase,
+    hasConsultationAccess,
+    hasPlanTripAccess,
+  }
+}
+
+function isPatientNavItemAvailable(item, access) {
+  return isPatientPathAvailable(item.path, access)
+}
+
+function isPatientPathAvailable(path, access) {
+  if (!access) return true
+  if (path.startsWith('/patient/cases/')) return true
+  if (ALWAYS_AVAILABLE_PATIENT_PATHS.has(path)) return true
+  if (path.startsWith('/patient/chat')) return access.hasCase
+  if (path.startsWith('/patient/documents')) return access.hasCase
+  if (path.startsWith('/patient/appointments')) return access.hasConsultationAccess
+  if (path.startsWith('/patient/doctors')) return access.hasConsultationAccess
+  if (path.startsWith('/patient/plan-trip')) return access.hasPlanTripAccess
+  return true
+}
+
 function DashboardLayout({ navItems }) {
   const { t } = useTranslation()
   const location = useLocation()
   const { user } = useAuthStore()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [patientCases, setPatientCases] = useState(null)
+  const [patientNavReady, setPatientNavReady] = useState(false)
+  const [patientNavFailed, setPatientNavFailed] = useState(false)
   const sidebarTouchStartX = useRef(null)
 
   const path = location.pathname
   const title = t(`dashboard.page_titles.${path}`, t('dashboard.page_titles.default'))
   const subtitle = t(`dashboard.page_titles.${path}_sub`, '')
+  const isPatientArea = user?.userRole === 'patient' && location.pathname.startsWith('/patient')
+
+  const loadPatientCases = useCallback(async () => {
+    if (!isPatientArea || !user?.id) return
+    setPatientNavReady(false)
+    setPatientNavFailed(false)
+    try {
+      const response = await medicalCasesAPI.getAll()
+      const { data } = normalizeResponse(response)
+      setPatientCases(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error('Error loading patient navigation state:', error)
+      setPatientNavFailed(true)
+    } finally {
+      setPatientNavReady(true)
+    }
+  }, [isPatientArea, user?.id])
+
+  useEffect(() => {
+    if (!isPatientArea || !user?.id) {
+      setPatientCases(null)
+      setPatientNavReady(false)
+      setPatientNavFailed(false)
+      return undefined
+    }
+
+    loadPatientCases()
+    window.addEventListener('medtour:cases-changed', loadPatientCases)
+    return () => window.removeEventListener('medtour:cases-changed', loadPatientCases)
+  }, [isPatientArea, loadPatientCases, user?.id])
+
+  const patientAccess = useMemo(() => (
+    isPatientArea && patientNavReady && !patientNavFailed
+      ? getPatientNavAccess(patientCases)
+      : null
+  ), [isPatientArea, patientCases, patientNavFailed, patientNavReady])
+
+  const effectiveNavItems = useMemo(() => {
+    if (!isPatientArea) return navItems
+    return navItems.filter((item) => isPatientNavItemAvailable(item, patientAccess))
+  }, [isPatientArea, navItems, patientAccess])
+
+  const effectiveBottomNavItems = useMemo(() => {
+    if (!isPatientArea) return PATIENT_BOTTOM_NAV_ITEMS
+    return PATIENT_BOTTOM_NAV_ITEMS.filter((item) => isPatientNavItemAvailable(item, patientAccess))
+  }, [isPatientArea, patientAccess])
+
+  const isCurrentPatientPathUnavailable = useMemo(() => {
+    if (!isPatientArea || !patientAccess) return false
+    return !isPatientPathAvailable(path, patientAccess)
+  }, [isPatientArea, path, patientAccess])
 
   useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [location.pathname])
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false)
+
+  if (isCurrentPatientPathUnavailable) {
+    return <Navigate to="/patient/cases" replace />
+  }
 
   return (
     <div className="min-h-[var(--app-height)] bg-gradient-to-br from-slate-50 via-teal-50/30 to-sky-50/30">
@@ -57,7 +183,7 @@ function DashboardLayout({ navItems }) {
           sidebarTouchStartX.current = null
         }}
       >
-        <Sidebar navItems={navItems} onNavClick={closeMobileMenu} />
+        <Sidebar navItems={effectiveNavItems} onNavClick={closeMobileMenu} />
       </div>
 
       {/* Main Content */}
@@ -72,14 +198,17 @@ function DashboardLayout({ navItems }) {
           <Outlet />
         </main>
       </div>
-      {user?.userRole === 'patient' && location.pathname.startsWith('/patient') && (
+      {isPatientArea && (
         <>
           <div className="hidden sm:block">
             <PatientChatWidget />
           </div>
           <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur sm:hidden pb-[env(safe-area-inset-bottom)]">
-            <div className="grid grid-cols-5">
-              {PATIENT_BOTTOM_NAV_ITEMS.map((item) => {
+            <div
+              className="grid"
+              style={{ gridTemplateColumns: `repeat(${Math.max(effectiveBottomNavItems.length, 1)}, minmax(0, 1fr))` }}
+            >
+              {effectiveBottomNavItems.map((item) => {
                 const Icon = bottomIconMap[item.icon] || Activity
                 return (
                   <NavLink

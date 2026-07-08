@@ -101,7 +101,7 @@ function PatientPlanTrip() {
         <CardContent className="space-y-4 py-10 text-center">
           <Activity className="mx-auto h-12 w-12 text-slate-300" />
           <p className="text-slate-600">{t('plan_trip.no_case')}</p>
-          <Link to="/patient/cases">
+          <Link to="/patient/cases?create=1">
             <Button>{t('patient.case_start_btn')}</Button>
           </Link>
         </CardContent>

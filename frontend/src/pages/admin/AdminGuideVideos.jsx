@@ -18,7 +18,14 @@ const defaultForm = {
   icon: 'play',
   sortOrder: '',
   isActive: true,
+  i18n: {},
 }
+
+const languageOptions = [
+  { value: 'ru', label: 'Русский' },
+  { value: 'en', label: 'English' },
+  { value: 'kk', label: 'Қазақша' },
+]
 
 const iconOptions = [
   { value: 'play', label: 'Старт' },
@@ -27,6 +34,33 @@ const iconOptions = [
   { value: 'chat', label: 'Чат' },
   { value: 'document', label: 'Документ' },
 ]
+
+function createEmptyLocale() {
+  return {
+    title: '',
+    description: '',
+    videoUrl: '',
+    videoFile: null,
+    poster: null,
+  }
+}
+
+function createDefaultI18n(source = {}) {
+  return languageOptions.reduce((acc, { value }) => {
+    acc[value] = {
+      ...createEmptyLocale(),
+      ...(source?.[value] || {}),
+    }
+    return acc
+  }, {})
+}
+
+function createDefaultForm() {
+  return {
+    ...defaultForm,
+    i18n: createDefaultI18n(),
+  }
+}
 
 function sortVideos(list) {
   return [...(list || [])].sort((a, b) => {
@@ -37,17 +71,30 @@ function sortVideos(list) {
   })
 }
 
+function hasVideoSource(entry) {
+  return Boolean(entry?.videoUrl?.trim() || entry?.videoFile?.id || entry?.videoFile?.url)
+}
+
+function getFileLabel(file, fallback) {
+  return file?.name || file?.url || fallback
+}
+
+function getVideoSource(entry) {
+  return entry?.videoUrl || getMediaUrl(entry?.videoFile) || ''
+}
+
 function AdminGuideVideos() {
   const toast = useToast()
   const [items, setItems] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [isUploadingVideo, setIsUploadingVideo] = useState(false)
-  const [isUploadingPoster, setIsUploadingPoster] = useState(false)
+  const [uploadingVideoTarget, setUploadingVideoTarget] = useState(null)
+  const [uploadingPosterTarget, setUploadingPosterTarget] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [search, setSearch] = useState('')
-  const [form, setForm] = useState(defaultForm)
+  const [form, setForm] = useState(createDefaultForm)
+  const [activeLanguage, setActiveLanguage] = useState('ru')
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -72,16 +119,21 @@ function AdminGuideVideos() {
     if (!query) return items
     return items.filter((item) =>
       item.title?.toLowerCase().includes(query) ||
-      item.description?.toLowerCase().includes(query),
+      item.description?.toLowerCase().includes(query) ||
+      Object.values(item.i18n || {}).some((locale) =>
+        locale?.title?.toLowerCase().includes(query) ||
+        locale?.description?.toLowerCase().includes(query),
+      ),
     )
   }, [items, search])
 
   const openCreateModal = () => {
     setEditingItem(null)
     setForm({
-      ...defaultForm,
+      ...createDefaultForm(),
       sortOrder: String((items.length + 1) * 10),
     })
+    setActiveLanguage('ru')
     setIsModalOpen(true)
   }
 
@@ -96,7 +148,9 @@ function AdminGuideVideos() {
       icon: item.icon || 'play',
       sortOrder: item.sortOrder !== undefined ? String(item.sortOrder) : '',
       isActive: item.isActive !== false,
+      i18n: createDefaultI18n(item.i18n || {}),
     })
+    setActiveLanguage('ru')
     setIsModalOpen(true)
   }
 
@@ -104,35 +158,60 @@ function AdminGuideVideos() {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleVideoUpload = async (event) => {
+  const setLocaleValue = (language, field, value) => {
+    setForm((prev) => ({
+      ...prev,
+      i18n: {
+        ...prev.i18n,
+        [language]: {
+          ...createEmptyLocale(),
+          ...(prev.i18n?.[language] || {}),
+          [field]: value,
+        },
+      },
+    }))
+  }
+
+  const handleVideoUpload = async (event, language = null) => {
     const file = event.target.files?.[0]
     if (!file) return
-    setIsUploadingVideo(true)
+    const target = language || 'default'
+    setUploadingVideoTarget(target)
     try {
       const uploaded = await uploadFile(file)
-      setFormValue('videoFile', uploaded)
-      setFormValue('videoUrl', '')
+      if (language) {
+        setLocaleValue(language, 'videoFile', uploaded)
+        setLocaleValue(language, 'videoUrl', '')
+      } else {
+        setFormValue('videoFile', uploaded)
+        setFormValue('videoUrl', '')
+      }
       toast.success('Видео загружено')
     } catch (error) {
       toast.error(error.message || 'Не удалось загрузить видео')
     } finally {
-      setIsUploadingVideo(false)
+      setUploadingVideoTarget(null)
       event.target.value = ''
     }
   }
 
-  const handlePosterUpload = async (event) => {
+  const handlePosterUpload = async (event, language = null) => {
     const file = event.target.files?.[0]
     if (!file) return
-    setIsUploadingPoster(true)
+    const target = language || 'default'
+    setUploadingPosterTarget(target)
     try {
       const uploaded = await uploadFile(file)
-      setFormValue('poster', uploaded)
+      if (language) {
+        setLocaleValue(language, 'poster', uploaded)
+      } else {
+        setFormValue('poster', uploaded)
+      }
       toast.success('Обложка загружена')
     } catch (error) {
       toast.error(error.message || 'Не удалось загрузить обложку')
     } finally {
-      setIsUploadingPoster(false)
+      setUploadingPosterTarget(null)
       event.target.value = ''
     }
   }
@@ -142,10 +221,24 @@ function AdminGuideVideos() {
       toast.warning('Введите название видео')
       return
     }
-    if (!form.videoUrl.trim() && !form.videoFile?.id) {
+    const hasDefaultVideo = hasVideoSource(form)
+    const hasLocalizedVideo = Object.values(form.i18n || {}).some(hasVideoSource)
+    if (!hasDefaultVideo && !hasLocalizedVideo) {
       toast.warning('Добавьте ссылку на видео или загрузите файл')
       return
     }
+
+    const localizedPayload = languageOptions.reduce((acc, { value }) => {
+      const locale = form.i18n?.[value] || createEmptyLocale()
+      acc[value] = {
+        title: locale.title?.trim() || '',
+        description: locale.description?.trim() || '',
+        videoUrl: locale.videoUrl?.trim() || '',
+        videoFile: locale.videoFile || null,
+        poster: locale.poster || null,
+      }
+      return acc
+    }, {})
 
     const payload = {
       title: form.title.trim(),
@@ -156,6 +249,7 @@ function AdminGuideVideos() {
       icon: form.icon || 'play',
       sortOrder: Number(form.sortOrder) || 0,
       isActive: Boolean(form.isActive),
+      i18n: localizedPayload,
     }
 
     setIsSaving(true)
@@ -189,6 +283,9 @@ function AdminGuideVideos() {
       toast.error('Не удалось удалить видео')
     }
   }
+
+  const activeLocale = form.i18n?.[activeLanguage] || createEmptyLocale()
+  const activeLanguageLabel = languageOptions.find((item) => item.value === activeLanguage)?.label || activeLanguage
 
   return (
     <div className="space-y-6">
@@ -241,7 +338,10 @@ function AdminGuideVideos() {
                 </thead>
                 <tbody>
                   {filteredItems.map((item) => {
-                    const videoSrc = item.videoUrl || getMediaUrl(item.videoFile)
+                    const localizedVideoCount = Object.values(item.i18n || {}).filter(hasVideoSource).length
+                    const firstLocalizedVideo = Object.values(item.i18n || {}).map(getVideoSource).find(Boolean)
+                    const videoSrc = item.videoUrl || getMediaUrl(item.videoFile) || firstLocalizedVideo
+                    const sourceLabel = item.videoUrl ? 'Ссылка' : item.videoFile ? 'Файл' : localizedVideoCount ? 'По языкам' : '-'
                     return (
                       <tr key={item.documentId || item.id} className="border-b border-slate-50">
                         <td className="px-4 py-4">
@@ -251,7 +351,12 @@ function AdminGuideVideos() {
                           )}
                         </td>
                         <td className="px-4 py-4 text-slate-600">
-                          {item.videoUrl ? 'Ссылка' : item.videoFile ? 'Файл' : '-'}
+                          <div>{sourceLabel}</div>
+                          {localizedVideoCount > 0 && (
+                            <div className="text-xs text-slate-400 mt-1">
+                              {localizedVideoCount} языковая версия
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-4">
                           <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
@@ -347,11 +452,11 @@ function AdminGuideVideos() {
             <div className="space-y-2">
               <label className="block text-sm font-medium text-slate-700">Файл видео</label>
               <label className="flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-teal-400 hover:bg-teal-50/40">
-                {isUploadingVideo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {uploadingVideoTarget === 'default' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                 <span className="text-sm text-slate-600">
-                  {form.videoFile?.name || form.videoFile?.url ? 'Заменить видео' : 'Загрузить MP4/WebM/MOV'}
+                  {getFileLabel(form.videoFile, 'Загрузить MP4/WebM/MOV')}
                 </span>
-                <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={handleVideoUpload} />
+                <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={(e) => handleVideoUpload(e)} />
               </label>
               {form.videoFile && (
                 <button
@@ -366,11 +471,11 @@ function AdminGuideVideos() {
             <div className="space-y-2">
               <label className="block text-sm font-medium text-slate-700">Обложка</label>
               <label className="flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-teal-400 hover:bg-teal-50/40">
-                {isUploadingPoster ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {uploadingPosterTarget === 'default' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                 <span className="text-sm text-slate-600">
-                  {form.poster?.name || form.poster?.url ? 'Заменить обложку' : 'Загрузить изображение'}
+                  {getFileLabel(form.poster, 'Загрузить изображение')}
                 </span>
-                <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handlePosterUpload} />
+                <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => handlePosterUpload(e)} />
               </label>
               {form.poster && (
                 <button
@@ -381,6 +486,111 @@ function AdminGuideVideos() {
                   Убрать обложку
                 </button>
               )}
+            </div>
+          </div>
+
+          <div className="border border-slate-200 rounded-xl p-4 space-y-4">
+            <div>
+              <h3 className="font-semibold text-slate-900">Версии по языкам сайта</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Эти поля показываются пациенту вместо основного видео, когда выбран соответствующий язык.
+              </p>
+            </div>
+
+            <div className="inline-flex flex-wrap gap-2 rounded-xl bg-slate-100 p-1">
+              {languageOptions.map((language) => (
+                <button
+                  key={language.value}
+                  type="button"
+                  onClick={() => setActiveLanguage(language.value)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    activeLanguage === language.value
+                      ? 'bg-white text-teal-700 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {language.label}
+                </button>
+              ))}
+            </div>
+
+            <Input
+              label={`Название (${activeLanguageLabel})`}
+              value={activeLocale.title || ''}
+              onChange={(e) => setLocaleValue(activeLanguage, 'title', e.target.value)}
+              placeholder="Локализованное название"
+            />
+            <Textarea
+              label={`Описание (${activeLanguageLabel})`}
+              value={activeLocale.description || ''}
+              onChange={(e) => setLocaleValue(activeLanguage, 'description', e.target.value)}
+              placeholder="Локализованное описание"
+              rows={3}
+            />
+            <Input
+              label={`Ссылка на видео (${activeLanguageLabel})`}
+              value={activeLocale.videoUrl || ''}
+              onChange={(e) => {
+                setLocaleValue(activeLanguage, 'videoUrl', e.target.value)
+                if (e.target.value.trim()) setLocaleValue(activeLanguage, 'videoFile', null)
+              }}
+              placeholder="https://... или /guide/start-ru.mp4"
+            />
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-700">
+                  Файл видео ({activeLanguageLabel})
+                </label>
+                <label className="flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-teal-400 hover:bg-teal-50/40">
+                  {uploadingVideoTarget === activeLanguage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  <span className="text-sm text-slate-600">
+                    {getFileLabel(activeLocale.videoFile, 'Загрузить MP4/WebM/MOV')}
+                  </span>
+                  <input
+                    type="file"
+                    accept="video/mp4,video/webm,video/quicktime"
+                    className="hidden"
+                    onChange={(e) => handleVideoUpload(e, activeLanguage)}
+                  />
+                </label>
+                {activeLocale.videoFile && (
+                  <button
+                    type="button"
+                    onClick={() => setLocaleValue(activeLanguage, 'videoFile', null)}
+                    className="text-sm text-rose-600 hover:text-rose-700"
+                  >
+                    Убрать загруженное видео
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-700">
+                  Обложка ({activeLanguageLabel})
+                </label>
+                <label className="flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-teal-400 hover:bg-teal-50/40">
+                  {uploadingPosterTarget === activeLanguage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  <span className="text-sm text-slate-600">
+                    {getFileLabel(activeLocale.poster, 'Загрузить изображение')}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => handlePosterUpload(e, activeLanguage)}
+                  />
+                </label>
+                {activeLocale.poster && (
+                  <button
+                    type="button"
+                    onClick={() => setLocaleValue(activeLanguage, 'poster', null)}
+                    className="text-sm text-rose-600 hover:text-rose-700"
+                  >
+                    Убрать обложку
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

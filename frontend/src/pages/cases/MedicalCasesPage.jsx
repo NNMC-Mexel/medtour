@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import CaseCreatedGuide from '../../components/cases/CaseCreatedGuide'
 import {
   Activity,
   AlertCircle,
   Bell,
+  ChevronDown,
   CheckCircle,
   Clock,
   FileText,
@@ -23,8 +24,10 @@ import Textarea from '../../components/ui/Textarea'
 import Select from '../../components/ui/Select'
 import { useToast } from '../../components/ui/Toast'
 import useAuthStore from '../../stores/authStore'
-import { medicalCasesAPI, normalizeResponse } from '../../services/api'
+import { medicalCasesAPI, normalizeResponse, specializationsAPI } from '../../services/api'
 import { getCaseSla, formatCaseStatus, MEDICAL_CASE_STATUSES, normalizeCaseStatus, STATUS_VARIANTS } from '../../utils/medicalCaseWorkflow'
+import { cn } from '../../utils/helpers'
+import { foldCountryText, getCountryOptions, normalizeCountryValue } from '../../utils/countries'
 
 function roleBase(role) {
   if (role === 'admin') return '/admin'
@@ -64,14 +67,155 @@ function StatCard({ icon: Icon, label, value, className }) {
   )
 }
 
+function SearchableFreeSelect({
+  label,
+  value,
+  options,
+  onChange,
+  placeholder,
+  searchPlaceholder,
+  customPrefix,
+  noResultsText,
+}) {
+  const rootRef = useRef(null)
+  const searchRef = useRef(null)
+  const [isOpen, setIsOpen] = useState(false)
+  const [query, setQuery] = useState('')
+
+  const selectedOption = options.find((option) => option.value === value)
+  const displayValue = selectedOption?.label || value || ''
+  const normalizedQuery = foldCountryText(query)
+
+  const filteredOptions = useMemo(() => {
+    if (!normalizedQuery) return options
+    return options.filter((option) => (
+      foldCountryText(option.label).includes(normalizedQuery) ||
+      foldCountryText(option.value).includes(normalizedQuery)
+    ))
+  }, [normalizedQuery, options])
+
+  const customValue = query.trim()
+  const hasExactMatch = options.some((option) => (
+    foldCountryText(option.label) === foldCountryText(customValue) ||
+    foldCountryText(option.value) === foldCountryText(customValue)
+  ))
+  const canUseCustom = Boolean(customValue && !hasExactMatch)
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+
+    const handlePointerDown = (event) => {
+      if (!rootRef.current?.contains(event.target)) {
+        setIsOpen(false)
+        setQuery('')
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [isOpen])
+
+  useEffect(() => {
+    if (isOpen) searchRef.current?.focus()
+  }, [isOpen])
+
+  const selectValue = (nextValue) => {
+    onChange(nextValue)
+    setIsOpen(false)
+    setQuery('')
+  }
+
+  return (
+    <div ref={rootRef} className="space-y-1.5">
+      <label className="block text-sm font-medium text-slate-700">{label}</label>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setIsOpen((current) => !current)}
+          className="w-full min-h-[46px] px-4 py-2.5 pr-10 rounded-xl border border-slate-200 bg-white text-left transition-all duration-200 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+        >
+          <span className={cn('block truncate', !displayValue && 'text-slate-400')}>
+            {displayValue || placeholder}
+          </span>
+        </button>
+        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+
+        {isOpen && (
+          <div className="absolute z-40 mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+            <div className="p-2 border-b border-slate-100">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && canUseCustom) {
+                      event.preventDefault()
+                      selectValue(customValue)
+                    }
+                  }}
+                  placeholder={searchPlaceholder}
+                  className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+            </div>
+            <div className="max-h-56 overflow-y-auto py-1">
+              {filteredOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => selectValue(option.value)}
+                  className={cn(
+                    'flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-teal-50',
+                    value === option.value ? 'bg-teal-50 text-teal-700' : 'text-slate-700'
+                  )}
+                >
+                  <span className="truncate">{option.label}</span>
+                  {option.meta && <span className="shrink-0 text-xs text-slate-400">{option.meta}</span>}
+                </button>
+              ))}
+
+              {canUseCustom && (
+                <button
+                  type="button"
+                  onClick={() => selectValue(customValue)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-teal-700 hover:bg-teal-50"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="truncate">{customPrefix} "{customValue}"</span>
+                </button>
+              )}
+
+              {filteredOptions.length === 0 && !canUseCustom && (
+                <p className="px-3 py-4 text-sm text-slate-500">{noResultsText}</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function getSpecializationName(item, language) {
+  const lang = String(language || 'ru').split('-')[0]
+  if (lang === 'en') return item.nameEn || item.name || ''
+  if (lang === 'kk') return item.nameKk || item.name || ''
+  return item.name || item.nameEn || item.nameKk || ''
+}
+
 function CreateCaseModal({ onClose, onCreated }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { user } = useAuthStore()
   const toast = useToast()
   const [isSaving, setIsSaving] = useState(false)
+  const [specializations, setSpecializations] = useState([])
+  const formId = 'create-medical-case-form'
   const [form, setForm] = useState({
     title: '',
-    country: user?.country || '',
+    country: normalizeCountryValue(user?.country) || user?.country || '',
     diagnosis: '',
     symptoms: '',
     treatmentCategory: '',
@@ -87,6 +231,39 @@ function CreateCaseModal({ onClose, onCreated }) {
   })
 
   const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }))
+
+  const language = i18n.resolvedLanguage || i18n.language || user?.language || 'ru'
+  const countryOptions = useMemo(() => (
+    getCountryOptions(language).map((option) => ({
+      ...option,
+      meta: option.value,
+    }))
+  ), [language])
+  const specializationOptions = useMemo(() => (
+    [...new Set(
+      specializations
+        .map((item) => getSpecializationName(item, language))
+        .filter(Boolean)
+    )].map((name) => ({ value: name, label: name }))
+  ), [specializations, language])
+
+  useEffect(() => {
+    let ignore = false
+
+    specializationsAPI.getAll()
+      .then((response) => {
+        if (ignore) return
+        const { data } = normalizeResponse(response)
+        setSpecializations(Array.isArray(data) ? data : [])
+      })
+      .catch((error) => {
+        console.error('Error loading specializations:', error)
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   const submit = async (event) => {
     event.preventDefault()
@@ -125,8 +302,28 @@ function CreateCaseModal({ onClose, onCreated }) {
   }
 
   return (
-    <Modal isOpen onClose={onClose} title={t('cases.modal_title')} size="lg">
-      <form onSubmit={submit} className="space-y-4">
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={t('cases.modal_title')}
+      size="lg"
+      footer={
+        <div className="ml-auto flex items-center gap-3">
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            type="submit"
+            form={formId}
+            disabled={isSaving}
+            leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+          >
+            {t('cases.create_btn')}
+          </Button>
+        </div>
+      }
+    >
+      <form id={formId} onSubmit={submit} className="space-y-4">
         <Input
           label={t('cases.case_title_label')}
           value={form.title}
@@ -134,17 +331,25 @@ function CreateCaseModal({ onClose, onCreated }) {
           placeholder={t('cases.case_title_placeholder')}
         />
         <div className="grid sm:grid-cols-2 gap-4">
-          <Input
+          <SearchableFreeSelect
             label={t('cases.country_label')}
             value={form.country}
-            onChange={(e) => update('country', e.target.value)}
+            options={countryOptions}
+            onChange={(value) => update('country', normalizeCountryValue(value) || value)}
             placeholder={t('cases.country_placeholder')}
+            searchPlaceholder={t('cases.country_search_placeholder')}
+            customPrefix={t('cases.use_custom_value')}
+            noResultsText={t('cases.no_options')}
           />
-          <Input
+          <SearchableFreeSelect
             label={t('cases.treatment_dir_label')}
             value={form.treatmentCategory}
-            onChange={(e) => update('treatmentCategory', e.target.value)}
+            options={specializationOptions}
+            onChange={(value) => update('treatmentCategory', value)}
             placeholder={t('cases.treatment_dir_placeholder')}
+            searchPlaceholder={t('cases.treatment_dir_search_placeholder')}
+            customPrefix={t('cases.use_custom_value')}
+            noResultsText={t('cases.no_options')}
           />
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
@@ -239,12 +444,6 @@ function CreateCaseModal({ onClose, onCreated }) {
           onChange={(e) => update('symptoms', e.target.value)}
           rows={4}
         />
-        <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
-          <Button type="submit" disabled={isSaving} leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}>
-            {t('cases.create_btn')}
-          </Button>
-        </div>
       </form>
     </Modal>
   )
@@ -255,6 +454,7 @@ function MedicalCasesPage() {
   const { user } = useAuthStore()
   const role = user?.userRole || 'patient'
   const location = useLocation()
+  const navigate = useNavigate()
   const toast = useToast()
   const [cases, setCases] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -282,6 +482,16 @@ function MedicalCasesPage() {
   useEffect(() => {
     loadCases()
   }, [status])
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const shouldOpenCreate = location.state?.openCreate || params.get('create') === '1'
+
+    if (!canCreate || !shouldOpenCreate) return
+
+    setShowCreate(true)
+    navigate(location.pathname, { replace: true, state: {} })
+  }, [canCreate, location.pathname, location.search, location.state, navigate])
 
   const filteredCases = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -498,6 +708,7 @@ function MedicalCasesPage() {
           onCreated={(created) => {
             setCases(prev => [created, ...prev])
             setCreatedCase(created)
+            window.dispatchEvent(new Event('medtour:cases-changed'))
           }}
         />
       )}
