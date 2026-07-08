@@ -1433,6 +1433,7 @@ export interface ApiPriceItemPriceItem extends Struct.CollectionTypeSchema {
       Schema.Attribute.DefaultTo<'KZT'>;
     description: Schema.Attribute.Text;
     i18n: Schema.Attribute.JSON;
+    image: Schema.Attribute.Media<'images'>;
     isActive: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
     isFeatured: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
@@ -1444,6 +1445,13 @@ export interface ApiPriceItemPriceItem extends Struct.CollectionTypeSchema {
     note: Schema.Attribute.Text;
     price: Schema.Attribute.Decimal &
       Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    priceUSD: Schema.Attribute.Decimal &
       Schema.Attribute.SetMinMax<
         {
           min: 0;

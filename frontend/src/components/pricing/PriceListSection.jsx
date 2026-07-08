@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowRight, CheckCircle, Loader2, ReceiptText, Sparkles } from 'lucide-react'
+import { ArrowRight, CheckCircle, ChevronDown, Loader2, ReceiptText, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Button from '../ui/Button'
 import { Card, CardContent } from '../ui/Card'
 import { normalizeResponse, priceItemsAPI } from '../../services/api'
 import { cn } from '../../utils/helpers'
 import { formatPrice } from '../../utils/pricing'
+import { useCurrencyStore } from '../../stores/currencyStore'
 
 function getLocalizedField(item, field, lang) {
   return item?.i18n?.[lang]?.[field] || item?.[field] || ''
@@ -21,18 +22,30 @@ function groupByCategory(items, lang) {
   }, {})
 }
 
-function PriceCard({ item, lang, compact = false }) {
+function PriceCard({ item, lang, compact = false, currency = 'KZT' }) {
+  const [expanded, setExpanded] = useState(false)
   const title = getLocalizedField(item, 'title', lang)
   const description = getLocalizedField(item, 'description', lang)
   const unit = getLocalizedField(item, 'unit', lang)
   const badge = getLocalizedField(item, 'badge', lang)
   const note = getLocalizedField(item, 'note', lang)
 
+  const displayPrice = currency === 'USD' && item.priceUSD ? item.priceUSD : item.price
+  const displayCurrency = currency === 'USD' && item.priceUSD ? 'USD' : item.currency
+
+  const imageUrl = item.image?.url ? `${import.meta.env.VITE_API_URL || 'http://localhost:1340'}${item.image.url}` : null
+
   return (
-    <Card className={cn('border-slate-200 shadow-sm h-full', item.isFeatured && 'border-teal-200 shadow-teal-100/60')}>
+    <Card className={cn('border-slate-200 shadow-sm h-full transition-all', item.isFeatured && 'border-teal-200 shadow-teal-100/60')}>
       <CardContent className={cn('flex h-full flex-col', compact ? 'p-4' : 'p-6')}>
+        {imageUrl && (
+          <div className='mb-4 overflow-hidden rounded-lg'>
+            <img src={imageUrl} alt={title} className='h-40 w-full object-cover' />
+          </div>
+        )}
+
         <div className='flex items-start justify-between gap-4'>
-          <div className='min-w-0'>
+          <div className='min-w-0 flex-1'>
             {badge && (
               <span className='inline-flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-700'>
                 <Sparkles className='h-3.5 w-3.5' />
@@ -45,18 +58,32 @@ function PriceCard({ item, lang, compact = false }) {
           </div>
           <div className='text-right flex-shrink-0'>
             <div className={cn('font-bold text-slate-900', compact ? 'text-lg' : 'text-2xl')}>
-              {formatPrice(item.price, item.currency)}
+              {formatPrice(displayPrice, displayCurrency)}
             </div>
             {unit && <div className='text-xs text-slate-500'>/ {unit}</div>}
           </div>
         </div>
 
-        {description && <p className='mt-3 text-sm leading-6 text-slate-600'>{description}</p>}
-        {note && (
-          <div className='mt-4 flex items-start gap-2 text-xs text-slate-500'>
-            <CheckCircle className='mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500' />
-            <span>{note}</span>
-          </div>
+        {(description || note) && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className='mt-4 flex items-center gap-2 text-teal-600 hover:text-teal-700 font-medium text-sm transition-colors'
+          >
+            <ChevronDown className={cn('h-4 w-4 transition-transform', expanded && 'rotate-180')} />
+            {expanded ? 'Свернуть' : 'Подробнее'}
+          </button>
+        )}
+
+        {expanded && (
+          <>
+            {description && <p className='mt-3 text-sm leading-6 text-slate-600'>{description}</p>}
+            {note && (
+              <div className='mt-4 flex items-start gap-2 text-xs text-slate-500'>
+                <CheckCircle className='mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500' />
+                <span>{note}</span>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
@@ -72,8 +99,10 @@ function PriceListSection({
   ctaLabel,
   ctaVariant,
   className,
+  showCurrencySelector = true,
 }) {
   const { t, i18n } = useTranslation()
+  const { currency, setCurrency } = useCurrencyStore()
   const [items, setItems] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -142,7 +171,35 @@ function PriceListSection({
               {compact ? t('pricing.patient_subtitle') : t('pricing.subtitle')}
             </p>
           </div>
-          {isLoading && compact && <Loader2 className='mt-2 h-5 w-5 animate-spin text-teal-600' />}
+          <div className='flex items-center gap-4 shrink-0'>
+            {showCurrencySelector && (
+              <div className='flex gap-2'>
+                <button
+                  onClick={() => setCurrency('KZT')}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg font-medium text-sm transition-all',
+                    currency === 'KZT'
+                      ? 'bg-teal-600 text-white'
+                      : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                  )}
+                >
+                  KZT
+                </button>
+                <button
+                  onClick={() => setCurrency('USD')}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg font-medium text-sm transition-all',
+                    currency === 'USD'
+                      ? 'bg-teal-600 text-white'
+                      : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                  )}
+                >
+                  USD
+                </button>
+              </div>
+            )}
+            {isLoading && compact && <Loader2 className='mt-2 h-5 w-5 animate-spin text-teal-600' />}
+          </div>
         </div>
 
         {isLoading && !compact ? (
@@ -170,6 +227,7 @@ function PriceListSection({
                       item={item}
                       lang={i18n.language}
                       compact={compact}
+                      currency={currency}
                     />
                   ))}
                 </div>

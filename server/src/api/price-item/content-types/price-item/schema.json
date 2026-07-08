@@ -58,6 +58,15 @@
     },
     "i18n": {
       "type": "json"
+    },
+    "image": {
+      "allowedTypes": ["images"],
+      "type": "media",
+      "multiple": false
+    },
+    "priceUSD": {
+      "type": "decimal",
+      "min": 0
     }
   }
 }

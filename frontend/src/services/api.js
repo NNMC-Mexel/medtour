@@ -512,6 +512,7 @@ export const contentAPI = {
 export const priceItemsAPI = {
     getAll: (params = {}) => {
         const query = new URLSearchParams();
+        query.append("populate", "image");
         query.append("sort", "sortOrder:asc,title:asc");
         query.append("pagination[limit]", LARGE_COLLECTION_LIMIT);
 
