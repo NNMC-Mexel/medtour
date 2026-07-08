@@ -61,7 +61,8 @@
     "mic_off": "Mute microphone",
     "cam_on": "Turn on camera",
     "cam_off": "Turn off camera",
-    "leave_call": "Leave call"
+    "leave_call": "Leave call",
+    "next": "Next"
   },
   "pricing": {
     "badge": "Price list",
@@ -2031,7 +2032,26 @@
     "create_btn": "Create case",
     "toast_created": "Medical case created",
     "toast_create_error": "Could not create medical case",
-    "toast_load_error": "Could not load medical cases"
+    "toast_load_error": "Could not load medical cases",
+    "step": "Step",
+    "of": "of",
+    "next": "Next",
+    "required": "Required",
+    "optional": "Optional",
+    "step1_title": "Basic information",
+    "step2_title": "Timeline and date",
+    "step3_title": "Support",
+    "step4_title": "Lead source",
+    "step5_title": "Medical data",
+    "upload_documents": "Upload documents",
+    "drop_files": "Drop files here",
+    "or_click": "or click to select",
+    "uploaded_files": "Uploaded files",
+    "file_uploaded": "uploaded",
+    "upload_error": "Error uploading file",
+    "diagnosis_placeholder": "Describe your diagnosis...",
+    "symptoms_placeholder": "Describe your symptoms...",
+    "treatment_placeholder": "Current treatment..."
   },
   "chat": {
     "no_conversations": "No conversations",

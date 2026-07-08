@@ -14,6 +14,10 @@ import {
   Plus,
   Search,
   UserRound,
+  Upload,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -24,7 +28,7 @@ import Textarea from '../../components/ui/Textarea'
 import Select from '../../components/ui/Select'
 import { useToast } from '../../components/ui/Toast'
 import useAuthStore from '../../stores/authStore'
-import { medicalCasesAPI, normalizeResponse, specializationsAPI } from '../../services/api'
+import { medicalCasesAPI, normalizeResponse, specializationsAPI, uploadFile } from '../../services/api'
 import { getCaseSla, formatCaseStatus, MEDICAL_CASE_STATUSES, normalizeCaseStatus, STATUS_VARIANTS } from '../../utils/medicalCaseWorkflow'
 import { cn } from '../../utils/helpers'
 import { foldCountryText, getCountryOptions, normalizeCountryValue } from '../../utils/countries'
@@ -211,8 +215,12 @@ function CreateCaseModal({ onClose, onCreated }) {
   const { user } = useAuthStore()
   const toast = useToast()
   const [isSaving, setIsSaving] = useState(false)
+  const [step, setStep] = useState(1)
   const [specializations, setSpecializations] = useState([])
-  const formId = 'create-medical-case-form'
+  const [uploadedDocuments, setUploadedDocuments] = useState([])
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef(null)
+
   const [form, setForm] = useState({
     title: '',
     country: normalizeCountryValue(user?.country) || user?.country || '',
@@ -265,6 +273,35 @@ function CreateCaseModal({ onClose, onCreated }) {
     }
   }, [])
 
+  const handleFileSelect = async (files) => {
+    if (!files.length) return
+
+    setIsUploading(true)
+    try {
+      for (const file of files) {
+        const uploaded = await uploadFile(file)
+        if (uploaded) {
+          setUploadedDocuments(prev => [...prev, uploaded])
+          toast.success(`${file.name} ${t('cases.file_uploaded')}`)
+        }
+      }
+    } catch (error) {
+      toast.error(error.message || t('cases.upload_error'))
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const removeDocument = (index) => {
+    setUploadedDocuments(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const canProceedStep1 = form.title && form.country && form.treatmentCategory
+  const canProceedStep2 = form.urgency
+  const canProceedStep3 = form.visaSupportNeeded
+  const canProceedStep4 = form.leadSource
+
   const submit = async (event) => {
     event.preventDefault()
     setIsSaving(true)
@@ -301,150 +338,269 @@ function CreateCaseModal({ onClose, onCreated }) {
     }
   }
 
+  const totalSteps = 5
+  const stepTitles = [
+    t('cases.step1_title') || 'Основная информация',
+    t('cases.step2_title') || 'Сроки и дата',
+    t('cases.step3_title') || 'Поддержка',
+    t('cases.step4_title') || 'Источник заявки',
+    t('cases.step5_title') || 'Медицинские данные',
+  ]
+
   return (
     <Modal
       isOpen
       onClose={onClose}
-      title={t('cases.modal_title')}
+      title={`${t('cases.modal_title')} - ${stepTitles[step - 1]}`}
       size="lg"
       footer={
-        <div className="ml-auto flex items-center gap-3">
-          <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
-            {t('common.cancel')}
-          </Button>
-          <Button
-            type="submit"
-            form={formId}
-            disabled={isSaving}
-            leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-          >
-            {t('cases.create_btn')}
-          </Button>
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-slate-500">
+            {t('cases.step')} {step} {t('cases.of')} {totalSteps}
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            {step > 1 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStep(step - 1)}
+                disabled={isSaving}
+                leftIcon={<ChevronLeft className="w-4 h-4" />}
+              >
+                {t('common.back') || 'Назад'}
+              </Button>
+            )}
+            {step < totalSteps && (
+              <Button
+                type="button"
+                onClick={() => setStep(step + 1)}
+                disabled={
+                  isSaving ||
+                  (step === 1 && !canProceedStep1) ||
+                  (step === 2 && !canProceedStep2) ||
+                  (step === 3 && !canProceedStep3) ||
+                  (step === 4 && !canProceedStep4)
+                }
+                rightIcon={<ChevronRight className="w-4 h-4" />}
+              >
+                {t('common.next') || 'Далее'}
+              </Button>
+            )}
+            {step === totalSteps && (
+              <>
+                <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSaving}
+                  leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  onClick={submit}
+                >
+                  {t('cases.create_btn')}
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       }
     >
-      <form id={formId} onSubmit={submit} className="space-y-4">
-        <Input
-          label={t('cases.case_title_label')}
-          value={form.title}
-          onChange={(e) => update('title', e.target.value)}
-          placeholder={t('cases.case_title_placeholder')}
-        />
-        <div className="grid sm:grid-cols-2 gap-4">
-          <SearchableFreeSelect
-            label={t('cases.country_label')}
-            value={form.country}
-            options={countryOptions}
-            onChange={(value) => update('country', normalizeCountryValue(value) || value)}
-            placeholder={t('cases.country_placeholder')}
-            searchPlaceholder={t('cases.country_search_placeholder')}
-            customPrefix={t('cases.use_custom_value')}
-            noResultsText={t('cases.no_options')}
-          />
-          <SearchableFreeSelect
-            label={t('cases.treatment_dir_label')}
-            value={form.treatmentCategory}
-            options={specializationOptions}
-            onChange={(value) => update('treatmentCategory', value)}
-            placeholder={t('cases.treatment_dir_placeholder')}
-            searchPlaceholder={t('cases.treatment_dir_search_placeholder')}
-            customPrefix={t('cases.use_custom_value')}
-            noResultsText={t('cases.no_options')}
-          />
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Select
-            label={t('cases.urgency_label')}
-            value={form.urgency}
-            onChange={(e) => update('urgency', e.target.value)}
-            options={[
-              { value: 'routine', label: t('cases.urgency_routine') },
-              { value: 'soon', label: t('cases.urgency_soon') },
-              { value: 'urgent', label: t('cases.urgency_urgent') },
-            ]}
-          />
-          <Input
-            label={t('cases.arrival_date_label')}
-            type="date"
-            value={form.preferredArrivalDate}
-            onChange={(e) => update('preferredArrivalDate', e.target.value)}
-          />
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Input
-            label={t('cases.budget_label')}
-            value={form.budgetRange}
-            onChange={(e) => update('budgetRange', e.target.value)}
-            placeholder={t('cases.budget_placeholder')}
-          />
-          <Input
-            label={t('cases.contact_label')}
-            value={form.preferredContact}
-            onChange={(e) => update('preferredContact', e.target.value)}
-            placeholder={t('cases.contact_placeholder')}
-          />
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Select
-            label={t('cases.lead_source_label')}
-            value={form.leadSource}
-            onChange={(e) => update('leadSource', e.target.value)}
-            placeholder={t('cases.lead_source_placeholder')}
-            options={[
-              { value: 'google', label: t('cases.lead_source_google') },
-              { value: 'instagram', label: t('cases.lead_source_instagram') },
-              { value: 'referral', label: t('cases.lead_source_referral') },
-              { value: 'clinic', label: t('cases.lead_source_clinic') },
-              { value: 'other', label: t('cases.lead_source_other') },
-            ]}
-          />
-          <Input
-            label={t('cases.lead_campaign_label')}
-            value={form.leadCampaign}
-            onChange={(e) => update('leadCampaign', e.target.value)}
-            placeholder={t('cases.lead_campaign_placeholder')}
-          />
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Select
-            label={t('cases.visa_label')}
-            value={form.visaSupportNeeded}
-            onChange={(e) => update('visaSupportNeeded', e.target.value)}
-            options={[
-              { value: 'unknown', label: t('cases.visa_unknown') },
-              { value: 'true', label: t('cases.visa_yes') },
-              { value: 'false', label: t('cases.visa_no') },
-            ]}
-          />
-          <Select
-            label={t('cases.tourism_label')}
-            value={form.tourismRequested}
-            onChange={(e) => update('tourismRequested', e.target.value)}
-            options={[
-              { value: 'false', label: t('cases.tourism_no') },
-              { value: 'true', label: t('cases.tourism_yes') },
-            ]}
-          />
-        </div>
-        <Textarea
-          label={t('cases.diagnosis_label')}
-          value={form.diagnosis}
-          onChange={(e) => update('diagnosis', e.target.value)}
-          rows={3}
-        />
-        <Textarea
-          label={t('cases.treatment_label')}
-          value={form.currentTreatment}
-          onChange={(e) => update('currentTreatment', e.target.value)}
-          rows={3}
-        />
-        <Textarea
-          label={t('cases.symptoms_label')}
-          value={form.symptoms}
-          onChange={(e) => update('symptoms', e.target.value)}
-          rows={4}
-        />
-      </form>
+      <div className="space-y-4">
+        {/* Step 1: Basic Info + Documents */}
+        {step === 1 && (
+          <div className="space-y-4">
+            <Input
+              label={t('cases.case_title_label')}
+              value={form.title}
+              onChange={(e) => update('title', e.target.value)}
+              placeholder={t('cases.case_title_placeholder')}
+              required
+            />
+            <div className="grid sm:grid-cols-2 gap-4">
+              <SearchableFreeSelect
+                label={t('cases.country_label')}
+                value={form.country}
+                options={countryOptions}
+                onChange={(value) => update('country', normalizeCountryValue(value) || value)}
+                placeholder={t('cases.country_placeholder')}
+                searchPlaceholder={t('cases.country_search_placeholder')}
+                customPrefix={t('cases.use_custom_value')}
+                noResultsText={t('cases.no_options')}
+              />
+              <SearchableFreeSelect
+                label={t('cases.treatment_dir_label')}
+                value={form.treatmentCategory}
+                options={specializationOptions}
+                onChange={(value) => update('treatmentCategory', value)}
+                placeholder={t('cases.treatment_dir_placeholder')}
+                searchPlaceholder={t('cases.treatment_dir_search_placeholder')}
+                customPrefix={t('cases.use_custom_value')}
+                noResultsText={t('cases.no_options')}
+              />
+            </div>
+
+            {/* Document Upload Section */}
+            <div className="border-t pt-4">
+              <h3 className="font-semibold text-slate-900 mb-3">{t('cases.upload_documents') || 'Загрузить документы'}</h3>
+              <div className="space-y-3">
+                <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-teal-500 transition-colors cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-slate-900">{t('cases.drop_files') || 'Перетащите файлы сюда'}</p>
+                  <p className="text-xs text-slate-500 mt-1">{t('cases.or_click') || 'или нажмите для выбора'}</p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,.mp4,.webm,.mov"
+                    onChange={(e) => handleFileSelect(Array.from(e.target.files))}
+                    className="hidden"
+                    disabled={isUploading}
+                  />
+                </div>
+
+                {uploadedDocuments.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-slate-700">{t('cases.uploaded_files') || 'Загруженные файлы'}</p>
+                    <div className="space-y-2">
+                      {uploadedDocuments.map((doc, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-2 bg-teal-50 border border-teal-200 rounded-lg">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText className="w-4 h-4 text-teal-600 shrink-0" />
+                            <span className="text-sm text-slate-700 truncate">{doc.name || 'File'}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeDocument(idx)}
+                            className="ml-2 p-1 hover:bg-teal-200 rounded transition-colors"
+                          >
+                            <X className="w-4 h-4 text-teal-600" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Urgency & Date */}
+        {step === 2 && (
+          <div className="space-y-4">
+            <Select
+              label={t('cases.urgency_label')}
+              value={form.urgency}
+              onChange={(e) => update('urgency', e.target.value)}
+              options={[
+                { value: 'routine', label: t('cases.urgency_routine') },
+                { value: 'soon', label: t('cases.urgency_soon') },
+                { value: 'urgent', label: t('cases.urgency_urgent') },
+              ]}
+              required
+            />
+            <Input
+              label={t('cases.arrival_date_label')}
+              type="date"
+              value={form.preferredArrivalDate}
+              onChange={(e) => update('preferredArrivalDate', e.target.value)}
+            />
+            <Input
+              label={t('cases.budget_label')}
+              value={form.budgetRange}
+              onChange={(e) => update('budgetRange', e.target.value)}
+              placeholder={t('cases.budget_placeholder')}
+            />
+            <Input
+              label={t('cases.contact_label')}
+              value={form.preferredContact}
+              onChange={(e) => update('preferredContact', e.target.value)}
+              placeholder={t('cases.contact_placeholder')}
+            />
+          </div>
+        )}
+
+        {/* Step 3: Visa & Tourism Support */}
+        {step === 3 && (
+          <div className="space-y-4">
+            <Select
+              label={t('cases.visa_label')}
+              value={form.visaSupportNeeded}
+              onChange={(e) => update('visaSupportNeeded', e.target.value)}
+              options={[
+                { value: 'unknown', label: t('cases.visa_unknown') },
+                { value: 'true', label: t('cases.visa_yes') },
+                { value: 'false', label: t('cases.visa_no') },
+              ]}
+              required
+            />
+            <Select
+              label={t('cases.tourism_label')}
+              value={form.tourismRequested}
+              onChange={(e) => update('tourismRequested', e.target.value)}
+              options={[
+                { value: 'false', label: t('cases.tourism_no') },
+                { value: 'true', label: t('cases.tourism_yes') },
+              ]}
+            />
+          </div>
+        )}
+
+        {/* Step 4: Lead Source */}
+        {step === 4 && (
+          <div className="space-y-4">
+            <Select
+              label={t('cases.lead_source_label')}
+              value={form.leadSource}
+              onChange={(e) => update('leadSource', e.target.value)}
+              placeholder={t('cases.lead_source_placeholder')}
+              options={[
+                { value: 'google', label: t('cases.lead_source_google') },
+                { value: 'instagram', label: t('cases.lead_source_instagram') },
+                { value: 'referral', label: t('cases.lead_source_referral') },
+                { value: 'clinic', label: t('cases.lead_source_clinic') },
+                { value: 'other', label: t('cases.lead_source_other') },
+              ]}
+              required
+            />
+            <Input
+              label={t('cases.lead_campaign_label')}
+              value={form.leadCampaign}
+              onChange={(e) => update('leadCampaign', e.target.value)}
+              placeholder={t('cases.lead_campaign_placeholder')}
+            />
+          </div>
+        )}
+
+        {/* Step 5: Medical Info */}
+        {step === 5 && (
+          <div className="space-y-4">
+            <Textarea
+              label={t('cases.diagnosis_label')}
+              value={form.diagnosis}
+              onChange={(e) => update('diagnosis', e.target.value)}
+              rows={3}
+              placeholder={t('cases.diagnosis_placeholder') || 'Опишите диагноз...'}
+            />
+            <Textarea
+              label={t('cases.symptoms_label')}
+              value={form.symptoms}
+              onChange={(e) => update('symptoms', e.target.value)}
+              rows={3}
+              placeholder={t('cases.symptoms_placeholder') || 'Опишите симптомы...'}
+            />
+            <Textarea
+              label={t('cases.treatment_label')}
+              value={form.currentTreatment}
+              onChange={(e) => update('currentTreatment', e.target.value)}
+              rows={3}
+              placeholder={t('cases.treatment_placeholder') || 'Текущее лечение..'}
+            />
+          </div>
+        )}
+      </div>
     </Modal>
   )
 }
