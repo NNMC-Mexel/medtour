@@ -222,6 +222,8 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
       onUploaded?.()
     } catch (error) {
       toast.error(error?.response?.data?.error?.message || error.message || t('case_detail.toast_doc_error'))
+      // Clear file on error to prevent double-upload if user retries
+      setFile(null)
     } finally {
       setIsUploading(false)
       uploadingRef.current = false
