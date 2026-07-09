@@ -165,8 +165,11 @@ function withSlotLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
 export default factories.createCoreController('api::appointment.appointment', () => ({
   async find(ctx) {
     const user = ctx.state.user;
-    // API Token requests (from signaling server) have ctx.state.auth.strategy === 'api-token'
-    const isApiToken = ctx.state.auth?.strategy?.name === 'api-token';
+    // API Token requests (from the signaling server) authenticate via the
+    // content-api-token strategy — its strategy name is 'content-api-token'
+    // in Strapi v5 (NOT 'api-token'). Accept the legacy name too, defensively.
+    const strategyName = (ctx.state as any)?.auth?.strategy?.name;
+    const isApiToken = strategyName === 'content-api-token' || strategyName === 'api-token';
     if (!user && !isApiToken) return ctx.forbidden('Not authenticated');
 
     const isAdmin = isApiToken || user?.role?.type === 'admin' || user?.userRole === 'admin';
@@ -302,7 +305,9 @@ export default factories.createCoreController('api::appointment.appointment', ()
     const user = ctx.state.user;
     // Requests from the signaling server arrive with an API token (no user session).
     // Treat them as trusted server-side calls, equivalent to admin for permission purposes.
-    const isApiToken = (ctx.state as any)?.auth?.strategy?.name === 'api-token';
+    // Strapi v5 names the API-token strategy 'content-api-token' (NOT 'api-token').
+    const strategyName = (ctx.state as any)?.auth?.strategy?.name;
+    const isApiToken = strategyName === 'content-api-token' || strategyName === 'api-token';
 
     if (!user && !isApiToken) return ctx.forbidden('Not authenticated');
 
