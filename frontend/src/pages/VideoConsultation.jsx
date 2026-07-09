@@ -849,6 +849,12 @@ function VideoConsultation({
     remoteStreamRef.current = null
   }
 
+  const handleBackToAppointments = () => {
+    cleanupCall()
+    onClose?.()
+    navigate(isDoctor ? '/doctor/schedule' : '/patient/appointments', { replace: true })
+  }
+
   const saveChatLog = async (chatMessages) => {
     if (!appointment?.documentId || !chatMessages?.length) return
     try {
@@ -1191,7 +1197,7 @@ function VideoConsultation({
           <p className="text-slate-300 text-sm mb-5">{detail}</p>
           <Button
             variant="secondary"
-            onClick={() => navigate(isDoctor ? '/doctor/schedule' : '/patient/appointments')}
+            onClick={handleBackToAppointments}
           >
             {t('video.back_to_appointments')}
           </Button>
