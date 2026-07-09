@@ -27,6 +27,7 @@ import Badge from "../components/ui/Badge";
 import { useTranslation } from "react-i18next";
 import api, { normalizeResponse, getMediaUrl } from "../services/api";
 import { formatPrice, formatDate, isDoctorOnline, getSpecName, getDoctorField } from "../utils/helpers";
+import { SHOW_DOCTOR_PRICES } from "../utils/constants";
 
 function DoctorProfilePage() {
     const { id } = useParams();
@@ -198,23 +199,25 @@ function DoctorProfilePage() {
                                     </div>
 
                                     {/* Price */}
-                                    <div className='p-4 bg-gradient-to-br from-teal-50 to-sky-50 rounded-2xl mb-4 text-teal-800 border border-teal-100'>
-                                        <p className='text-xs uppercase tracking-wide text-teal-500 mb-1'>
-                                            {t('doctor_public.price_label')}
-                                        </p>
-                                        <p className='text-2xl md:text-3xl font-bold leading-tight'>
-                                            {formatPrice(doctor.price || 0)}
-                                        </p>
-                                        <p className='text-sm text-slate-600 mt-1 flex items-center justify-center gap-1'>
-                                            <Clock className='w-4 h-4 text-teal-500' />
-                                            <span>
-                                                {doctor.consultationDuration ||
-                                                    doctor.slotDuration ||
-                                                    30}{" "}
-                                                {t('doctor_public.minutes')}
-                                            </span>
-                                        </p>
-                                    </div>
+                                    {SHOW_DOCTOR_PRICES && (
+                                        <div className='p-4 bg-gradient-to-br from-teal-50 to-sky-50 rounded-2xl mb-4 text-teal-800 border border-teal-100'>
+                                            <p className='text-xs uppercase tracking-wide text-teal-500 mb-1'>
+                                                {t('doctor_public.price_label')}
+                                            </p>
+                                            <p className='text-2xl md:text-3xl font-bold leading-tight'>
+                                                {formatPrice(doctor.price || 0)}
+                                            </p>
+                                            <p className='text-sm text-slate-600 mt-1 flex items-center justify-center gap-1'>
+                                                <Clock className='w-4 h-4 text-teal-500' />
+                                                <span>
+                                                    {doctor.consultationDuration ||
+                                                        doctor.slotDuration ||
+                                                        30}{" "}
+                                                    {t('doctor_public.minutes')}
+                                                </span>
+                                            </p>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
 
@@ -377,11 +380,13 @@ function DoctorProfilePage() {
                                                 <p className='font-semibold text-slate-900'>
                                                     {t('doctor_public.video_consult')}
                                                 </p>
-                                                <p className='text-lg font-bold text-teal-600'>
-                                                    {formatPrice(
-                                                        doctor.price || 0,
-                                                    )}
-                                                </p>
+                                                {SHOW_DOCTOR_PRICES && (
+                                                    <p className='text-lg font-bold text-teal-600'>
+                                                        {formatPrice(
+                                                            doctor.price || 0,
+                                                        )}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                         <div className='flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200 opacity-50'>

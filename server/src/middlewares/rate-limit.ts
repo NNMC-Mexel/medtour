@@ -6,8 +6,11 @@
  * Resets on server restart (acceptable for test; use Redis for production).
  */
 
+type RateLimitRule = { max: number; windowMs: number }
+type PrefixRateLimitRule = RateLimitRule & { prefix: string }
+
 // Exact-path limits (highest priority).
-const LIMITS: Record<string, { max: number; windowMs: number }> = {
+const DEFAULT_LIMITS: Record<string, RateLimitRule> = {
   '/api/auth/local':            { max: 10, windowMs: 15 * 60 * 1000 },
   '/api/auth/local/register':   { max: 5,  windowMs: 60 * 60 * 1000 },
   '/api/auth/forgot-password':  { max: 5,  windowMs: 60 * 60 * 1000 },
@@ -18,7 +21,7 @@ const LIMITS: Record<string, { max: number; windowMs: number }> = {
 //  - /api/upload: cap how fast a single client can push files into MinIO
 //    (storage abuse; the upload-guard already enforces type/size).
 //  - /api/file-proxy: blunt brute-force enumeration of file hashes.
-const PREFIX_LIMITS: { prefix: string; max: number; windowMs: number }[] = [
+const DEFAULT_PREFIX_LIMITS: PrefixRateLimitRule[] = [
   { prefix: '/api/upload',     max: 60,  windowMs: 15 * 60 * 1000 },
   { prefix: '/api/file-proxy', max: 300, windowMs: 60 * 1000 },
 ]
@@ -33,16 +36,33 @@ setInterval(() => {
   }
 }, 30 * 60 * 1000)
 
-export default (config, { strapi }) => {
+function getClientIp(ctx, trustProxy: boolean) {
+  if (trustProxy) {
+    const forwardedFor = ctx.get('x-forwarded-for')
+    const firstForwardedIp = forwardedFor?.split(',')[0]?.trim()
+    if (firstForwardedIp) return firstForwardedIp
+  }
+
+  return ctx.request.ip || ctx.ip || 'unknown'
+}
+
+export default (config = {}, { strapi }) => {
+  const limits: Record<string, RateLimitRule> = {
+    ...DEFAULT_LIMITS,
+    ...((config as any).limits || {}),
+  }
+  const prefixLimits: PrefixRateLimitRule[] = (config as any).prefixLimits || DEFAULT_PREFIX_LIMITS
+  const trustProxy = Boolean((config as any).trustProxy)
+
   return async (ctx, next) => {
     if (ctx.method === 'OPTIONS') return next()
 
     const path = ctx.request.path
-    let limit = LIMITS[path]
+    let limit = limits[path]
     let bucket = path
 
     if (!limit) {
-      const prefixRule = PREFIX_LIMITS.find((rule) => path.startsWith(rule.prefix))
+      const prefixRule = prefixLimits.find((rule) => path.startsWith(rule.prefix))
       if (prefixRule) {
         limit = { max: prefixRule.max, windowMs: prefixRule.windowMs }
         bucket = prefixRule.prefix
@@ -51,7 +71,7 @@ export default (config, { strapi }) => {
 
     if (!limit) return next()
 
-    const ip = ctx.request.ip || 'unknown'
+    const ip = getClientIp(ctx, trustProxy)
     const key = `${ip}:${bucket}`
     const now = Date.now()
     const entry = store.get(key)

@@ -1,6 +1,11 @@
-// Rate limiter: max 5 requests per IP per 15-minute window (in-memory, resets on server restart)
-const RATE_LIMIT_MAX = 5
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000
+// Rate limiter for email existence checks (in-memory, resets on server restart).
+const parsePositiveInt = (value: string | undefined, fallback: number) => {
+  const parsed = Number.parseInt(value || '', 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const RATE_LIMIT_MAX = parsePositiveInt(process.env.CHECK_EMAIL_RATE_LIMIT_MAX, 300)
+const RATE_LIMIT_WINDOW_MS = parsePositiveInt(process.env.CHECK_EMAIL_RATE_LIMIT_WINDOW_MINUTES, 15) * 60 * 1000
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>()
 
 function checkRateLimit(ip: string): boolean {

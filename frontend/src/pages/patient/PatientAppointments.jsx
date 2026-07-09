@@ -22,6 +22,7 @@ import Modal from '../../components/ui/Modal'
 import useAuthStore from '../../stores/authStore'
 import useAppointmentStore from '../../stores/appointmentStore'
 import { formatPrice, formatDate, getSpecName } from '../../utils/helpers'
+import { SHOW_DOCTOR_PRICES } from '../../utils/constants'
 import { getMediaUrl, getServerNow } from '../../services/api'
 
 const ITEMS_PER_PAGE = 10
@@ -396,9 +397,11 @@ function PatientAppointments() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-slate-900">
-                            {formatPrice(appointment.price || appointment.doctor?.price || 0)}
-                          </span>
+                          {SHOW_DOCTOR_PRICES && (
+                            <span className="font-semibold text-slate-900">
+                              {formatPrice(appointment.price || appointment.doctor?.price || 0)}
+                            </span>
+                          )}
 
                           {canJoin && appointment.roomId ? (
                             <Link to={`/consultation/${appointment.roomId}`}>

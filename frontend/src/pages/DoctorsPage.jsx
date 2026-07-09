@@ -14,14 +14,17 @@ import Badge from '../components/ui/Badge'
 import DoctorCard from '../components/doctors/DoctorCard'
 import useAppointmentStore from '../stores/appointmentStore'
 import { getSpecName } from '../utils/helpers'
+import { SHOW_DOCTOR_PRICES } from '../utils/constants'
 
 function DoctorsPage() {
   const { t, i18n } = useTranslation()
 
   const sortOptions = [
     { value: 'rating', label: t('doctors_page.sort_rating') },
-    { value: 'price_asc', label: t('doctors_page.sort_price_asc') },
-    { value: 'price_desc', label: t('doctors_page.sort_price_desc') },
+    ...(SHOW_DOCTOR_PRICES ? [
+      { value: 'price_asc', label: t('doctors_page.sort_price_asc') },
+      { value: 'price_desc', label: t('doctors_page.sort_price_desc') },
+    ] : []),
     { value: 'experience', label: t('doctors_page.sort_experience') },
   ]
   const [searchParams] = useSearchParams()
@@ -60,8 +63,8 @@ function DoctorsPage() {
       const matchesSpec = !selectedSpec || 
         doc.specialization?.name === selectedSpec ||
         doc.specialization?.id?.toString() === selectedSpec
-      const matchesMinPrice = !priceRange.min || doc.price >= parseInt(priceRange.min)
-      const matchesMaxPrice = !priceRange.max || doc.price <= parseInt(priceRange.max)
+      const matchesMinPrice = !SHOW_DOCTOR_PRICES || !priceRange.min || doc.price >= parseInt(priceRange.min)
+      const matchesMaxPrice = !SHOW_DOCTOR_PRICES || !priceRange.max || doc.price <= parseInt(priceRange.max)
       return matchesSearch && matchesSpec && matchesMinPrice && matchesMaxPrice
     })
     .sort((a, b) => {
@@ -143,27 +146,29 @@ function DoctorsPage() {
                 </div>
 
                 {/* Price Filter */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-slate-700 mb-3">
-                    {t('doctors_page.price_label')}
-                  </label>
-                  <div className="flex gap-3">
-                    <Input
-                      type="number"
-                      placeholder={t('doctors_page.price_from')}
-                      value={priceRange.min}
-                      onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
-                      className="text-sm"
-                    />
-                    <Input
-                      type="number"
-                      placeholder={t('doctors_page.price_to')}
-                      value={priceRange.max}
-                      onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
-                      className="text-sm"
-                    />
+                {SHOW_DOCTOR_PRICES && (
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-700 mb-3">
+                      {t('doctors_page.price_label')}
+                    </label>
+                    <div className="flex gap-3">
+                      <Input
+                        type="number"
+                        placeholder={t('doctors_page.price_from')}
+                        value={priceRange.min}
+                        onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
+                        className="text-sm"
+                      />
+                      <Input
+                        type="number"
+                        placeholder={t('doctors_page.price_to')}
+                        value={priceRange.max}
+                        onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
+                        className="text-sm"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <Button
                   variant="secondary"
@@ -224,7 +229,7 @@ function DoctorsPage() {
             </div>
 
             {/* Active Filters */}
-            {(selectedSpec || priceRange.min || priceRange.max) && (
+            {(selectedSpec || (SHOW_DOCTOR_PRICES && (priceRange.min || priceRange.max))) && (
               <div className="flex flex-wrap gap-2 mb-6">
                 {selectedSpec && (
                   <Badge variant="primary" className="flex items-center gap-1">
@@ -234,7 +239,7 @@ function DoctorsPage() {
                     </button>
                   </Badge>
                 )}
-                {(priceRange.min || priceRange.max) && (
+                {SHOW_DOCTOR_PRICES && (priceRange.min || priceRange.max) && (
                   <Badge variant="primary" className="flex items-center gap-1">
                     {priceRange.min && t('doctors_page.price_from_badge', { price: priceRange.min })}
                     {priceRange.min && priceRange.max && ' — '}

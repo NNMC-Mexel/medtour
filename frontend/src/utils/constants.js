@@ -7,6 +7,9 @@ export const ROLES = {
   ADMIN: 'admin',
 }
 
+// Temporary product switch: keep doctor consultation prices out of patient/public UI.
+export const SHOW_DOCTOR_PRICES = false
+
 // Medical Case Statuses - target Kazakhstan Med Travel CRM lifecycle
 export const MEDICAL_CASE_STATUS = {
   NEW_LEAD: 'NEW_LEAD',

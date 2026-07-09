@@ -60,7 +60,26 @@ export default ({ env }) => {
             ],
       },
     },
-    { name: 'global::rate-limit', config: {} },
+    {
+      name: 'global::rate-limit',
+      config: {
+        trustProxy: env.bool('RATE_LIMIT_TRUST_PROXY', isProduction),
+        limits: {
+          '/api/auth/local': {
+            max: env.int('AUTH_LOGIN_RATE_LIMIT_MAX', 60),
+            windowMs: env.int('AUTH_LOGIN_RATE_LIMIT_WINDOW_MINUTES', 15) * 60 * 1000,
+          },
+          '/api/auth/local/register': {
+            max: env.int('AUTH_REGISTER_RATE_LIMIT_MAX', 300),
+            windowMs: env.int('AUTH_REGISTER_RATE_LIMIT_WINDOW_MINUTES', 60) * 60 * 1000,
+          },
+          '/api/auth/forgot-password': {
+            max: env.int('AUTH_FORGOT_PASSWORD_RATE_LIMIT_MAX', 20),
+            windowMs: env.int('AUTH_FORGOT_PASSWORD_RATE_LIMIT_WINDOW_MINUTES', 60) * 60 * 1000,
+          },
+        },
+      },
+    },
     'strapi::poweredBy',
     'strapi::query',
     'strapi::body',

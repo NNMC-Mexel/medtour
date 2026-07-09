@@ -45,6 +45,7 @@ import {
 } from "../services/api";
 import { cn, getInitials, isDoctorOnline, getSpecName } from "../utils/helpers";
 import { DEFAULT_CONTENT_LOCALE } from "../utils/locales";
+import { SHOW_DOCTOR_PRICES } from "../utils/constants";
 
 const doctorCardColors = [
     "bg-gradient-to-br from-teal-400 to-teal-600",
@@ -341,17 +342,19 @@ function DoctorsCarousel({ doctors }) {
                                                         )}
                                                     </div>
 
-                                                    <div className='flex items-center justify-between pt-4 border-t border-slate-100 mt-auto'>
-                                                        <div>
-                                                            <p className='text-xl font-bold text-slate-900'>
-                                                                {(doctor.price || 0).toLocaleString("ru-RU")}{" "}
-                                                                {t('common.currency')}
-                                                            </p>
-                                                            <p className='text-xs text-slate-500'>
-                                                                {t('common.price_per_consultation')}
-                                                            </p>
+                                                    {SHOW_DOCTOR_PRICES && (
+                                                        <div className='flex items-center justify-between pt-4 border-t border-slate-100 mt-auto'>
+                                                            <div>
+                                                                <p className='text-xl font-bold text-slate-900'>
+                                                                    {(doctor.price || 0).toLocaleString("ru-RU")}{" "}
+                                                                    {t('common.currency')}
+                                                                </p>
+                                                                <p className='text-xs text-slate-500'>
+                                                                    {t('common.price_per_consultation')}
+                                                                </p>
+                                                            </div>
                                                         </div>
-                                                    </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </Link>
