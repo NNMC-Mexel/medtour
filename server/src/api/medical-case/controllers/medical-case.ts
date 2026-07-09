@@ -15,7 +15,11 @@ const DEFAULT_POPULATE = {
   clinic: true,
   doctor: { populate: ['specialization', 'photo', 'clinic'] },
   medical_documents: { populate: ['file'] },
-  appointments: { populate: ['doctor'] },
+  appointments: {
+    populate: {
+      doctor: { populate: ['specialization'] },
+    },
+  },
   treatment_plans: { populate: ['clinic', 'doctor'] },
   trip_checklist: true,
   visa_requests: true,
@@ -157,6 +161,20 @@ function redactCaseForRole(medicalCase: any, role: string) {
     return medicalCase.map((item) => redactCaseForRole(item, role));
   }
   if (!medicalCase || typeof medicalCase !== 'object') return medicalCase;
+  if (role === 'patient') {
+    return {
+      ...medicalCase,
+      internalNotes: undefined,
+      doctorDecisionNotes: undefined,
+      appointments: Array.isArray(medicalCase.appointments)
+        ? medicalCase.appointments.map((appointment: any) => {
+          const { doctorDecision, doctorDecisionNotes, ...publicAppointment } = appointment;
+          return publicAppointment;
+        })
+        : [],
+      clinic: null,
+    };
+  }
   if (role === 'doctor') {
     return {
       ...pickObjectFields(medicalCase, CASE_FIELDS_BY_ROLE.doctor),

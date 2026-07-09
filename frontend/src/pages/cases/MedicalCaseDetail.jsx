@@ -596,6 +596,9 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
 
 function DoctorFeedbackSummary({ medicalCase, plans }) {
   const { t } = useTranslation()
+  const appointmentNotes = (medicalCase.appointments || []).filter(appointment =>
+    appointment.doctorDecision || appointment.doctorDecisionNotes
+  )
   const doctorDocs = (medicalCase.medical_documents || []).filter(doc => {
     const hasDoctor = !!doc.doctor
     const hasAppointment = !!doc.appointment
@@ -604,6 +607,8 @@ function DoctorFeedbackSummary({ medicalCase, plans }) {
   })
   const planNotes = (plans || []).filter(plan => plan.doctorDecisionNotes || plan.diagnosisSummary || plan.recommendations)
   const hasCaseNotes = !!medicalCase.doctorDecisionNotes?.trim()
+  const getDecisionLabel = (decision) =>
+    decision ? t(`case_detail.appointment_decision_${decision}`, { defaultValue: decision }) : ''
 
   return (
     <Card>
@@ -611,7 +616,7 @@ function DoctorFeedbackSummary({ medicalCase, plans }) {
         <CardTitle>{t('case_detail.doctor_feedback_section')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!hasCaseNotes && doctorDocs.length === 0 && planNotes.length === 0 ? (
+        {!hasCaseNotes && appointmentNotes.length === 0 && doctorDocs.length === 0 && planNotes.length === 0 ? (
           <p className="text-sm text-slate-500">{t('case_detail.doctor_feedback_empty')}</p>
         ) : (
           <>
@@ -621,6 +626,26 @@ function DoctorFeedbackSummary({ medicalCase, plans }) {
                 <p className="text-sm text-slate-600 whitespace-pre-wrap">{medicalCase.doctorDecisionNotes}</p>
               </div>
             )}
+            {appointmentNotes.map(appointment => (
+              <div key={appointment.documentId || appointment.id} className="rounded-xl bg-teal-50 border border-teal-100 p-4 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-slate-900">
+                    {t('case_detail.appointment_private_feedback')}
+                  </p>
+                  {appointment.dateTime && (
+                    <span className="text-xs text-slate-500">
+                      {new Date(appointment.dateTime).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+                {appointment.doctorDecision && (
+                  <Badge variant="primary">{getDecisionLabel(appointment.doctorDecision)}</Badge>
+                )}
+                {appointment.doctorDecisionNotes && (
+                  <p className="text-sm text-slate-600 whitespace-pre-wrap">{appointment.doctorDecisionNotes}</p>
+                )}
+              </div>
+            ))}
             {planNotes.map(plan => (
               <div key={plan.documentId || plan.id} className="rounded-xl bg-slate-50 p-4 space-y-2">
                 <p className="text-sm font-medium text-slate-900">{plan.title || t('case_detail.section_treatment_plan')}</p>

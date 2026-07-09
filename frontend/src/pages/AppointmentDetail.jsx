@@ -63,6 +63,10 @@ function AppointmentDetail() {
   const [isUploadingFile, setIsUploadingFile] = useState(false)
   const [isUploadingPlanFile, setIsUploadingPlanFile] = useState(false)
   const [isUploadingPrescriptionsFile, setIsUploadingPrescriptionsFile] = useState(false)
+  const [doctorDecision, setDoctorDecision] = useState('')
+  const [doctorDecisionNotes, setDoctorDecisionNotes] = useState('')
+  const [isSavingDoctorDecision, setIsSavingDoctorDecision] = useState(false)
+  const [doctorDecisionSaved, setDoctorDecisionSaved] = useState(false)
 
   useEffect(() => {
     const fetchAppointment = async () => {
@@ -84,6 +88,8 @@ function AppointmentDetail() {
     if (!appointment) return
     const aptDocs = appointment.medical_documents || []
     setDocuments(aptDocs)
+    setDoctorDecision(appointment.doctorDecision || '')
+    setDoctorDecisionNotes(appointment.doctorDecisionNotes || '')
   }, [appointment])
 
   // Preload existing documents into notes fields
@@ -272,6 +278,29 @@ function AppointmentDetail() {
     }
   }
 
+  const saveDoctorDecision = async () => {
+    if (!appointment?.documentId) return
+    setIsSavingDoctorDecision(true)
+    try {
+      const response = await appointmentsAPI.update(appointment.documentId, {
+        doctorDecision: doctorDecision || null,
+        doctorDecisionNotes,
+      })
+      const updated = response.data?.data || response.data
+      setAppointment(prev => ({
+        ...prev,
+        doctorDecision: updated?.doctorDecision ?? doctorDecision,
+        doctorDecisionNotes: updated?.doctorDecisionNotes ?? doctorDecisionNotes,
+      }))
+      setDoctorDecisionSaved(true)
+      setTimeout(() => setDoctorDecisionSaved(false), 2000)
+    } catch (err) {
+      console.error('Error saving doctor decision:', err)
+    } finally {
+      setIsSavingDoctorDecision(false)
+    }
+  }
+
   // ── Render ──────────────────────────────────────────────────────
 
   if (isLoading) {
@@ -346,6 +375,13 @@ function AppointmentDetail() {
     { key: 'diagnosis', label: t('video.tab_diagnosis') },
     { key: 'plan', label: t('video.plan_label') },
     { key: 'prescriptions', label: t('video.prescriptions_label') },
+  ]
+
+  const doctorDecisionOptions = [
+    { value: '', label: t('appointment_detail.private_decision_placeholder') },
+    { value: 'treatment_required', label: t('appointment_detail.private_decision_treatment_kz') },
+    { value: 'no_treatment_needed', label: t('appointment_detail.private_decision_local') },
+    { value: 'needs_more_documents', label: t('appointment_detail.private_decision_more_docs') },
   ]
 
   return (
@@ -628,6 +664,57 @@ function AppointmentDetail() {
                       </Button>
                     )}
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Internal doctor opinion (staff only, never shown to patient) */}
+          {isDoctor && isCompleted && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5 text-teal-600" />
+                    {t('appointment_detail.private_notes_title')}
+                  </div>
+                  <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                    {t('appointment_detail.staff_only')}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-slate-500">
+                  {t('appointment_detail.private_notes_help')}
+                </p>
+                <select
+                  value={doctorDecision}
+                  onChange={e => setDoctorDecision(e.target.value)}
+                  disabled={!isWithinWindow}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
+                >
+                  {doctorDecisionOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <textarea
+                  value={doctorDecisionNotes}
+                  onChange={e => setDoctorDecisionNotes(e.target.value)}
+                  disabled={!isWithinWindow}
+                  placeholder={t('appointment_detail.private_notes_placeholder')}
+                  rows={5}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
+                />
+                {isWithinWindow && (
+                  <Button
+                    size="sm"
+                    onClick={saveDoctorDecision}
+                    isLoading={isSavingDoctorDecision}
+                    leftIcon={doctorDecisionSaved ? <Check className="w-4 h-4" /> : null}
+                    className={doctorDecisionSaved ? 'bg-green-600! hover:bg-green-700!' : ''}
+                  >
+                    {doctorDecisionSaved ? t('appointment_detail.saved') : t('appointment_detail.save')}
+                  </Button>
                 )}
               </CardContent>
             </Card>

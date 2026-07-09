@@ -883,6 +883,7 @@ function VideoConsultation({
   }
 
   const forceCompleteCall = async () => {
+    if (isCompletingCall) return
     if (!appointment?.documentId) return
     setIsCompletingCall(true)
     try {
@@ -1576,13 +1577,20 @@ function VideoConsultation({
           <div className="pointer-events-none absolute inset-x-0 bottom-[max(1rem,calc(env(safe-area-inset-bottom)+1rem))] z-20 flex flex-col items-center gap-2 px-3">
             {isDoctor && (
               <button
-                onClick={() => setShowCompleteConfirm(true)}
+                onClick={forceCompleteCall}
+                disabled={isCompletingCall}
                 title={t('video.complete_btn')}
                 aria-label={t('video.complete_btn')}
-                className="pointer-events-auto inline-flex max-w-full items-center gap-2 rounded-full bg-slate-800/92 px-4 py-2 text-sm font-medium text-white shadow-xl ring-1 ring-white/10 backdrop-blur-xl transition-all hover:bg-emerald-600"
+                className="pointer-events-auto inline-flex max-w-full items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-xl ring-1 ring-white/10 backdrop-blur-xl transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                <Check className="w-4 h-4" />
-                <span className="truncate">{t('video.complete_btn')}</span>
+                {isCompletingCall ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Check className="w-4 h-4" />
+                )}
+                <span className="truncate">
+                  {isCompletingCall ? t('common.loading') : t('video.complete_btn')}
+                </span>
               </button>
             )}
 

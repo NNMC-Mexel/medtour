@@ -50,6 +50,10 @@ function appointmentPopulateForRole(role: string) {
 
 function redactAppointmentForRole(appointment: any, role: string) {
   if (!appointment || typeof appointment !== 'object') return appointment;
+  if (role === 'patient') {
+    const { doctorDecision, doctorDecisionNotes, ...publicAppointment } = appointment;
+    return publicAppointment;
+  }
   if (role === 'doctor') {
     return {
       ...appointment,
@@ -739,7 +743,9 @@ export default factories.createCoreController('api::appointment.appointment', ()
         if (body.review !== undefined) allowed.review = body.review;
       }
     } else if (isDoctorParticipant || isDoctor) {
-      // Doctors may advance/update status and write chatLog
+      // Doctors may advance/update status, write chatLog and leave internal
+      // consultation feedback for MedTour staff. Patients never receive these
+      // fields from the API redaction layer.
       const DOCTOR_ALLOWED_STATUSES = ['confirmed', 'in_progress', 'completed', 'cancelled'];
       if (body.statuse !== undefined) {
         if (!DOCTOR_ALLOWED_STATUSES.includes(body.statuse)) {
@@ -748,6 +754,16 @@ export default factories.createCoreController('api::appointment.appointment', ()
         allowed.statuse = body.statuse;
       }
       if (body.chatLog !== undefined) allowed.chatLog = body.chatLog;
+      if (body.doctorDecision !== undefined) {
+        const allowedDecisions = ['treatment_required', 'no_treatment_needed', 'needs_more_documents'];
+        if (body.doctorDecision !== null && body.doctorDecision !== '' && !allowedDecisions.includes(body.doctorDecision)) {
+          return ctx.badRequest('Invalid doctorDecision value');
+        }
+        allowed.doctorDecision = body.doctorDecision || null;
+      }
+      if (body.doctorDecisionNotes !== undefined) {
+        allowed.doctorDecisionNotes = String(body.doctorDecisionNotes || '').slice(0, 10000);
+      }
     }
 
     if (Object.keys(allowed).length === 0) {
