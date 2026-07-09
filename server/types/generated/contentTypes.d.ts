@@ -1136,6 +1136,10 @@ export interface ApiMedicalCaseMedicalCase extends Struct.CollectionTypeSchema {
     >;
     caseNumber: Schema.Attribute.String & Schema.Attribute.Unique;
     clinic: Schema.Attribute.Relation<'manyToOne', 'api::clinic.clinic'>;
+    commissionDecision: Schema.Attribute.Enumeration<
+      ['treatment_in_kazakhstan', 'local_treatment', 'needs_more_documents']
+    >;
+    commissionDecisionNotes: Schema.Attribute.Text;
     conversation: Schema.Attribute.Relation<
       'oneToOne',
       'api::conversation.conversation'
@@ -1154,6 +1158,9 @@ export interface ApiMedicalCaseMedicalCase extends Struct.CollectionTypeSchema {
     diagnosis: Schema.Attribute.Text;
     doctor: Schema.Attribute.Relation<'manyToOne', 'api::doctor.doctor'>;
     doctorDecisionNotes: Schema.Attribute.Text;
+    doctorRecommendation: Schema.Attribute.Enumeration<
+      ['treatment_in_kazakhstan', 'local_treatment', 'needs_more_documents']
+    >;
     flightDetails: Schema.Attribute.JSON;
     hotelName: Schema.Attribute.String;
     internalNotes: Schema.Attribute.Text;
@@ -1194,6 +1201,7 @@ export interface ApiMedicalCaseMedicalCase extends Struct.CollectionTypeSchema {
         'WAITING_PAYMENT',
         'CONSULTATION_BOOKED',
         'CONSULTATION_COMPLETED',
+        'COMMISSION_REVIEW',
         'LOCAL_TREATMENT',
         'TREATMENT_IN_KAZAKHSTAN',
         'TRAVEL_PREPARATION',

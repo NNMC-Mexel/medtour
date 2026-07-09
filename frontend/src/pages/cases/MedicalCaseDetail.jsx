@@ -94,6 +94,12 @@ function formatEventMessage(event, t) {
       defaultValue: event.message || event.createdAt,
     })
   }
+  if (type === 'COMMISSION_DECISION') {
+    const decision = event?.metadata?.decision || 'unknown'
+    return t(`case_detail.event_message.COMMISSION_DECISION.${decision}`, {
+      defaultValue: event.message || event.createdAt,
+    })
+  }
   const translated = t(`case_detail.event_message.${type}`, { defaultValue: '' })
   return translated || event?.message || event?.createdAt || ''
 }
@@ -607,7 +613,10 @@ function DoctorFeedbackSummary({ medicalCase, plans }) {
   })
   const planNotes = (plans || []).filter(plan => plan.doctorDecisionNotes || plan.diagnosisSummary || plan.recommendations)
   const hasCaseNotes = !!medicalCase.doctorDecisionNotes?.trim()
+  const hasCommissionNotes = !!medicalCase.commissionDecisionNotes?.trim()
   const getDecisionLabel = (decision) =>
+    decision ? t(`case_detail.decision_label_${decision}`, { defaultValue: decision }) : ''
+  const getAppointmentDecisionLabel = (decision) =>
     decision ? t(`case_detail.appointment_decision_${decision}`, { defaultValue: decision }) : ''
 
   return (
@@ -616,14 +625,30 @@ function DoctorFeedbackSummary({ medicalCase, plans }) {
         <CardTitle>{t('case_detail.doctor_feedback_section')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!hasCaseNotes && appointmentNotes.length === 0 && doctorDocs.length === 0 && planNotes.length === 0 ? (
+        {!hasCaseNotes && !medicalCase.doctorRecommendation && !medicalCase.commissionDecision && !hasCommissionNotes && appointmentNotes.length === 0 && doctorDocs.length === 0 && planNotes.length === 0 ? (
           <p className="text-sm text-slate-500">{t('case_detail.doctor_feedback_empty')}</p>
         ) : (
           <>
-            {hasCaseNotes && (
-              <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-sm font-medium text-slate-900 mb-1">{t('case_detail.label_doctor_decision_notes')}</p>
-                <p className="text-sm text-slate-600 whitespace-pre-wrap">{medicalCase.doctorDecisionNotes}</p>
+            {(hasCaseNotes || medicalCase.doctorRecommendation) && (
+              <div className="rounded-xl bg-slate-50 p-4 space-y-2">
+                <p className="text-sm font-medium text-slate-900">{t('case_detail.section_doctor_recommendation')}</p>
+                {medicalCase.doctorRecommendation && (
+                  <Badge variant="primary">{getDecisionLabel(medicalCase.doctorRecommendation)}</Badge>
+                )}
+                {hasCaseNotes && (
+                  <p className="text-sm text-slate-600 whitespace-pre-wrap">{medicalCase.doctorDecisionNotes}</p>
+                )}
+              </div>
+            )}
+            {(medicalCase.commissionDecision || hasCommissionNotes) && (
+              <div className="rounded-xl bg-amber-50 border border-amber-100 p-4 space-y-2">
+                <p className="text-sm font-medium text-slate-900">{t('case_detail.section_commission_decision')}</p>
+                {medicalCase.commissionDecision && (
+                  <Badge variant="warning">{getDecisionLabel(medicalCase.commissionDecision)}</Badge>
+                )}
+                {hasCommissionNotes && (
+                  <p className="text-sm text-slate-600 whitespace-pre-wrap">{medicalCase.commissionDecisionNotes}</p>
+                )}
               </div>
             )}
             {appointmentNotes.map(appointment => (
@@ -639,7 +664,7 @@ function DoctorFeedbackSummary({ medicalCase, plans }) {
                   )}
                 </div>
                 {appointment.doctorDecision && (
-                  <Badge variant="primary">{getDecisionLabel(appointment.doctorDecision)}</Badge>
+                  <Badge variant="primary">{getAppointmentDecisionLabel(appointment.doctorDecision)}</Badge>
                 )}
                 {appointment.doctorDecisionNotes && (
                   <p className="text-sm text-slate-600 whitespace-pre-wrap">{appointment.doctorDecisionNotes}</p>
@@ -1005,7 +1030,10 @@ function MedicalCaseDetail() {
         clinic: getRef(data?.clinic),
         doctor: getRef(data?.doctor),
         internalNotes: data?.internalNotes || '',
+        doctorRecommendation: data?.doctorRecommendation || '',
         doctorDecisionNotes: data?.doctorDecisionNotes || '',
+        commissionDecision: data?.commissionDecision || '',
+        commissionDecisionNotes: data?.commissionDecisionNotes || '',
         tourismNotes: data?.tourismNotes || '',
       })
     } catch (error) {
@@ -1136,22 +1164,14 @@ function MedicalCaseDetail() {
       return
     }
 
-    const nextStatus = decision === 'treatment_in_kazakhstan'
-      ? 'TREATMENT_IN_KAZAKHSTAN'
-      : decision === 'local_treatment'
-        ? 'LOCAL_TREATMENT'
-        : 'WAITING_FOR_DOCUMENTS'
-
-    const message = decision === 'treatment_in_kazakhstan'
-      ? t('case_detail.event_message.DOCTOR_DECISION.treatment_in_kazakhstan')
-      : decision === 'local_treatment'
-        ? t('case_detail.event_message.DOCTOR_DECISION.local_treatment')
-        : t('case_detail.event_message.DOCTOR_DECISION.needs_more_documents')
+    const nextStatus = 'COMMISSION_REVIEW'
+    const message = t(`case_detail.event_message.DOCTOR_DECISION.${decision}`)
 
     setIsSaving(true)
     try {
       await medicalCasesAPI.update(id, {
         status: nextStatus,
+        doctorRecommendation: decision,
         doctorDecisionNotes: form.doctorDecisionNotes,
       })
       await caseEventsAPI.create({
@@ -1168,6 +1188,46 @@ function MedicalCaseDetail() {
       await loadReferenceData()
     } catch (error) {
       toast.error(error?.response?.data?.error?.message || t('case_detail.toast_doctor_error'))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const submitCommissionDecision = async (decision) => {
+    if (!form.commissionDecisionNotes?.trim()) {
+      toast.warning(t('case_detail.toast_commission_notes_required'))
+      return
+    }
+
+    const nextStatus = decision === 'treatment_in_kazakhstan'
+      ? 'TREATMENT_IN_KAZAKHSTAN'
+      : decision === 'local_treatment'
+        ? 'LOCAL_TREATMENT'
+        : 'WAITING_FOR_DOCUMENTS'
+
+    const message = t(`case_detail.event_message.COMMISSION_DECISION.${decision}`)
+
+    setIsSaving(true)
+    try {
+      await medicalCasesAPI.update(id, {
+        status: nextStatus,
+        commissionDecision: decision,
+        commissionDecisionNotes: form.commissionDecisionNotes,
+      })
+      await caseEventsAPI.create({
+        medical_case: medicalCase.documentId || medicalCase.id,
+        actor: user?.documentId || user?.id,
+        eventType: 'COMMISSION_DECISION',
+        fromStatus: medicalCase.status,
+        toStatus: nextStatus,
+        message,
+        metadata: { decision },
+      })
+      toast.success(t('case_detail.toast_commission_saved'))
+      await loadCase()
+      await loadReferenceData()
+    } catch (error) {
+      toast.error(error?.response?.data?.error?.message || t('case_detail.toast_commission_error'))
     } finally {
       setIsSaving(false)
     }
@@ -1201,14 +1261,17 @@ function MedicalCaseDetail() {
     return linked.length > 0 ? linked : doctors
   }, [doctors, form.clinic, role])
 
-  const canDoctorDecide = ['doctor', 'admin', 'coordinator'].includes(role)
+  const canDoctorRecommend = ['doctor', 'admin'].includes(role)
+  const canFinalizeCommission = ['admin', 'manager', 'coordinator'].includes(role)
   const canEditTreatmentPlan = ['doctor', 'admin', 'coordinator'].includes(role)
   const canApproveTreatmentPlan = role === 'patient'
   const canManageClinic = ['admin', 'manager'].includes(role)
   const allowedStatusOptions = useMemo(() => {
     const current = normalizeCaseStatus(medicalCase?.status) || 'NEW_LEAD'
+    const commissionDecisionTargets = ['LOCAL_TREATMENT', 'TREATMENT_IN_KAZAKHSTAN', 'WAITING_FOR_DOCUMENTS']
     return [current, ...getAllowedCaseTransitions(role, current)]
       .filter((value, index, values) => values.indexOf(value) === index)
+      .filter(value => !(current === 'COMMISSION_REVIEW' && commissionDecisionTargets.includes(value)))
   }, [medicalCase?.status, role])
   const caseSla = getCaseSla(medicalCase)
 
@@ -1225,6 +1288,7 @@ function MedicalCaseDetail() {
   }, [assignedDoctor, canManage, doctors, form.doctor])
 
   const caseStatus = normalizeCaseStatus(medicalCase?.status)
+  const canShowCommissionDecision = canFinalizeCommission && caseStatus === 'COMMISSION_REVIEW'
   const BOOKING_STATUSES = ['DOCTOR_ASSIGNED', 'WAITING_PATIENT_CONFIRMATION', 'UNDER_REVIEW', 'DOCUMENTS_UPLOADED', 'CONSULTATION_COMPLETED']
   const isFollowUpBooking = caseStatus === 'CONSULTATION_COMPLETED'
   const canBookSlot = bookingDoctor && BOOKING_STATUSES.includes(caseStatus)
@@ -1408,17 +1472,22 @@ function MedicalCaseDetail() {
             </Card>
           )}
 
-          {canDoctorDecide && (
+          {canDoctorRecommend && (
             <Card>
               <CardHeader>
-                <CardTitle>{t('case_detail.section_doctor_decision')}</CardTitle>
+                <CardTitle>{t('case_detail.section_doctor_recommendation')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-slate-600">
-                  {t('case_detail.doctor_decision_help')}
+                  {t('case_detail.doctor_recommendation_help')}
                 </p>
+                {form.doctorRecommendation && (
+                  <Badge variant="primary">
+                    {t(`case_detail.decision_label_${form.doctorRecommendation}`, { defaultValue: form.doctorRecommendation })}
+                  </Badge>
+                )}
                 <Textarea
-                  label={t('case_detail.label_doctor_decision_notes')}
+                  label={t('case_detail.label_doctor_recommendation_notes')}
                   value={form.doctorDecisionNotes}
                   onChange={(e) => update('doctorDecisionNotes', e.target.value)}
                   rows={3}
@@ -1429,18 +1498,72 @@ function MedicalCaseDetail() {
                     disabled={isSaving}
                     leftIcon={<CheckCircle className="w-4 h-4" />}
                   >
-                    {t('case_detail.decision_treatment_kz')}
+                    {t('case_detail.recommend_treatment_kz')}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => submitDoctorDecision('local_treatment')}
                     disabled={isSaving}
                   >
-                    {t('case_detail.decision_local_treatment')}
+                    {t('case_detail.recommend_local_treatment')}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => submitDoctorDecision('needs_more_documents')}
+                    disabled={isSaving}
+                    leftIcon={<FileText className="w-4 h-4" />}
+                  >
+                    {t('case_detail.recommend_more_docs')}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {canShowCommissionDecision && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('case_detail.section_commission_decision')}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-slate-600">
+                  {t('case_detail.commission_decision_help')}
+                </p>
+                {medicalCase.doctorRecommendation && (
+                  <div className="rounded-xl bg-teal-50 border border-teal-100 p-4 space-y-2">
+                    <p className="text-sm font-medium text-slate-900">{t('case_detail.section_doctor_recommendation')}</p>
+                    <Badge variant="primary">
+                      {t(`case_detail.decision_label_${medicalCase.doctorRecommendation}`, { defaultValue: medicalCase.doctorRecommendation })}
+                    </Badge>
+                    {medicalCase.doctorDecisionNotes && (
+                      <p className="text-sm text-slate-600 whitespace-pre-wrap">{medicalCase.doctorDecisionNotes}</p>
+                    )}
+                  </div>
+                )}
+                <Textarea
+                  label={t('case_detail.label_commission_decision_notes')}
+                  value={form.commissionDecisionNotes}
+                  onChange={(e) => update('commissionDecisionNotes', e.target.value)}
+                  rows={3}
+                />
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button
+                    onClick={() => submitCommissionDecision('treatment_in_kazakhstan')}
+                    disabled={isSaving}
+                    leftIcon={<CheckCircle className="w-4 h-4" />}
+                  >
+                    {t('case_detail.decision_treatment_kz')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => submitCommissionDecision('local_treatment')}
+                    disabled={isSaving}
+                  >
+                    {t('case_detail.decision_local_treatment')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => submitCommissionDecision('needs_more_documents')}
                     disabled={isSaving}
                     leftIcon={<FileText className="w-4 h-4" />}
                   >

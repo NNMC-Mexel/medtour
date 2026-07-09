@@ -32,6 +32,7 @@
         "WAITING_PAYMENT",
         "CONSULTATION_BOOKED",
         "CONSULTATION_COMPLETED",
+        "COMMISSION_REVIEW",
         "LOCAL_TREATMENT",
         "TREATMENT_IN_KAZAKHSTAN",
         "TRAVEL_PREPARATION",
@@ -150,7 +151,26 @@
     "internalNotes": {
       "type": "text"
     },
+    "doctorRecommendation": {
+      "type": "enumeration",
+      "enum": [
+        "treatment_in_kazakhstan",
+        "local_treatment",
+        "needs_more_documents"
+      ]
+    },
     "doctorDecisionNotes": {
+      "type": "text"
+    },
+    "commissionDecision": {
+      "type": "enumeration",
+      "enum": [
+        "treatment_in_kazakhstan",
+        "local_treatment",
+        "needs_more_documents"
+      ]
+    },
+    "commissionDecisionNotes": {
       "type": "text"
     },
     "cancellationReason": {

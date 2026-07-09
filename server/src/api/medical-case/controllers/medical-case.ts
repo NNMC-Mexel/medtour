@@ -42,6 +42,7 @@ const CASE_FIELDS_BY_ROLE: Record<string, string[]> = {
     'diagnosis',
     'symptoms',
     'currentTreatment',
+    'doctorRecommendation',
     'doctorDecisionNotes',
     'createdAt',
     'updatedAt',
@@ -83,7 +84,7 @@ const FIELD_ALLOWLIST_BY_ROLE: Record<string, string[]> = {
     'currentTreatment',
     'tourismRequested',
   ],
-  doctor: ['status', 'doctorDecisionNotes'],
+  doctor: ['status', 'doctorRecommendation', 'doctorDecisionNotes'],
   manager: [
     'status',
     'manager',
@@ -104,7 +105,10 @@ const FIELD_ALLOWLIST_BY_ROLE: Record<string, string[]> = {
     'tourismRequested',
     'tourismNotes',
     'internalNotes',
+    'doctorRecommendation',
     'doctorDecisionNotes',
+    'commissionDecision',
+    'commissionDecisionNotes',
     'cancellationReason',
   ],
   coordinator: [
@@ -115,7 +119,10 @@ const FIELD_ALLOWLIST_BY_ROLE: Record<string, string[]> = {
     'urgency',
     'currentTreatment',
     'internalNotes',
+    'doctorRecommendation',
     'doctorDecisionNotes',
+    'commissionDecision',
+    'commissionDecisionNotes',
     'cancellationReason',
   ],
   admin: ['*'],
@@ -155,6 +162,20 @@ function hasAssignmentChange(data: Record<string, any>) {
   return ['manager', 'coordinator', 'clinic', 'doctor'].some((key) => Object.prototype.hasOwnProperty.call(data, key));
 }
 
+const CASE_DECISIONS = ['treatment_in_kazakhstan', 'local_treatment', 'needs_more_documents'];
+const PATIENT_HIDDEN_EVENT_TYPES = ['DOCTOR_DECISION', 'COMMISSION_DECISION'];
+const COMMISSION_STATUS_DECISIONS: Record<string, string> = {
+  TREATMENT_IN_KAZAKHSTAN: 'treatment_in_kazakhstan',
+  LOCAL_TREATMENT: 'local_treatment',
+  WAITING_FOR_DOCUMENTS: 'needs_more_documents',
+};
+
+function validateCaseDecision(value: any, field: string) {
+  if (value === undefined || value === null || value === '') return null;
+  if (!CASE_DECISIONS.includes(value)) return `${field} must be one of: ${CASE_DECISIONS.join(', ')}`;
+  return null;
+}
+
 function redactCaseForRole(medicalCase: any, role: string) {
   if (['manager', 'admin'].includes(role)) return medicalCase;
   if (Array.isArray(medicalCase)) {
@@ -165,12 +186,18 @@ function redactCaseForRole(medicalCase: any, role: string) {
     return {
       ...medicalCase,
       internalNotes: undefined,
+      doctorRecommendation: undefined,
       doctorDecisionNotes: undefined,
+      commissionDecision: undefined,
+      commissionDecisionNotes: undefined,
       appointments: Array.isArray(medicalCase.appointments)
         ? medicalCase.appointments.map((appointment: any) => {
           const { doctorDecision, doctorDecisionNotes, ...publicAppointment } = appointment;
           return publicAppointment;
         })
+        : [],
+      case_events: Array.isArray(medicalCase.case_events)
+        ? medicalCase.case_events.filter((event: any) => !PATIENT_HIDDEN_EVENT_TYPES.includes(event?.eventType))
         : [],
       clinic: null,
     };
@@ -365,6 +392,10 @@ export default factories.createCoreController('api::medical-case.medical-case' a
     if (!normalizedStatus || !isMedicalCaseStatus(data.status)) {
       return ctx.badRequest('Invalid medical case status');
     }
+    const createDoctorRecommendationError = validateCaseDecision(data.doctorRecommendation, 'doctorRecommendation');
+    if (createDoctorRecommendationError) return ctx.badRequest(createDoctorRecommendationError);
+    const createCommissionDecisionError = validateCaseDecision(data.commissionDecision, 'commissionDecision');
+    if (createCommissionDecisionError) return ctx.badRequest(createCommissionDecisionError);
 
     if (role === 'patient') {
       data.patient = user.documentId;
@@ -421,6 +452,10 @@ export default factories.createCoreController('api::medical-case.medical-case' a
     if (body.status && !data.status) {
       return ctx.forbidden('This role cannot change medical case status');
     }
+    const doctorRecommendationError = validateCaseDecision(data.doctorRecommendation, 'doctorRecommendation');
+    if (doctorRecommendationError) return ctx.badRequest(doctorRecommendationError);
+    const commissionDecisionError = validateCaseDecision(data.commissionDecision, 'commissionDecision');
+    if (commissionDecisionError) return ctx.badRequest(commissionDecisionError);
 
     if (data.status !== undefined) {
       const normalizedToStatus = normalizeCaseStatus(data.status);
@@ -434,6 +469,17 @@ export default factories.createCoreController('api::medical-case.medical-case' a
       if (!canTransitionCaseStatus(role, fromStatus, toStatus)) {
         const allowed = getAllowedCaseTransitions(role, fromStatus).join(', ') || 'none';
         return ctx.badRequest(`Invalid status transition ${fromStatus} -> ${toStatus}. Allowed for ${role}: ${allowed}`);
+      }
+      if (role === 'doctor' && toStatus === 'COMMISSION_REVIEW') {
+        if (!data.doctorRecommendation || !String(data.doctorDecisionNotes || '').trim()) {
+          return ctx.badRequest('Doctor recommendation and notes are required before commission review');
+        }
+      }
+      if (fromStatus === 'COMMISSION_REVIEW' && COMMISSION_STATUS_DECISIONS[toStatus]) {
+        const expectedDecision = COMMISSION_STATUS_DECISIONS[toStatus];
+        if (data.commissionDecision !== expectedDecision || !String(data.commissionDecisionNotes || '').trim()) {
+          return ctx.badRequest('Commission decision and notes are required before finalizing the case');
+        }
       }
     }
 

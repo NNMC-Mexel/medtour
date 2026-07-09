@@ -52,6 +52,16 @@ function redactAppointmentForRole(appointment: any, role: string) {
   if (!appointment || typeof appointment !== 'object') return appointment;
   if (role === 'patient') {
     const { doctorDecision, doctorDecisionNotes, ...publicAppointment } = appointment;
+    if (publicAppointment.medical_case && typeof publicAppointment.medical_case === 'object') {
+      const {
+        doctorRecommendation,
+        doctorDecisionNotes: _caseDoctorDecisionNotes,
+        commissionDecision,
+        commissionDecisionNotes,
+        ...publicCase
+      } = publicAppointment.medical_case;
+      publicAppointment.medical_case = publicCase;
+    }
     return publicAppointment;
   }
   if (role === 'doctor') {
