@@ -35,6 +35,7 @@ const STAFF_UPDATE_FIELDS = [
   'dueDate',
 ];
 const STAFF_CREATE_FIELDS = ['reviewStatus', 'reviewNotes', 'requestedLanguage', 'dueDate'];
+const TERMINAL_CASE_STATUSES = ['COMPLETED', 'CANCELLED'];
 
 function pickFields(body: Record<string, any>, fields: string[]) {
   return Object.fromEntries(Object.entries(body).filter(([key]) => fields.includes(key)));
@@ -43,6 +44,49 @@ function pickFields(body: Record<string, any>, fields: string[]) {
 function getRelationRef(value: any) {
   if (!value) return undefined;
   return typeof value === 'object' ? value.documentId || value.id : value;
+}
+
+function buildDocumentIntakeCaseNumber() {
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `MT-${date}-${suffix}`;
+}
+
+async function findOrCreatePatientUploadCase(strapi: any, user: any) {
+  if (!user?.documentId) return undefined;
+
+  const activeCases = await strapi.documents('api::medical-case.medical-case' as any).findMany({
+    filters: {
+      patient: { documentId: user.documentId },
+      status: { $notIn: TERMINAL_CASE_STATUSES },
+    },
+    sort: ['updatedAt:desc'],
+    limit: 1,
+    fields: ['id', 'documentId', 'status'],
+  });
+
+  if (activeCases[0]?.documentId) {
+    return activeCases[0].documentId;
+  }
+
+  const created = await strapi.documents('api::medical-case.medical-case' as any).create({
+    data: {
+      title: 'Patient document upload',
+      caseNumber: buildDocumentIntakeCaseNumber(),
+      status: 'WAITING_FOR_DOCUMENTS',
+      patient: user.documentId,
+      country: user.country || '',
+      language: user.language || 'en',
+      timezone: user.timezone || '',
+      preferredContact: user.phone || user.email || '',
+      leadSource: 'patient_documents',
+    },
+    status: 'published',
+    fields: ['id', 'documentId', 'status'],
+  });
+
+  return created?.documentId;
 }
 
 export default factories.createCoreController('api::medical-document.medical-document', () => ({
@@ -170,6 +214,7 @@ export default factories.createCoreController('api::medical-document.medical-doc
     const isAdmin = isAdminUser(user);
     const isDoctor = role === 'doctor';
     const isStaff = ['manager', 'coordinator'].includes(role);
+    const isPatientSelfUpload = !isAdmin && !isDoctor && !isStaff;
     const canSetReviewFields = isAdmin || isDoctor || isStaff;
 
     // Resolve user (patient) documentId
@@ -252,7 +297,10 @@ export default factories.createCoreController('api::medical-document.medical-doc
 
     let medicalCaseDocId: string | undefined;
     let linkedCaseRecord: any;
-    const requestedCaseRef = body.medical_case || appointmentRecord?.medical_case?.documentId || appointmentRecord?.medical_case?.id;
+    const fallbackPatientCaseRef = (!body.medical_case && !appointmentRecord?.medical_case && isPatientSelfUpload)
+      ? await findOrCreatePatientUploadCase(strapi, user)
+      : undefined;
+    const requestedCaseRef = body.medical_case || appointmentRecord?.medical_case?.documentId || appointmentRecord?.medical_case?.id || fallbackPatientCaseRef;
     if (requestedCaseRef) {
       let caseRecord: any;
       if (typeof requestedCaseRef === 'number') {

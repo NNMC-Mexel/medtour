@@ -29,7 +29,26 @@ import Modal from '../../components/ui/Modal'
 import { formatDate, cn } from '../../utils/helpers'
 import useDocumentStore from '../../stores/documentStore'
 import useAuthStore from '../../stores/authStore'
-import api, { getMediaUrl, openMediaInNewTab } from '../../services/api'
+import api, { getMediaUrl, medicalCasesAPI, normalizeResponse, openMediaInNewTab } from '../../services/api'
+
+const ACTIVE_CASE_STATUSES = new Set([
+  'NEW_LEAD',
+  'REGISTERED',
+  'WAITING_FOR_DOCUMENTS',
+  'DOCUMENTS_UPLOADED',
+  'UNDER_REVIEW',
+  'DOCTOR_ASSIGNED',
+  'WAITING_PATIENT_CONFIRMATION',
+  'WAITING_PAYMENT',
+  'CONSULTATION_BOOKED',
+  'CONSULTATION_COMPLETED',
+  'COMMISSION_REVIEW',
+  'TREATMENT_IN_KAZAKHSTAN',
+  'TRAVEL_PREPARATION',
+  'ARRIVED_TO_KAZAKHSTAN',
+  'IN_TREATMENT',
+  'RECOVERY',
+])
 
 const isHiddenLegacyConsultationDoc = (doc) =>
   !!doc.doctor && !!doc.appointment && ['other', 'prescription'].includes(doc.type)
@@ -47,6 +66,7 @@ function PatientDocuments() {
     other: { label: t('documents.type_other'), icon: FileText, color: 'bg-slate-100 text-slate-700' },
   }
   const { user } = useAuthStore()
+  const canUploadDocuments = user?.userRole === 'patient'
   const {
     documents,
     myDoctors,
@@ -82,6 +102,8 @@ function PatientDocuments() {
   const [uploadTitle, setUploadTitle] = useState('')
   const [uploadType, setUploadType] = useState('other')
   const [uploadDescription, setUploadDescription] = useState('')
+  const [medicalCases, setMedicalCases] = useState([])
+  const [uploadCaseId, setUploadCaseId] = useState('')
   const fileInputRef = useRef(null)
   // Synchronous double-submit guard: the `isUploading` store flag only disables
   // the button after a React re-render, leaving a window where a fast double
@@ -95,6 +117,31 @@ function PatientDocuments() {
       fetchMyDoctors()
     }
   }, [user?.id, fetchDocuments, fetchMyDoctors])
+
+  useEffect(() => {
+    let ignore = false
+
+    if (user?.userRole !== 'patient') {
+      setMedicalCases([])
+      setUploadCaseId('')
+      return undefined
+    }
+
+    medicalCasesAPI.getAll()
+      .then((response) => {
+        if (ignore) return
+        const { data } = normalizeResponse(response)
+        setMedicalCases(Array.isArray(data) ? data : [])
+      })
+      .catch((error) => {
+        console.error('Error fetching patient medical cases for documents:', error)
+        if (!ignore) setMedicalCases([])
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [user?.id, user?.userRole])
 
   // Preview logic
   useEffect(() => {
@@ -208,6 +255,15 @@ function PatientDocuments() {
     return docs.filter(d => d.type === filter)
   }, [selectedFolder, folders, ungroupedDocs, filter])
 
+  const activeMedicalCases = useMemo(() => (
+    medicalCases.filter((item) => ACTIVE_CASE_STATUSES.has(item.status || ''))
+  ), [medicalCases])
+
+  useEffect(() => {
+    if (uploadCaseId && activeMedicalCases.some((item) => (item.documentId || item.id) === uploadCaseId)) return
+    setUploadCaseId(activeMedicalCases[0]?.documentId || activeMedicalCases[0]?.id || '')
+  }, [activeMedicalCases, uploadCaseId])
+
   const stats = {
     total: documents.length,
     analysis: documents.filter(d => d.type === 'analysis').length,
@@ -245,6 +301,7 @@ function PatientDocuments() {
         type: uploadType,
         description: uploadDescription,
         userId: user.id,
+        medicalCaseId: uploadCaseId || undefined,
       })
       if (result.success) {
         setShowUploadModal(false)
@@ -260,6 +317,7 @@ function PatientDocuments() {
     setUploadTitle('')
     setUploadType('other')
     setUploadDescription('')
+    setUploadCaseId(activeMedicalCases[0]?.documentId || activeMedicalCases[0]?.id || '')
   }
 
   const handleDelete = async (id) => {
@@ -349,9 +407,11 @@ function PatientDocuments() {
           <h1 className="text-2xl font-bold text-slate-900">{t('documents.title')}</h1>
           <p className="text-slate-600">{t('documents.subtitle')}</p>
         </div>
-        <Button onClick={() => setShowUploadModal(true)} leftIcon={<Upload className="w-4 h-4" />}>
-          {t('documents.upload_button')}
-        </Button>
+        {canUploadDocuments && (
+          <Button onClick={() => setShowUploadModal(true)} leftIcon={<Upload className="w-4 h-4" />}>
+            {t('documents.upload_button')}
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -830,6 +890,25 @@ function PatientDocuments() {
               ))}
             </select>
           </div>
+
+          {user?.userRole === 'patient' && activeMedicalCases.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                {t('nav.medical_cases')}
+              </label>
+              <select
+                value={uploadCaseId}
+                onChange={(e) => setUploadCaseId(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                {activeMedicalCases.map((item) => {
+                  const id = item.documentId || item.id
+                  const label = item.caseNumber || item.title || t('cases.case_title_label')
+                  return <option key={id} value={id}>{label}</option>
+                })}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">{t('documents.doc_desc_label')}</label>
