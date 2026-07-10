@@ -6,7 +6,6 @@ import {
   Building2,
   Calendar,
   CheckCircle,
-  CreditCard,
   FileText,
   Upload,
   Loader2,
@@ -19,12 +18,14 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
+import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import Textarea from '../../components/ui/Textarea'
 import Input from '../../components/ui/Input'
 import { useToast } from '../../components/ui/Toast'
 import useAuthStore from '../../stores/authStore'
 import CaseSlotPicker from '../../components/cases/CaseSlotPicker'
+import { cn } from '../../utils/helpers'
 import {
   documentsAPI,
   clinicsAPI,
@@ -38,7 +39,6 @@ import {
   visaRequestsAPI,
   tourismPackagesAPI,
   caseEventsAPI,
-  financeLedgerAPI,
   uploadFile,
 } from '../../services/api'
 import {
@@ -193,6 +193,7 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
   const [title, setTitle] = useState('')
   const [type, setType] = useState('other')
   const [description, setDescription] = useState('')
+  const [showUploadModal, setShowUploadModal] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [savingDocId, setSavingDocId] = useState(null)
   // Synchronous guard against double-submit (the isUploading state disables the
@@ -200,6 +201,19 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
   const uploadingRef = useRef(false)
 
   const docs = medicalCase.medical_documents || []
+
+  const resetUploadForm = () => {
+    setFile(null)
+    setTitle('')
+    setDescription('')
+    setType('other')
+  }
+
+  const closeUploadModal = () => {
+    if (isUploading) return
+    setShowUploadModal(false)
+    resetUploadForm()
+  }
 
   const submit = async (event) => {
     event.preventDefault()
@@ -221,10 +235,8 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
         medical_case: medicalCase.documentId || medicalCase.id,
       })
       toast.success(t('case_detail.toast_doc_uploaded'))
-      setFile(null)
-      setTitle('')
-      setDescription('')
-      setType('other')
+      resetUploadForm()
+      setShowUploadModal(false)
       onUploaded?.()
     } catch (error) {
       toast.error(error?.response?.data?.error?.message || error.message || t('case_detail.toast_doc_error'))
@@ -259,12 +271,91 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('case_detail.section_docs')}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <form onSubmit={submit} className="grid lg:grid-cols-4 gap-3 items-end">
+    <>
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle>{t('case_detail.section_docs')}</CardTitle>
+          <Button
+            size="sm"
+            onClick={() => setShowUploadModal(true)}
+            leftIcon={<Upload className="w-4 h-4" />}
+            className="sm:w-auto"
+          >
+            {t('documents.upload_action')}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {docs.length === 0 ? (
+            <div className="text-sm text-slate-500 bg-slate-50 rounded-xl p-4">
+              {t('documents.empty_all')}
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
+              {docs.map(doc => {
+                const reviewStatus = doc.reviewStatus || 'UPLOADED'
+                const docId = doc.documentId || doc.id
+                return (
+                  <div key={docId} className="flex flex-col gap-3 p-4">
+                    <div className="flex items-start gap-3">
+                      <FileText className="w-5 h-5 text-teal-600 mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-slate-900">{doc.title}</p>
+                          <Badge variant={DOCUMENT_STATUS_VARIANTS[reviewStatus] || 'default'}>
+                            {t(`case_detail.doc_status_${reviewStatus.toLowerCase()}`, { defaultValue: reviewStatus })}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-slate-500">{doc.type || 'other'}{doc.description ? ` · ${doc.description}` : ''}</p>
+                        {doc.reviewNotes && <p className="text-xs text-slate-600 mt-1">{doc.reviewNotes}</p>}
+                        {doc.dueDate && <p className="text-xs text-amber-700 mt-1">{t('case_detail.doc_due_date')}: {doc.dueDate}</p>}
+                      </div>
+                      {doc.file && (
+                        <Button size="sm" variant="outline" className="shrink-0" onClick={() => openDocument(doc)}>
+                          {t('case_detail.doc_open_btn')}
+                        </Button>
+                      )}
+                    </div>
+                    {canReview && (
+                      <div className="grid md:grid-cols-[220px_1fr_160px_auto] gap-3 items-end">
+                        <Select
+                          label={t('case_detail.doc_review_status')}
+                          value={reviewStatus}
+                          onChange={(e) => updateDocumentReview(doc, { reviewStatus: e.target.value })}
+                          options={DOCUMENT_REVIEW_STATUSES.map(value => ({
+                            value,
+                            label: t(`case_detail.doc_status_${value.toLowerCase()}`, { defaultValue: value }),
+                          }))}
+                        />
+                        <Input
+                          label={t('case_detail.doc_review_notes')}
+                          defaultValue={doc.reviewNotes || ''}
+                          onBlur={(e) => e.target.value !== (doc.reviewNotes || '') && updateDocumentReview(doc, { reviewNotes: e.target.value })}
+                          placeholder={t('case_detail.doc_review_notes_placeholder')}
+                        />
+                        <Input
+                          label={t('case_detail.doc_due_date')}
+                          type="date"
+                          defaultValue={doc.dueDate || ''}
+                          onBlur={(e) => e.target.value !== (doc.dueDate || '') && updateDocumentReview(doc, { dueDate: e.target.value || null })}
+                        />
+                        {savingDocId === docId && <Loader2 className="w-5 h-5 animate-spin text-teal-600 mb-3" />}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Modal
+        isOpen={showUploadModal}
+        onClose={closeUploadModal}
+        title={t('documents.upload_modal_title')}
+        closeOnOverlay={!isUploading}
+      >
+        <form onSubmit={submit} className="space-y-4">
           <Input
             label={t('documents.doc_name_label')}
             value={title}
@@ -297,81 +388,23 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
               className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-teal-700 hover:file:bg-teal-100"
             />
           </div>
-          <Button type="submit" disabled={isUploading} leftIcon={isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}>
-            {t('documents.upload_action')}
-          </Button>
           <Textarea
-            containerClassName="lg:col-span-4"
             label={t('documents.description')}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            rows={2}
+            rows={3}
           />
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="secondary" onClick={closeUploadModal} disabled={isUploading}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" disabled={isUploading} leftIcon={isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}>
+              {t('documents.upload_action')}
+            </Button>
+          </div>
         </form>
-
-        {docs.length === 0 ? (
-          <div className="text-sm text-slate-500 bg-slate-50 rounded-xl p-4">
-            {t('documents.empty_all')}
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
-            {docs.map(doc => {
-              const reviewStatus = doc.reviewStatus || 'UPLOADED'
-              const docId = doc.documentId || doc.id
-              return (
-                <div key={docId} className="flex flex-col gap-3 p-4">
-                  <div className="flex items-start gap-3">
-                    <FileText className="w-5 h-5 text-teal-600 mt-0.5" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium text-slate-900">{doc.title}</p>
-                        <Badge variant={DOCUMENT_STATUS_VARIANTS[reviewStatus] || 'default'}>
-                          {t(`case_detail.doc_status_${reviewStatus.toLowerCase()}`, { defaultValue: reviewStatus })}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-slate-500">{doc.type || 'other'}{doc.description ? ` · ${doc.description}` : ''}</p>
-                      {doc.reviewNotes && <p className="text-xs text-slate-600 mt-1">{doc.reviewNotes}</p>}
-                      {doc.dueDate && <p className="text-xs text-amber-700 mt-1">{t('case_detail.doc_due_date')}: {doc.dueDate}</p>}
-                    </div>
-                    {doc.file && (
-                      <Button size="sm" variant="outline" className="shrink-0" onClick={() => openDocument(doc)}>
-                        {t('case_detail.doc_open_btn')}
-                      </Button>
-                    )}
-                  </div>
-                  {canReview && (
-                    <div className="grid md:grid-cols-[220px_1fr_160px_auto] gap-3 items-end">
-                      <Select
-                        label={t('case_detail.doc_review_status')}
-                        value={reviewStatus}
-                        onChange={(e) => updateDocumentReview(doc, { reviewStatus: e.target.value })}
-                        options={DOCUMENT_REVIEW_STATUSES.map(value => ({
-                          value,
-                          label: t(`case_detail.doc_status_${value.toLowerCase()}`, { defaultValue: value }),
-                        }))}
-                      />
-                      <Input
-                        label={t('case_detail.doc_review_notes')}
-                        defaultValue={doc.reviewNotes || ''}
-                        onBlur={(e) => e.target.value !== (doc.reviewNotes || '') && updateDocumentReview(doc, { reviewNotes: e.target.value })}
-                        placeholder={t('case_detail.doc_review_notes_placeholder')}
-                      />
-                      <Input
-                        label={t('case_detail.doc_due_date')}
-                        type="date"
-                        defaultValue={doc.dueDate || ''}
-                        onBlur={(e) => e.target.value !== (doc.dueDate || '') && updateDocumentReview(doc, { dueDate: e.target.value || null })}
-                      />
-                      {savingDocId === docId && <Loader2 className="w-5 h-5 animate-spin text-teal-600 mb-3" />}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </Modal>
+    </>
   )
 }
 
@@ -719,7 +752,7 @@ function linesToRequiredDocs(value) {
     .filter(Boolean)
 }
 
-function LogisticsWorkspace({ medicalCase, checklists, visas, tourism, canEdit, onChanged }) {
+function LogisticsWorkspace({ medicalCase, checklists, visas, tourism, canEdit, section = 'summary', onChanged }) {
   const { t } = useTranslation()
   const toast = useToast()
   const [isSaving, setIsSaving] = useState(false)
@@ -860,7 +893,7 @@ function LogisticsWorkspace({ medicalCase, checklists, visas, tourism, canEdit, 
     }
   }
 
-  if (!canEdit) {
+  if (!canEdit || section === 'summary') {
     return (
       <Card>
         <CardHeader>
@@ -870,6 +903,122 @@ function LogisticsWorkspace({ medicalCase, checklists, visas, tourism, canEdit, 
           <TimelineItem icon={FileText} title={t('case_detail.trip_checklist')} value={currentChecklist?.status ? t(`case_detail.logistics_${currentChecklist.status.toLowerCase()}`, { defaultValue: currentChecklist.status }) : undefined} muted={!currentChecklist} />
           <TimelineItem icon={Plane} title={t('case_detail.visa_request')} value={currentVisa?.status ? t(`case_detail.logistics_${currentVisa.status.toLowerCase()}`, { defaultValue: currentVisa.status }) : undefined} muted={!currentVisa} />
           <TimelineItem icon={Calendar} title={t('case_detail.tourism_package')} value={currentTourism?.status ? t(`case_detail.logistics_${currentTourism.status.toLowerCase()}`, { defaultValue: currentTourism.status }) : undefined} muted={!currentTourism} />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (section === 'logistics') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('case_detail.trip_checklist')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Select
+            label={t('case_detail.logistics_status_label')}
+            value={tripForm.status}
+            onChange={(e) => { setSavedAction(''); setTripForm(prev => ({ ...prev, status: e.target.value })) }}
+            options={['OPEN', 'IN_PROGRESS', 'COMPLETED'].map(value => ({ value, label: t(`case_detail.logistics_${value.toLowerCase()}`, { defaultValue: value }) }))}
+          />
+          <Textarea
+            label={t('case_detail.trip_items_label')}
+            value={tripForm.itemsText}
+            onChange={(e) => { setSavedAction(''); setTripForm(prev => ({ ...prev, itemsText: e.target.value })) }}
+            rows={5}
+            placeholder={t('case_detail.trip_items_placeholder')}
+          />
+          <Textarea
+            label={t('case_detail.logistics_notes_label')}
+            value={tripForm.managerNotes}
+            onChange={(e) => { setSavedAction(''); setTripForm(prev => ({ ...prev, managerNotes: e.target.value })) }}
+            rows={3}
+          />
+          <Button
+            size="sm"
+            onClick={saveTrip}
+            disabled={isSaving}
+            variant={savedAction === 'trip' ? 'success' : 'primary'}
+            leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : savedAction === 'trip' ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          >
+            {savedAction === 'trip' ? t('common.saved') : t('case_detail.save_trip_btn')}
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (section === 'visa') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('case_detail.visa_request')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Input label={t('case_detail.visa_country_label')} value={visaForm.country} onChange={(e) => { setSavedAction(''); setVisaForm(prev => ({ ...prev, country: e.target.value })) }} />
+            <Input label={t('case_detail.visa_type_label')} value={visaForm.visaType} onChange={(e) => { setSavedAction(''); setVisaForm(prev => ({ ...prev, visaType: e.target.value })) }} />
+          </div>
+          <Select
+            label={t('case_detail.logistics_status_label')}
+            value={visaForm.status}
+            onChange={(e) => { setSavedAction(''); setVisaForm(prev => ({ ...prev, status: e.target.value })) }}
+            options={['NOT_STARTED', 'DOCS_REQUESTED', 'DOCS_RECEIVED', 'INVITATION_PREPARING', 'INVITATION_SENT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'NOT_REQUIRED'].map(value => ({ value, label: t(`case_detail.visa_status_${value.toLowerCase()}`, { defaultValue: value }) }))}
+          />
+          <Textarea
+            label={t('case_detail.visa_required_docs_label')}
+            value={visaForm.requiredDocsText}
+            onChange={(e) => { setSavedAction(''); setVisaForm(prev => ({ ...prev, requiredDocsText: e.target.value })) }}
+            rows={5}
+            placeholder={t('case_detail.visa_required_docs_placeholder')}
+          />
+          <Textarea label={t('case_detail.logistics_notes_label')} value={visaForm.notes} onChange={(e) => { setSavedAction(''); setVisaForm(prev => ({ ...prev, notes: e.target.value })) }} rows={3} />
+          <Button
+            size="sm"
+            onClick={saveVisa}
+            disabled={isSaving}
+            variant={savedAction === 'visa' ? 'success' : 'primary'}
+            leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : savedAction === 'visa' ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          >
+            {savedAction === 'visa' ? t('common.saved') : t('case_detail.save_visa_btn')}
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (section === 'tourism') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('case_detail.tourism_package')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Input label={t('case_detail.tourism_title_label')} value={tourismForm.title} onChange={(e) => { setSavedAction(''); setTourismForm(prev => ({ ...prev, title: e.target.value })) }} />
+            <Input label={t('case_detail.tourism_city_label')} value={tourismForm.city} onChange={(e) => { setSavedAction(''); setTourismForm(prev => ({ ...prev, city: e.target.value })) }} />
+          </div>
+          <div className="grid sm:grid-cols-3 gap-4">
+            <Select
+              label={t('case_detail.logistics_status_label')}
+              value={tourismForm.status}
+              onChange={(e) => { setSavedAction(''); setTourismForm(prev => ({ ...prev, status: e.target.value })) }}
+              options={['DRAFT', 'OFFERED', 'ACCEPTED', 'DECLINED', 'BOOKED', 'COMPLETED', 'CANCELLED'].map(value => ({ value, label: t(`case_detail.tourism_status_${value.toLowerCase()}`, { defaultValue: value }) }))}
+            />
+            <Input label={t('case_detail.plan_cost_label')} type="number" value={tourismForm.totalCost} onChange={(e) => { setSavedAction(''); setTourismForm(prev => ({ ...prev, totalCost: e.target.value })) }} />
+            <Select label={t('case_detail.plan_currency_label')} value={tourismForm.currency} onChange={(e) => { setSavedAction(''); setTourismForm(prev => ({ ...prev, currency: e.target.value })) }} options={['USD', 'EUR', 'GBP', 'KZT'].map(value => ({ value, label: value }))} />
+          </div>
+          <Textarea label={t('case_detail.tourism_desc_label')} value={tourismForm.description} onChange={(e) => { setSavedAction(''); setTourismForm(prev => ({ ...prev, description: e.target.value })) }} rows={4} />
+          <Textarea label={t('case_detail.logistics_notes_label')} value={tourismForm.notes} onChange={(e) => { setSavedAction(''); setTourismForm(prev => ({ ...prev, notes: e.target.value })) }} rows={3} />
+          <Button
+            size="sm"
+            onClick={saveTourism}
+            disabled={isSaving}
+            variant={savedAction === 'tourism' ? 'success' : 'primary'}
+            leftIcon={isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : savedAction === 'tourism' ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          >
+            {savedAction === 'tourism' ? t('common.saved') : t('case_detail.save_tourism_btn')}
+          </Button>
         </CardContent>
       </Card>
     )
@@ -999,6 +1148,7 @@ function MedicalCaseDetail() {
   const canViewPatientContact = ['admin', 'manager', 'coordinator', 'patient'].includes(role)
   const canViewBusinessFields = ['admin', 'manager'].includes(role)
   const canViewTravel = ['admin', 'manager', 'patient'].includes(role)
+  const canEditTravel = ['admin', 'manager'].includes(role)
 
   const [medicalCase, setMedicalCase] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -1012,10 +1162,12 @@ function MedicalCaseDetail() {
   const [visas, setVisas] = useState([])
   const [tourism, setTourism] = useState([])
   const [events, setEvents] = useState([])
-  const [ledger, setLedger] = useState([])
+  // Finance ledger is intentionally hidden for now.
+  // const [ledger, setLedger] = useState([])
   const [form, setForm] = useState({})
   const [showSlotPicker, setShowSlotPicker] = useState(false)
   const [caseSaveState, setCaseSaveState] = useState('idle')
+  const [activeTab, setActiveTab] = useState('overview')
 
   const loadCase = async () => {
     setIsLoading(true)
@@ -1057,7 +1209,7 @@ function MedicalCaseDetail() {
         setChecklists([])
         setVisas([])
         setTourism([])
-        setLedger([])
+        // setLedger([])
         return
       }
 
@@ -1069,7 +1221,8 @@ function MedicalCaseDetail() {
         canViewTravel ? visaRequestsAPI.getByCase(id) : Promise.resolve({ data: { data: [] } }),
         canViewTravel ? tourismPackagesAPI.getByCase(id) : Promise.resolve({ data: { data: [] } }),
         caseEventsAPI.getByCase(id),
-        canManage ? financeLedgerAPI.getAll({ caseId: id }) : Promise.resolve({ data: { data: [] } }),
+        // Finance ledger is hidden and not loaded for now.
+        // canManage ? financeLedgerAPI.getAll({ caseId: id }) : Promise.resolve({ data: { data: [] } }),
       ]
 
       if (role === 'admin') {
@@ -1085,10 +1238,10 @@ function MedicalCaseDetail() {
       setVisas(normalizeResponse(responses[4]).data || [])
       setTourism(normalizeResponse(responses[5]).data || [])
       setEvents(normalizeResponse(responses[6]).data || [])
-      setLedger(normalizeResponse(responses[7]).data || [])
+      // setLedger(normalizeResponse(responses[7]).data || [])
       if (role === 'admin') {
-        setManagers(normalizeResponse(responses[8]).data || [])
-        setCoordinators(normalizeResponse(responses[9]).data || [])
+        setManagers(normalizeResponse(responses[7]).data || [])
+        setCoordinators(normalizeResponse(responses[8]).data || [])
       }
     } catch (error) {
       console.warn('Reference data load failed', error)
@@ -1274,6 +1427,23 @@ function MedicalCaseDetail() {
       .filter(value => !(current === 'COMMISSION_REVIEW' && commissionDecisionTargets.includes(value)))
   }, [medicalCase?.status, role])
   const caseSla = getCaseSla(medicalCase)
+  const detailTabs = useMemo(() => {
+    const tabs = [{ id: 'overview', label: t('case_detail.tab_overview') }]
+    if (canEditTravel) {
+      tabs.push(
+        { id: 'logistics', label: t('case_detail.tab_logistics') },
+        { id: 'visa', label: t('case_detail.tab_visa') },
+        { id: 'tourism', label: t('case_detail.tab_tourism') },
+      )
+    }
+    return tabs
+  }, [canEditTravel, t])
+
+  useEffect(() => {
+    if (!canEditTravel && activeTab !== 'overview') {
+      setActiveTab('overview')
+    }
+  }, [activeTab, canEditTravel])
 
   const assignedDoctor = useMemo(() => {
     const docRef = getRef(medicalCase?.doctor)
@@ -1357,6 +1527,24 @@ function MedicalCaseDetail() {
         )}
       </div>
 
+      <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 pb-2" aria-label={t('case_detail.case_tabs_label')}>
+        {detailTabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              'shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
+              activeTab === tab.id
+                ? 'bg-teal-600 text-white shadow-sm shadow-teal-600/20'
+                : 'text-slate-600 hover:bg-white hover:text-slate-900'
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
       {role === 'patient' && (
         <PatientNextStep status={medicalCase.status} />
       )}
@@ -1372,6 +1560,7 @@ function MedicalCaseDetail() {
         </div>
       )}
 
+      {activeTab === 'overview' && (
       <div className="grid xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 space-y-6">
           <Card>
@@ -1630,20 +1819,8 @@ function MedicalCaseDetail() {
             </Card>
           )}
 
-          {canViewTravel && (
-            <LogisticsWorkspace
-              medicalCase={medicalCase}
-              checklists={checklists}
-              visas={visas}
-              tourism={tourism}
-              canEdit={['admin', 'manager'].includes(role)}
-              onChanged={async () => {
-                await loadCase()
-                await loadReferenceData()
-              }}
-            />
-          )}
-
+          {/*
+          Finance ledger is temporarily hidden from the case page.
           {canManage && (
             <Card>
               <CardHeader>
@@ -1672,6 +1849,7 @@ function MedicalCaseDetail() {
               </CardContent>
             </Card>
           )}
+          */}
 
           <Card>
             <CardHeader>
@@ -1694,6 +1872,22 @@ function MedicalCaseDetail() {
           </Card>
         </div>
       </div>
+      )}
+
+      {activeTab !== 'overview' && canEditTravel && (
+        <LogisticsWorkspace
+          medicalCase={medicalCase}
+          checklists={checklists}
+          visas={visas}
+          tourism={tourism}
+          canEdit={canEditTravel}
+          section={activeTab}
+          onChanged={async () => {
+            await loadCase()
+            await loadReferenceData()
+          }}
+        />
+      )}
 
       <CaseSlotPicker
         isOpen={showSlotPicker}

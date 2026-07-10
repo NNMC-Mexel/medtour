@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   Bell,
@@ -61,6 +61,7 @@ function staffDisplayName(person) {
 
 function CaseCard({ item, role, doctors, conversations, claimingCaseId, onClaim, onAssignDoctor, onChangeStatus, onOpenChat, onRequestDocs }) {
   const { t } = useTranslation()
+  const location = useLocation()
   const status = normalizeCaseStatus(item.status)
   const sla = getCaseSla(item)
   const allowedTransitions = getAllowedCaseTransitions(role, status)
@@ -70,12 +71,23 @@ function CaseCard({ item, role, doctors, conversations, claimingCaseId, onClaim,
   const assignedStaffName = staffDisplayName(assignedStaff)
   const hasClaimForRole = Boolean(assignedStaff)
   const isClaiming = String(claimingCaseId || '') === String(getCaseId(item))
+  const caseId = getCaseId(item)
+  const caseTitle = item.caseNumber || item.title || `Case #${item.id}`
+  const base = roleBase(role)
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-semibold text-sm text-slate-900 truncate">{item.caseNumber || item.title || `Case #${item.id}`}</p>
+          <Link
+            to={`${base}/cases/${caseId}`}
+            state={{ from: location.pathname }}
+            onClick={(event) => event.stopPropagation()}
+            className="block truncate text-sm font-semibold text-slate-900 transition-colors hover:text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 rounded-sm"
+            title={caseTitle}
+          >
+            {caseTitle}
+          </Link>
           <p className="text-xs text-slate-500 truncate">{patientName(item, t)} · {item.country || t('staff.country_pending')}</p>
         </div>
         {unreadCount > 0 && <Badge variant="danger">{unreadCount}</Badge>}
@@ -536,8 +548,9 @@ function StaffDashboard() {
               {patientPipeline.map((item) => {
                 const sla = getCaseSla(item)
                 const unread = getUnreadByCase(conversations, item).count
+                const caseId = getCaseId(item)
                 return (
-                  <button key={getCaseId(item)} type="button" onClick={() => setSelectedCase(item)} className="w-full flex items-center justify-between gap-3 text-left">
+                  <button key={caseId} type="button" onClick={() => setSelectedCase(item)} className="w-full flex items-center justify-between gap-3 text-left">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-slate-900 truncate">{patientName(item)}</p>
                       <p className="text-xs text-slate-500 truncate">{formatCaseStatus(item.status, t)} · {item.treatmentCategory || t('staff.direction_pending')}</p>

@@ -28,7 +28,7 @@ import Textarea from '../../components/ui/Textarea'
 import Select from '../../components/ui/Select'
 import { useToast } from '../../components/ui/Toast'
 import useAuthStore from '../../stores/authStore'
-import { medicalCasesAPI, normalizeResponse, specializationsAPI, uploadFile } from '../../services/api'
+import { documentsAPI, medicalCasesAPI, normalizeResponse, specializationsAPI, uploadFile } from '../../services/api'
 import { getCaseSla, formatCaseStatus, MEDICAL_CASE_STATUSES, normalizeCaseStatus, STATUS_VARIANTS } from '../../utils/medicalCaseWorkflow'
 import { cn } from '../../utils/helpers'
 import { foldCountryText, getCountryOptions, normalizeCountryValue } from '../../utils/countries'
@@ -229,10 +229,8 @@ function CreateCaseModal({ onClose, onCreated }) {
     treatmentCategory: '',
     urgency: 'routine',
     preferredArrivalDate: '',
-    budgetRange: '',
     preferredContact: user?.phone || '',
     visaSupportNeeded: 'unknown',
-    currentTreatment: '',
     tourismRequested: 'false',
     leadSource: '',
     leadCampaign: '',
@@ -299,8 +297,7 @@ function CreateCaseModal({ onClose, onCreated }) {
 
   const canProceedStep1 = form.title && form.country && form.treatmentCategory
   const canProceedStep2 = form.urgency
-  const canProceedStep3 = form.visaSupportNeeded
-  const canProceedStep4 = form.leadSource
+  const canProceedStep3 = form.visaSupportNeeded && form.leadSource
 
   const submit = async (event) => {
     event.preventDefault()
@@ -316,20 +313,49 @@ function CreateCaseModal({ onClose, onCreated }) {
         desiredDates: {
           preferredArrivalDate: form.preferredArrivalDate || null,
         },
-        budgetRange: form.budgetRange,
         preferredContact: form.preferredContact,
         leadSource: form.leadSource,
         leadCampaign: form.leadCampaign,
         leadReferrer: typeof document !== 'undefined' ? document.referrer : '',
         visaSupportNeeded: form.visaSupportNeeded === 'true',
-        currentTreatment: form.currentTreatment,
         tourismRequested: form.tourismRequested === 'true',
         language: user?.language || 'en',
         timezone: user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
       })
       const { data } = normalizeResponse(response)
-      toast.success(t('cases.toast_created'))
-      onCreated(data)
+
+      const caseRef = data?.documentId || data?.id
+      let hasDocumentLinkError = false
+      if (caseRef && uploadedDocuments.length > 0) {
+        const documentResults = await Promise.allSettled(uploadedDocuments.map((doc) => documentsAPI.create({
+          title: doc.name || t('cases.uploaded_document_title'),
+          type: 'other',
+          description: '',
+          file: doc.id,
+          medical_case: caseRef,
+        })))
+        hasDocumentLinkError = documentResults.some((result) => result.status === 'rejected')
+        if (hasDocumentLinkError) {
+          console.error('Some medical documents failed to link:', documentResults)
+        }
+      }
+
+      let createdCase = data
+      if (caseRef) {
+        try {
+          const updatedResponse = await medicalCasesAPI.getOne(caseRef)
+          createdCase = normalizeResponse(updatedResponse)?.data || data
+        } catch (refreshError) {
+          console.error('Error refreshing created medical case:', refreshError)
+        }
+      }
+
+      if (hasDocumentLinkError) {
+        toast.warning(t('cases.toast_created_document_link_error'))
+      } else {
+        toast.success(t('cases.toast_created'))
+      }
+      onCreated(createdCase)
       onClose()
     } catch (error) {
       toast.error(error?.response?.data?.error?.message || t('cases.toast_create_error'))
@@ -338,13 +364,11 @@ function CreateCaseModal({ onClose, onCreated }) {
     }
   }
 
-  const totalSteps = 5
+  const totalSteps = 3
   const stepTitles = [
     t('cases.step1_title') || 'Основная информация',
-    t('cases.step2_title') || 'Сроки и дата',
-    t('cases.step3_title') || 'Поддержка',
-    t('cases.step4_title') || 'Источник заявки',
-    t('cases.step5_title') || 'Медицинские данные',
+    t('cases.step2_title') || 'Сроки и госпитализация',
+    t('cases.step3_title') || 'Поддержка и комментарий',
   ]
 
   return (
@@ -354,11 +378,11 @@ function CreateCaseModal({ onClose, onCreated }) {
       title={`${t('cases.modal_title')} - ${stepTitles[step - 1]}`}
       size="lg"
       footer={
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-slate-500">
+        <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-slate-500 sm:min-w-[88px]">
             {t('cases.step')} {step} {t('cases.of')} {totalSteps}
           </div>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
             {step > 1 && (
               <Button
                 type="button"
@@ -378,8 +402,7 @@ function CreateCaseModal({ onClose, onCreated }) {
                   isSaving ||
                   (step === 1 && !canProceedStep1) ||
                   (step === 2 && !canProceedStep2) ||
-                  (step === 3 && !canProceedStep3) ||
-                  (step === 4 && !canProceedStep4)
+                  (step === 3 && !canProceedStep3)
                 }
                 rightIcon={<ChevronRight className="w-4 h-4" />}
               >
@@ -487,7 +510,7 @@ function CreateCaseModal({ onClose, onCreated }) {
           </div>
         )}
 
-        {/* Step 2: Urgency & Date */}
+        {/* Step 2: Hospitalization urgency & contact */}
         {step === 2 && (
           <div className="space-y-4">
             <Select
@@ -508,12 +531,6 @@ function CreateCaseModal({ onClose, onCreated }) {
               onChange={(e) => update('preferredArrivalDate', e.target.value)}
             />
             <Input
-              label={t('cases.budget_label')}
-              value={form.budgetRange}
-              onChange={(e) => update('budgetRange', e.target.value)}
-              placeholder={t('cases.budget_placeholder')}
-            />
-            <Input
               label={t('cases.contact_label')}
               value={form.preferredContact}
               onChange={(e) => update('preferredContact', e.target.value)}
@@ -522,7 +539,7 @@ function CreateCaseModal({ onClose, onCreated }) {
           </div>
         )}
 
-        {/* Step 3: Visa & Tourism Support */}
+        {/* Step 3: Support, source and patient comment */}
         {step === 3 && (
           <div className="space-y-4">
             <Select
@@ -545,12 +562,6 @@ function CreateCaseModal({ onClose, onCreated }) {
                 { value: 'true', label: t('cases.tourism_yes') },
               ]}
             />
-          </div>
-        )}
-
-        {/* Step 4: Lead Source */}
-        {step === 4 && (
-          <div className="space-y-4">
             <Select
               label={t('cases.lead_source_label')}
               value={form.leadSource}
@@ -565,38 +576,12 @@ function CreateCaseModal({ onClose, onCreated }) {
               ]}
               required
             />
-            <Input
-              label={t('cases.lead_campaign_label')}
+            <Textarea
+              label={t('cases.patient_comment_label')}
               value={form.leadCampaign}
               onChange={(e) => update('leadCampaign', e.target.value)}
-              placeholder={t('cases.lead_campaign_placeholder')}
-            />
-          </div>
-        )}
-
-        {/* Step 5: Medical Info */}
-        {step === 5 && (
-          <div className="space-y-4">
-            <Textarea
-              label={t('cases.diagnosis_label')}
-              value={form.diagnosis}
-              onChange={(e) => update('diagnosis', e.target.value)}
               rows={3}
-              placeholder={t('cases.diagnosis_placeholder') || 'Опишите диагноз...'}
-            />
-            <Textarea
-              label={t('cases.symptoms_label')}
-              value={form.symptoms}
-              onChange={(e) => update('symptoms', e.target.value)}
-              rows={3}
-              placeholder={t('cases.symptoms_placeholder') || 'Опишите симптомы...'}
-            />
-            <Textarea
-              label={t('cases.treatment_label')}
-              value={form.currentTreatment}
-              onChange={(e) => update('currentTreatment', e.target.value)}
-              rows={3}
-              placeholder={t('cases.treatment_placeholder') || 'Текущее лечение..'}
+              placeholder={t('cases.patient_comment_placeholder')}
             />
           </div>
         )}
