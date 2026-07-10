@@ -46,23 +46,12 @@ function AppointmentDetail() {
   const [isLoading, setIsLoading] = useState(true)
 
   // Post-consultation notes state (doctors only)
-  const [activeNotesTab, setActiveNotesTab] = useState('diagnosis')
   const [diagnosisText, setDiagnosisText] = useState('')
-  const [planText, setPlanText] = useState('')
-  const [prescriptionsText, setPrescriptionsText] = useState('')
   const [diagnosisFile, setDiagnosisFile] = useState(null)
-  const [planFile, setPlanFile] = useState(null)
-  const [prescriptionsFile, setPrescriptionsFile] = useState(null)
-  const [existingDocIds, setExistingDocIds] = useState({ certificate: null, other: null, prescription: null })
+  const [existingDocIds, setExistingDocIds] = useState({ certificate: null })
   const [isSavingDiagnosis, setIsSavingDiagnosis] = useState(false)
-  const [isSavingPlan, setIsSavingPlan] = useState(false)
-  const [isSavingPrescriptions, setIsSavingPrescriptions] = useState(false)
   const [diagnosisSaved, setDiagnosisSaved] = useState(false)
-  const [planSaved, setPlanSaved] = useState(false)
-  const [prescriptionsSaved, setPrescriptionsSaved] = useState(false)
   const [isUploadingFile, setIsUploadingFile] = useState(false)
-  const [isUploadingPlanFile, setIsUploadingPlanFile] = useState(false)
-  const [isUploadingPrescriptionsFile, setIsUploadingPrescriptionsFile] = useState(false)
   const [doctorDecision, setDoctorDecision] = useState('')
   const [doctorDecisionNotes, setDoctorDecisionNotes] = useState('')
   const [isSavingDoctorDecision, setIsSavingDoctorDecision] = useState(false)
@@ -96,23 +85,11 @@ function AppointmentDetail() {
   useEffect(() => {
     if (!documents.length) return
     const cert = documents.find(d => d.type === 'certificate')
-    const plan = documents.find(d => d.type === 'other')
-    const presc = documents.find(d => d.type === 'prescription')
 
     if (cert) {
       setDiagnosisText(cert.description || '')
       setExistingDocIds(prev => ({ ...prev, certificate: cert.documentId || cert.id }))
       if (cert.file) setDiagnosisFile(cert.file)
-    }
-    if (plan) {
-      setPlanText(plan.description || '')
-      setExistingDocIds(prev => ({ ...prev, other: plan.documentId || plan.id }))
-      if (plan.file) setPlanFile(plan.file)
-    }
-    if (presc) {
-      setPrescriptionsText(presc.description || '')
-      setExistingDocIds(prev => ({ ...prev, prescription: presc.documentId || presc.id }))
-      if (presc.file) setPrescriptionsFile(presc.file)
     }
   }, [documents])
 
@@ -175,106 +152,6 @@ function AppointmentDetail() {
       console.error('Error saving diagnosis:', err)
     } finally {
       setIsSavingDiagnosis(false)
-    }
-  }
-
-  const handlePlanFile = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setIsUploadingPlanFile(true)
-    try {
-      const uploaded = await uploadFile(file)
-      setPlanFile(uploaded)
-    } catch (err) {
-      console.error('Error uploading plan file:', err)
-    } finally {
-      setIsUploadingPlanFile(false)
-    }
-  }
-
-  const handlePrescriptionsFile = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setIsUploadingPrescriptionsFile(true)
-    try {
-      const uploaded = await uploadFile(file)
-      setPrescriptionsFile(uploaded)
-    } catch (err) {
-      console.error('Error uploading prescriptions file:', err)
-    } finally {
-      setIsUploadingPrescriptionsFile(false)
-    }
-  }
-
-  const savePlan = async () => {
-    if (!appointment?.id || (!planText.trim() && !planFile)) return
-    setIsSavingPlan(true)
-    const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
-    const appointmentRef = appointment.documentId || appointment.id
-    const patientRef = appointment.patient?.documentId || appointment.patient?.id
-    const doctorRef = appointment.doctor?.documentId || appointment.doctor?.id
-    try {
-      if (existingDocIds.other) {
-        await documentsAPI.update(existingDocIds.other, {
-          description: planText,
-          ...(planFile?.id && { file: planFile.id }),
-        })
-      } else {
-        const res = await documentsAPI.create({
-          title: t('video.doc_plan'),
-          type: 'other',
-          description: planText,
-          ...(planFile?.id && { file: planFile.id }),
-          appointment: appointmentRef,
-          ...(caseId && { medical_case: caseId }),
-          user: patientRef,
-          doctor: doctorRef,
-        })
-        const newDoc = res.data?.data
-        if (newDoc) setExistingDocIds(prev => ({ ...prev, other: newDoc.documentId || newDoc.id }))
-      }
-      setPlanSaved(true)
-      setTimeout(() => setPlanSaved(false), 2000)
-    } catch (err) {
-      console.error('Error saving plan:', err)
-    } finally {
-      setIsSavingPlan(false)
-    }
-  }
-
-  const savePrescriptions = async () => {
-    if (!appointment?.id || (!prescriptionsText.trim() && !prescriptionsFile)) return
-    setIsSavingPrescriptions(true)
-    const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
-    const appointmentRef = appointment.documentId || appointment.id
-    const patientRef = appointment.patient?.documentId || appointment.patient?.id
-    const doctorRef = appointment.doctor?.documentId || appointment.doctor?.id
-    try {
-      if (existingDocIds.prescription) {
-        await documentsAPI.update(existingDocIds.prescription, {
-          description: prescriptionsText,
-          ...(prescriptionsFile?.id && { file: prescriptionsFile.id }),
-        })
-      } else {
-        const res = await documentsAPI.create({
-          title: t('video.doc_prescriptions'),
-          type: 'prescription',
-          description: prescriptionsText,
-          ...(prescriptionsFile?.id && { file: prescriptionsFile.id }),
-          appointment: appointmentRef,
-          ...(caseId && { medical_case: caseId }),
-          user: patientRef,
-          doctor: doctorRef,
-        })
-        const newDoc = res.data?.data
-        if (newDoc) setExistingDocIds(prev => ({ ...prev, prescription: newDoc.documentId || newDoc.id }))
-      }
-      setPrescriptionsSaved(true)
-      setTimeout(() => setPrescriptionsSaved(false), 2000)
-    } catch (err) {
-      console.error('Error saving prescriptions:', err)
-    } finally {
-      setIsSavingPrescriptions(false)
     }
   }
 
@@ -371,18 +248,13 @@ function AppointmentDetail() {
     other: t('appointment_detail.doctype_other'),
   }
 
-  const notesTabs = [
-    { key: 'diagnosis', label: t('video.tab_diagnosis') },
-    { key: 'plan', label: t('video.plan_label') },
-    { key: 'prescriptions', label: t('video.prescriptions_label') },
-  ]
-
   const doctorDecisionOptions = [
     { value: '', label: t('appointment_detail.private_decision_placeholder') },
     { value: 'treatment_required', label: t('appointment_detail.private_decision_treatment_kz') },
     { value: 'no_treatment_needed', label: t('appointment_detail.private_decision_local') },
     { value: 'needs_more_documents', label: t('appointment_detail.private_decision_more_docs') },
   ]
+  const visibleDocuments = documents.filter(doc => !['other', 'prescription'].includes(doc.type))
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -487,184 +359,74 @@ function AppointmentDetail() {
                   </div>
                 )}
 
-                {/* Tabs */}
-                <div className="flex gap-1 mb-4 bg-slate-100 p-1 rounded-xl">
-                  {notesTabs.map(tab => (
-                    <button
-                      key={tab.key}
-                      onClick={() => setActiveNotesTab(tab.key)}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        activeNotesTab === tab.key
-                          ? 'bg-white text-slate-900 shadow-sm'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
+                <div className="mb-4">
+                  <p className="text-sm font-medium text-slate-700">
+                    {t('appointment_detail.conclusion_label')}
+                  </p>
                 </div>
 
-                {/* Diagnosis tab */}
-                {activeNotesTab === 'diagnosis' && (
-                  <div className="space-y-3">
-                    <textarea
-                      value={diagnosisText}
-                      onChange={e => setDiagnosisText(e.target.value)}
-                      disabled={!isWithinWindow}
-                      placeholder={t('appointment_detail.diagnosis_placeholder')}
-                      rows={5}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    />
-                    {isWithinWindow && (
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-colors text-sm text-slate-600">
-                          <Paperclip className="w-4 h-4" />
-                          {isUploadingFile
-                            ? t('appointment_detail.uploading')
-                            : diagnosisFile
-                            ? (diagnosisFile.name || t('appointment_detail.file_attached'))
-                            : t('appointment_detail.attach_file')}
-                          <input
-                            type="file"
-                            className="hidden"
-                            onChange={handleDiagnosisFile}
-                            disabled={isUploadingFile}
-                          />
-                        </label>
-                        {diagnosisFile && (
-                          <button
-                            onClick={() => setDiagnosisFile(null)}
-                            className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {!isWithinWindow && diagnosisFile && (
-                      <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <Paperclip className="w-4 h-4 text-slate-400" />
-                        <span>{diagnosisFile.name || t('appointment_detail.file_attached')}</span>
-                        {diagnosisFile.url && (
-                          <button
-                            type="button"
-                            onClick={() => openAttachment(diagnosisFile)}
-                            className="text-teal-600 hover:underline"
-                          >
-                            {t('appointment_detail.open')}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {isWithinWindow && (
-                      <Button
-                        size="sm"
-                        onClick={saveDiagnosis}
-                        isLoading={isSavingDiagnosis}
-                        leftIcon={diagnosisSaved ? <Check className="w-4 h-4" /> : null}
-                        className={diagnosisSaved ? 'bg-green-600! hover:bg-green-700!' : ''}
-                      >
-                        {diagnosisSaved ? t('appointment_detail.saved') : t('appointment_detail.save')}
-                      </Button>
-                    )}
-                  </div>
-                )}
-
-                {/* Plan tab */}
-                {activeNotesTab === 'plan' && (
-                  <div className="space-y-3">
-                    <textarea
-                      value={planText}
-                      onChange={e => setPlanText(e.target.value)}
-                      disabled={!isWithinWindow}
-                      placeholder={t('appointment_detail.plan_placeholder')}
-                      rows={5}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    />
-                    {isWithinWindow && (
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-colors text-sm text-slate-600">
-                          <Paperclip className="w-4 h-4" />
-                          {isUploadingPlanFile ? t('appointment_detail.uploading') : planFile ? (planFile.name || t('appointment_detail.file_attached')) : t('appointment_detail.attach_file')}
-                          <input type="file" className="hidden" onChange={handlePlanFile} disabled={isUploadingPlanFile} />
-                        </label>
-                        {planFile && (
-                          <button onClick={() => setPlanFile(null)} className="p-1 text-slate-400 hover:text-rose-500 transition-colors">
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {!isWithinWindow && planFile && (
-                      <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <Paperclip className="w-4 h-4 text-slate-400" />
-                        <span>{planFile.name || t('appointment_detail.file_attached')}</span>
-                        {planFile.url && (
-                          <button type="button" onClick={() => openAttachment(planFile)} className="text-teal-600 hover:underline">{t('appointment_detail.open')}</button>
-                        )}
-                      </div>
-                    )}
-                    {isWithinWindow && (
-                      <Button
-                        size="sm"
-                        onClick={savePlan}
-                        isLoading={isSavingPlan}
-                        leftIcon={planSaved ? <Check className="w-4 h-4" /> : null}
-                        className={planSaved ? 'bg-green-600! hover:bg-green-700!' : ''}
-                      >
-                        {planSaved ? t('appointment_detail.saved') : t('appointment_detail.save')}
-                      </Button>
-                    )}
-                  </div>
-                )}
-
-                {/* Prescriptions tab */}
-                {activeNotesTab === 'prescriptions' && (
-                  <div className="space-y-3">
-                    <textarea
-                      value={prescriptionsText}
-                      onChange={e => setPrescriptionsText(e.target.value)}
-                      disabled={!isWithinWindow}
-                      placeholder={t('appointment_detail.prescriptions_placeholder')}
-                      rows={5}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    />
-                    {isWithinWindow && (
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-colors text-sm text-slate-600">
-                          <Paperclip className="w-4 h-4" />
-                          {isUploadingPrescriptionsFile ? t('appointment_detail.uploading') : prescriptionsFile ? (prescriptionsFile.name || t('appointment_detail.file_attached')) : t('appointment_detail.attach_file')}
-                          <input type="file" className="hidden" onChange={handlePrescriptionsFile} disabled={isUploadingPrescriptionsFile} />
-                        </label>
-                        {prescriptionsFile && (
-                          <button onClick={() => setPrescriptionsFile(null)} className="p-1 text-slate-400 hover:text-rose-500 transition-colors">
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {!isWithinWindow && prescriptionsFile && (
-                      <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <Paperclip className="w-4 h-4 text-slate-400" />
-                        <span>{prescriptionsFile.name || t('appointment_detail.file_attached')}</span>
-                        {prescriptionsFile.url && (
-                          <button type="button" onClick={() => openAttachment(prescriptionsFile)} className="text-teal-600 hover:underline">{t('appointment_detail.open')}</button>
-                        )}
-                      </div>
-                    )}
-                    {isWithinWindow && (
-                      <Button
-                        size="sm"
-                        onClick={savePrescriptions}
-                        isLoading={isSavingPrescriptions}
-                        leftIcon={prescriptionsSaved ? <Check className="w-4 h-4" /> : null}
-                        className={prescriptionsSaved ? 'bg-green-600! hover:bg-green-700!' : ''}
-                      >
-                        {prescriptionsSaved ? t('appointment_detail.saved') : t('appointment_detail.save')}
-                      </Button>
-                    )}
-                  </div>
-                )}
+                <div className="space-y-3">
+                  <textarea
+                    value={diagnosisText}
+                    onChange={e => setDiagnosisText(e.target.value)}
+                    disabled={!isWithinWindow}
+                    placeholder={t('appointment_detail.conclusion_placeholder')}
+                    rows={5}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
+                  />
+                  {isWithinWindow && (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-colors text-sm text-slate-600">
+                        <Paperclip className="w-4 h-4" />
+                        {isUploadingFile
+                          ? t('appointment_detail.uploading')
+                          : diagnosisFile
+                          ? (diagnosisFile.name || t('appointment_detail.file_attached'))
+                          : t('appointment_detail.attach_file')}
+                        <input
+                          type="file"
+                          className="hidden"
+                          onChange={handleDiagnosisFile}
+                          disabled={isUploadingFile}
+                        />
+                      </label>
+                      {diagnosisFile && (
+                        <button
+                          onClick={() => setDiagnosisFile(null)}
+                          className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {!isWithinWindow && diagnosisFile && (
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <Paperclip className="w-4 h-4 text-slate-400" />
+                      <span>{diagnosisFile.name || t('appointment_detail.file_attached')}</span>
+                      {diagnosisFile.url && (
+                        <button
+                          type="button"
+                          onClick={() => openAttachment(diagnosisFile)}
+                          className="text-teal-600 hover:underline"
+                        >
+                          {t('appointment_detail.open')}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {isWithinWindow && (
+                    <Button
+                      size="sm"
+                      onClick={saveDiagnosis}
+                      isLoading={isSavingDiagnosis}
+                      leftIcon={diagnosisSaved ? <Check className="w-4 h-4" /> : null}
+                      className={diagnosisSaved ? 'bg-green-600! hover:bg-green-700!' : ''}
+                    >
+                      {diagnosisSaved ? t('appointment_detail.saved') : t('appointment_detail.save')}
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           )}
@@ -771,14 +533,14 @@ function AppointmentDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {documents.length === 0 ? (
+              {visibleDocuments.length === 0 ? (
                 <div className="text-center py-8">
                   <FileText className="w-12 h-12 mx-auto text-slate-300 mb-3" />
                   <p className="text-slate-500 text-sm">{t('appointment_detail.no_docs')}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {documents.map((doc) => {
+                  {visibleDocuments.map((doc) => {
                     return (
                       <div
                         key={doc.id}

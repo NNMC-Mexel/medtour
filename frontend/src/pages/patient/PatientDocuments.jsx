@@ -31,6 +31,9 @@ import useDocumentStore from '../../stores/documentStore'
 import useAuthStore from '../../stores/authStore'
 import api, { getMediaUrl, openMediaInNewTab } from '../../services/api'
 
+const isHiddenLegacyConsultationDoc = (doc) =>
+  !!doc.doctor && !!doc.appointment && ['other', 'prescription'].includes(doc.type)
+
 function PatientDocuments() {
   const { t, i18n } = useTranslation()
 
@@ -149,7 +152,7 @@ function PatientDocuments() {
       // Patient-uploaded doc: no doctor relation (doctor uploads have doctor set)
       const isPatientUploaded = !doc.doctor
 
-      if (apt) {
+      if (apt && !isHiddenLegacyConsultationDoc(doc)) {
         const aptKey = apt.documentId || apt.id
         if (!grouped[aptKey]) {
           grouped[aptKey] = {

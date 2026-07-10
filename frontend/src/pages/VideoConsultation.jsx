@@ -22,7 +22,6 @@ import {
   ChevronRight,
   Stethoscope,
   ClipboardList,
-  Pill,
   Settings,
   MoreVertical,
   User,
@@ -114,21 +113,11 @@ function VideoConsultation({
   // Notes state
   const [notesTab, setNotesTab] = useState('diagnosis')
   const [diagnosisText, setDiagnosisText] = useState('')
-  const [planText, setPlanText] = useState('')
-  const [prescriptionsText, setPrescriptionsText] = useState('')
   const [diagnosisFile, setDiagnosisFile] = useState(null)
-  const [planFile, setPlanFile] = useState(null)
-  const [prescriptionsFile, setPrescriptionsFile] = useState(null)
-  const [isUploadingPlanFile, setIsUploadingPlanFile] = useState(false)
-  const [isUploadingPrescriptionsFile, setIsUploadingPrescriptionsFile] = useState(false)
   const [isSavingDiagnosis, setIsSavingDiagnosis] = useState(false)
-  const [isSavingPlan, setIsSavingPlan] = useState(false)
-  const [isSavingPrescriptions, setIsSavingPrescriptions] = useState(false)
   const [diagnosisSaved, setDiagnosisSaved] = useState(false)
-  const [planSaved, setPlanSaved] = useState(false)
-  const [prescriptionsSaved, setPrescriptionsSaved] = useState(false)
   // Track existing document IDs to update instead of create duplicates
-  const [existingDocIds, setExistingDocIds] = useState({ certificate: null, other: null, prescription: null })
+  const [existingDocIds, setExistingDocIds] = useState({ certificate: null })
   const [patientDocuments, setPatientDocuments] = useState([])
   const [isLoadingDocs, setIsLoadingDocs] = useState(false)
 
@@ -400,21 +389,13 @@ function VideoConsultation({
           const docAptId = d.appointment?.documentId || d.appointment?.id
           return docAptId && String(docAptId) === String(aptId)
         })
-        const ids = { certificate: null, other: null, prescription: null }
+        const ids = { certificate: null }
         for (const doc of aptDocs) {
           const docId = doc.documentId || doc.id
           if (doc.type === 'certificate' && !ids.certificate) {
             ids.certificate = docId
             setDiagnosisText(doc.description || '')
             if (doc.file) setDiagnosisFile(doc.file)
-          } else if (doc.type === 'other' && !ids.other) {
-            ids.other = docId
-            setPlanText(doc.description || '')
-            if (doc.file) setPlanFile(doc.file)
-          } else if (doc.type === 'prescription' && !ids.prescription) {
-            ids.prescription = docId
-            setPrescriptionsText(doc.description || '')
-            if (doc.file) setPrescriptionsFile(doc.file)
           }
         }
         setExistingDocIds(ids)
@@ -1013,34 +994,6 @@ function VideoConsultation({
     }
   }
 
-  const handlePlanFile = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setIsUploadingPlanFile(true)
-    try {
-      const uploaded = await uploadFile(file)
-      setPlanFile(uploaded)
-    } catch (err) {
-      console.error('Error uploading plan file:', err)
-    } finally {
-      setIsUploadingPlanFile(false)
-    }
-  }
-
-  const handlePrescriptionsFile = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setIsUploadingPrescriptionsFile(true)
-    try {
-      const uploaded = await uploadFile(file)
-      setPrescriptionsFile(uploaded)
-    } catch (err) {
-      console.error('Error uploading prescriptions file:', err)
-    } finally {
-      setIsUploadingPrescriptionsFile(false)
-    }
-  }
-
   const saveDiagnosis = async () => {
     if (!appointment?.id) return
     setIsSavingDiagnosis(true)
@@ -1074,78 +1027,6 @@ function VideoConsultation({
       console.error('Error saving diagnosis:', err)
     } finally {
       setIsSavingDiagnosis(false)
-    }
-  }
-
-  const savePlan = async () => {
-    if (!appointment?.id || (!planText.trim() && !planFile)) return
-    setIsSavingPlan(true)
-    const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
-    const appointmentRef = appointment.documentId || appointment.id
-    const patientRef = appointment.patient?.documentId || appointment.patient?.id
-    const doctorRef = appointment.doctor?.documentId || appointment.doctor?.id
-    try {
-      if (existingDocIds.other) {
-        await documentsAPI.update(existingDocIds.other, {
-          description: planText,
-          ...(planFile?.id && { file: planFile.id }),
-        })
-      } else {
-        const res = await documentsAPI.create({
-          title: t('video.doc_plan'),
-          type: 'other',
-          description: planText,
-          ...(planFile?.id && { file: planFile.id }),
-          appointment: appointmentRef,
-          ...(caseId && { medical_case: caseId }),
-          user: patientRef,
-          doctor: doctorRef,
-        })
-        const newDoc = res.data?.data
-        if (newDoc) setExistingDocIds(prev => ({ ...prev, other: newDoc.documentId || newDoc.id }))
-      }
-      setPlanSaved(true)
-      setTimeout(() => setPlanSaved(false), 2000)
-    } catch (err) {
-      console.error('Error saving plan:', err)
-    } finally {
-      setIsSavingPlan(false)
-    }
-  }
-
-  const savePrescriptions = async () => {
-    if (!appointment?.id || (!prescriptionsText.trim() && !prescriptionsFile)) return
-    setIsSavingPrescriptions(true)
-    const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
-    const appointmentRef = appointment.documentId || appointment.id
-    const patientRef = appointment.patient?.documentId || appointment.patient?.id
-    const doctorRef = appointment.doctor?.documentId || appointment.doctor?.id
-    try {
-      if (existingDocIds.prescription) {
-        await documentsAPI.update(existingDocIds.prescription, {
-          description: prescriptionsText,
-          ...(prescriptionsFile?.id && { file: prescriptionsFile.id }),
-        })
-      } else {
-        const res = await documentsAPI.create({
-          title: t('video.doc_prescriptions'),
-          type: 'prescription',
-          description: prescriptionsText,
-          ...(prescriptionsFile?.id && { file: prescriptionsFile.id }),
-          appointment: appointmentRef,
-          ...(caseId && { medical_case: caseId }),
-          user: patientRef,
-          doctor: doctorRef,
-        })
-        const newDoc = res.data?.data
-        if (newDoc) setExistingDocIds(prev => ({ ...prev, prescription: newDoc.documentId || newDoc.id }))
-      }
-      setPrescriptionsSaved(true)
-      setTimeout(() => setPrescriptionsSaved(false), 2000)
-    } catch (err) {
-      console.error('Error saving prescriptions:', err)
-    } finally {
-      setIsSavingPrescriptions(false)
     }
   }
 
@@ -1797,9 +1678,7 @@ function VideoConsultation({
             {/* Notes Sub-tabs */}
             <div className="flex items-center gap-1.5 p-4 border-b border-slate-100 overflow-x-auto">
               {[
-                { id: 'diagnosis', label: t('video.tab_diagnosis'), icon: Stethoscope },
-                { id: 'plan', label: t('video.tab_plan'), icon: ClipboardList },
-                { id: 'prescriptions', label: t('video.tab_prescriptions'), icon: Pill },
+                { id: 'diagnosis', label: t('video.conclusion_label'), icon: Stethoscope },
                 { id: 'documents', label: t('video.tab_documents'), icon: FolderOpen },
               ].map((tab) => (
                   <button
@@ -1841,7 +1720,7 @@ function VideoConsultation({
                       value={diagnosisText}
                       onChange={(e) => setDiagnosisText(e.target.value)}
                       className="w-full h-48 px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder={t('video.diagnosis_placeholder')}
+                      placeholder={t('video.conclusion_placeholder')}
                     />
                     {diagnosisFile && (
                       <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg text-sm">
@@ -1868,118 +1747,6 @@ function VideoConsultation({
                       {isSavingDiagnosis ? t('video.saving') : t('video.save')}
                     </Button>
                     {diagnosisSaved && (
-                      <span className="flex items-center gap-1 text-sm text-emerald-600">
-                        <Check className="w-4 h-4" /> {t('video.saved')}
-                      </span>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {notesTab === 'plan' && (
-                <>
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-sm font-medium text-slate-700">{t('video.plan_label')}</label>
-                      <label className="flex items-center gap-1.5 text-xs text-teal-600 cursor-pointer hover:text-teal-700">
-                        <Upload className="w-3.5 h-3.5" />
-                        {isUploadingPlanFile ? t('video.uploading') : t('video.upload_file')}
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                          onChange={handlePlanFile}
-                          disabled={isUploadingPlanFile}
-                        />
-                      </label>
-                    </div>
-                    <textarea
-                      value={planText}
-                      onChange={(e) => setPlanText(e.target.value)}
-                      className="w-full h-48 px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder={t('video.plan_placeholder')}
-                    />
-                    {planFile && (
-                      <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg text-sm">
-                        <FileText className="w-4 h-4 text-slate-400" />
-                        <span className="text-slate-600 truncate">{planFile.name}</span>
-                        <button
-                          onClick={() => setPlanFile(null)}
-                          title={t('common.remove')}
-                          aria-label={t('common.remove')}
-                          className="ml-auto p-1 hover:bg-slate-200 rounded"
-                        >
-                          <X className="w-3 h-3 text-slate-400" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      onClick={savePlan}
-                      leftIcon={<Save className="w-4 h-4" />}
-                      disabled={isSavingPlan || (!planText.trim() && !planFile)}
-                      className="flex-1"
-                    >
-                      {isSavingPlan ? t('video.saving') : t('video.save')}
-                    </Button>
-                    {planSaved && (
-                      <span className="flex items-center gap-1 text-sm text-emerald-600">
-                        <Check className="w-4 h-4" /> {t('video.saved')}
-                      </span>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {notesTab === 'prescriptions' && (
-                <>
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-sm font-medium text-slate-700">{t('video.prescriptions_label')}</label>
-                      <label className="flex items-center gap-1.5 text-xs text-teal-600 cursor-pointer hover:text-teal-700">
-                        <Upload className="w-3.5 h-3.5" />
-                        {isUploadingPrescriptionsFile ? t('video.uploading') : t('video.upload_file')}
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                          onChange={handlePrescriptionsFile}
-                          disabled={isUploadingPrescriptionsFile}
-                        />
-                      </label>
-                    </div>
-                    <textarea
-                      value={prescriptionsText}
-                      onChange={(e) => setPrescriptionsText(e.target.value)}
-                      className="w-full h-48 px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder={t('video.prescriptions_placeholder')}
-                    />
-                    {prescriptionsFile && (
-                      <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg text-sm">
-                        <FileText className="w-4 h-4 text-slate-400" />
-                        <span className="text-slate-600 truncate">{prescriptionsFile.name}</span>
-                        <button
-                          onClick={() => setPrescriptionsFile(null)}
-                          title={t('common.remove')}
-                          aria-label={t('common.remove')}
-                          className="ml-auto p-1 hover:bg-slate-200 rounded"
-                        >
-                          <X className="w-3 h-3 text-slate-400" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      onClick={savePrescriptions}
-                      leftIcon={<Save className="w-4 h-4" />}
-                      disabled={isSavingPrescriptions || (!prescriptionsText.trim() && !prescriptionsFile)}
-                      className="flex-1"
-                    >
-                      {isSavingPrescriptions ? t('video.saving') : t('video.save')}
-                    </Button>
-                    {prescriptionsSaved && (
                       <span className="flex items-center gap-1 text-sm text-emerald-600">
                         <Check className="w-4 h-4" /> {t('video.saved')}
                       </span>
