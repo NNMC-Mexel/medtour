@@ -59,6 +59,23 @@ export default defineConfig(({ mode }) => {
         '127.0.0.1',
       ],
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined
+            if (id.includes('react-dom') || id.includes('react-router') || /node_modules\/react\//.test(id)) return 'react-vendor'
+            if (id.includes('lucide-react')) return 'icons-vendor'
+            if (id.includes('i18next')) return 'i18n-vendor'
+            if (id.includes('axios')) return 'http-vendor'
+            if (id.includes('zustand')) return 'state-vendor'
+            if (id.includes('date-fns')) return 'date-vendor'
+            if (id.includes('@capacitor')) return 'capacitor-vendor'
+            return undefined
+          },
+        },
+      },
+    },
     define: {
       'import.meta.env.VITE_API_URL': JSON.stringify(API_URL),
       'import.meta.env.VITE_SIGNALING_SERVER': JSON.stringify(SIGNALING_SERVER),

@@ -166,6 +166,19 @@ async function decideFileAccess(ctx, key: string): Promise<AccessDecision> {
     }
   }
 
+  // Treatment department hero images are stored as compact media descriptors
+  // inside the global JSON field, so they do not create a Strapi morph relation.
+  // Treat an exact file-id reference from that public CMS content as public.
+  const globalContent: any = await strapi.documents('api::global.global').findFirst({
+    fields: ['treatmentDepartments'] as any,
+  });
+  const treatmentDepartments = Array.isArray(globalContent?.treatmentDepartments)
+    ? globalContent.treatmentDepartments
+    : [];
+  if (treatmentDepartments.some((department: any) => Number(department?.heroImage?.id) === Number(uploadFile.id))) {
+    return { allowed: true, isMedicalDocument: false };
+  }
+
   // 2. Chat attachments are private too, but they are linked to messages
   //    rather than medical-document. Authorise through conversation/case RBAC.
   const user = await getAuthenticatedUser(ctx);

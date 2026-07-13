@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import VideoConsultation from '../../pages/VideoConsultation'
 import useAuthStore from '../../stores/authStore'
 import useConsultationStore from '../../stores/consultationStore'
+
+const VideoConsultation = lazy(() => import('../../pages/VideoConsultation'))
 
 function getRoleHomePath(user) {
   const userRole = user?.userRole || 'patient'
@@ -60,13 +61,15 @@ function ActiveConsultation() {
   }
 
   return (
-    <VideoConsultation
-      roomId={activeRoomId}
-      isMinimized={isMinimized}
-      onMinimize={handleMinimize}
-      onRestore={handleRestore}
-      onClose={handleClose}
-    />
+    <Suspense fallback={null}>
+      <VideoConsultation
+        roomId={activeRoomId}
+        isMinimized={isMinimized}
+        onMinimize={handleMinimize}
+        onRestore={handleRestore}
+        onClose={handleClose}
+      />
+    </Suspense>
   )
 }
 

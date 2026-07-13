@@ -20,6 +20,9 @@
       "target": "api::specialization.specialization",
       "inversedBy": "doctors"
     },
+    "treatmentDepartments": {
+      "type": "json"
+    },
     "experience": {
       "type": "integer"
     },

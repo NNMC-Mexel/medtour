@@ -10,6 +10,7 @@ const variants = {
   ghost: 'text-slate-600 hover:bg-slate-100 active:bg-slate-200',
   danger: 'bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 shadow-md shadow-rose-600/20',
   success: 'bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800 shadow-md shadow-emerald-600/20',
+  inverse: 'bg-white text-slate-900 hover:bg-slate-100 active:bg-slate-200 shadow-md shadow-slate-950/10',
 }
 
 const sizes = {
@@ -29,19 +30,30 @@ const Button = forwardRef(({
   leftIcon,
   rightIcon,
   className,
+  as: Component = 'button',
+  onClick,
   ...props
 }, ref) => {
   const { t } = useTranslation()
+  const isDisabled = disabled || isLoading
   return (
-    <button
+    <Component
       ref={ref}
-      disabled={disabled || isLoading}
+      {...(Component === 'button' ? { disabled: isDisabled } : { 'aria-disabled': isDisabled || undefined })}
+      onClick={(event) => {
+        if (isDisabled) {
+          event.preventDefault()
+          return
+        }
+        onClick?.(event)
+      }}
       className={cn(
         'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200',
         'focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2',
         'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
         variants[variant],
         sizes[size],
+        isDisabled && 'opacity-50 cursor-not-allowed pointer-events-none',
         className
       )}
       {...props}
@@ -58,7 +70,7 @@ const Button = forwardRef(({
           {rightIcon && <span className="flex-shrink-0">{rightIcon}</span>}
         </>
       )}
-    </button>
+    </Component>
   )
 })
 

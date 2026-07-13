@@ -19,7 +19,25 @@ const ADMIN_ONLY_FIELDS = [
   'licenseNumber',
   'position',
   'workplace',
+  'treatmentDepartments',
 ];
+
+const TREATMENT_DEPARTMENT_SLUGS = new Set([
+  'neurosurgery',
+  'therapy',
+  'urology',
+  'general-thoracic-surgery',
+  'interventional-cardiology',
+  'arrhythmology',
+  'gynecology',
+  'cardiac-surgery',
+]);
+
+function hasValidTreatmentDepartments(value: unknown) {
+  return Array.isArray(value)
+    && new Set(value).size === value.length
+    && value.every((slug) => typeof slug === 'string' && TREATMENT_DEPARTMENT_SLUGS.has(slug));
+}
 
 export default factories.createCoreController('api::doctor.doctor', ({ strapi }) => ({
   async find(ctx) {
@@ -65,6 +83,11 @@ export default factories.createCoreController('api::doctor.doctor', ({ strapi })
     const isAdmin = user.role?.type === 'admin' || user.userRole === 'admin';
     if (!isAdmin) return ctx.forbidden('Only admins can create doctors');
 
+    const body = (ctx.request.body as any)?.data || ctx.request.body || {};
+    if ('treatmentDepartments' in body && !hasValidTreatmentDepartments(body.treatmentDepartments)) {
+      return ctx.badRequest('Treatment department assignments are invalid');
+    }
+
     return await super.create(ctx);
   },
 
@@ -89,6 +112,9 @@ export default factories.createCoreController('api::doctor.doctor', ({ strapi })
     // Audit log for price changes (admin only path)
     if (isAdmin) {
       const body = (ctx.request.body as any)?.data || ctx.request.body || {};
+      if ('treatmentDepartments' in body && !hasValidTreatmentDepartments(body.treatmentDepartments)) {
+        return ctx.badRequest('Treatment department assignments are invalid');
+      }
       if ('price' in body) {
         strapi.log.info(JSON.stringify({
           audit: 'DOCTOR_PRICE_CHANGED',

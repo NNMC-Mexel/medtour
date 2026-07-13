@@ -8,44 +8,39 @@ import ConsultationRoute from './components/consultation/ConsultationRoute'
 // Layouts
 import { PublicLayout, DashboardLayout } from './components/layout'
 
-// Public Pages
-import LandingPage from './pages/LandingPage'
-import DoctorsPage from './pages/DoctorsPage'
-import DoctorProfilePage from './pages/DoctorProfilePage'
-import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage'
-import ForgotPasswordPage from './pages/ForgotPasswordPage'
-import ResetPasswordPage from './pages/ResetPasswordPage'
-import VerifyEmailSentPage from './pages/VerifyEmailSentPage'
-import EmailConfirmedPage from './pages/EmailConfirmedPage'
-import TourismPage from './pages/TourismPage'
-import PriceListPage from './pages/PriceListPage'
-
-// Patient Pages
-import PatientDashboard from './pages/patient/PatientDashboard'
-import PatientAppointments from './pages/patient/PatientAppointments'
-import PatientProfile from './pages/patient/PatientProfile'
-import PatientChat from './pages/patient/PatientChat'
-import PatientDocuments from './pages/patient/PatientDocuments'
-import PatientGuide from './pages/patient/PatientGuide'
-import AppointmentDetail from './pages/AppointmentDetail'
-import PatientPlanTrip from './pages/patient/PatientPlanTrip'
-
-import MedicalCasesPage from './pages/cases/MedicalCasesPage'
-import MedicalCaseDetail from './pages/cases/MedicalCaseDetail'
-
-import NotificationsPage from './pages/NotificationsPage'
-import PaymentSuccess from './pages/PaymentSuccess'
-import PaymentFailure from './pages/PaymentFailure'
-import PrivacyPage from './pages/PrivacyPage'
-import TermsPage from './pages/TermsPage'
-
 // Stores
 import useAuthStore from './stores/authStore'
 import { initializeMobilePushNotifications } from './services/mobilePush'
 
 // Utils
 import { PATIENT_NAV_ITEMS, DOCTOR_NAV_ITEMS, ADMIN_NAV_ITEMS, MANAGER_NAV_ITEMS, COORDINATOR_NAV_ITEMS } from './utils/constants'
+
+const LandingPage = lazy(() => import('./pages/LandingPage'))
+const DoctorsPage = lazy(() => import('./pages/DoctorsPage'))
+const DoctorProfilePage = lazy(() => import('./pages/DoctorProfilePage'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
+const RegisterPage = lazy(() => import('./pages/RegisterPage'))
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
+const VerifyEmailSentPage = lazy(() => import('./pages/VerifyEmailSentPage'))
+const EmailConfirmedPage = lazy(() => import('./pages/EmailConfirmedPage'))
+const TourismPage = lazy(() => import('./pages/TourismPage'))
+const PriceListPage = lazy(() => import('./pages/PriceListPage'))
+const PatientDashboard = lazy(() => import('./pages/patient/PatientDashboard'))
+const PatientAppointments = lazy(() => import('./pages/patient/PatientAppointments'))
+const PatientProfile = lazy(() => import('./pages/patient/PatientProfile'))
+const PatientChat = lazy(() => import('./pages/patient/PatientChat'))
+const PatientDocuments = lazy(() => import('./pages/patient/PatientDocuments'))
+const PatientGuide = lazy(() => import('./pages/patient/PatientGuide'))
+const AppointmentDetail = lazy(() => import('./pages/AppointmentDetail'))
+const PatientPlanTrip = lazy(() => import('./pages/patient/PatientPlanTrip'))
+const MedicalCasesPage = lazy(() => import('./pages/cases/MedicalCasesPage'))
+const MedicalCaseDetail = lazy(() => import('./pages/cases/MedicalCaseDetail'))
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'))
+const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'))
+const PaymentFailure = lazy(() => import('./pages/PaymentFailure'))
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'))
+const TermsPage = lazy(() => import('./pages/TermsPage'))
 
 const DoctorDashboard = lazy(() => import('./pages/doctor/DoctorDashboard'))
 const DoctorSchedule = lazy(() => import('./pages/doctor/DoctorSchedule'))
@@ -61,7 +56,9 @@ const AdminSpecializations = lazy(() => import('./pages/admin/AdminSpecializatio
 const AdminPriceList = lazy(() => import('./pages/admin/AdminPriceList'))
 const AdminGuideVideos = lazy(() => import('./pages/admin/AdminGuideVideos'))
 const AdminContent = lazy(() => import('./pages/admin/AdminContent'))
+const AdminTreatmentDepartments = lazy(() => import('./pages/admin/AdminTreatmentDepartments'))
 const StaffDashboard = lazy(() => import('./pages/staff/StaffDashboard'))
+const TreatmentDepartmentPage = lazy(() => import('./pages/TreatmentDepartmentPage'))
 
 // Loading component
 function LoadingScreen() {
@@ -179,6 +176,7 @@ function App() {
           <Route path="/specializations" element={<DoctorsPage />} />
           <Route path="/tourism" element={<TourismPage />} />
           <Route path="/prices" element={<PriceListPage />} />
+          <Route path="/treatments/:slug" element={<TreatmentDepartmentPage />} />
           <Route path="/about" element={<LandingPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
@@ -265,6 +263,7 @@ function App() {
           <Route path="doctors" element={<AdminDoctors />} />
           <Route path="appointments" element={<AdminAppointments />} />
           <Route path="specializations" element={<AdminSpecializations />} />
+          <Route path="treatment-departments" element={<AdminTreatmentDepartments />} />
           <Route path="prices" element={<AdminPriceList />} />
           <Route path="guide-videos" element={<AdminGuideVideos />} />
           <Route path="settings" element={<AdminContent />} />

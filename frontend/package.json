@@ -8,6 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "i18n:check": "node scripts/check-i18n.mjs",
+    "i18n:treatments": "node scripts/check-treatment-locales.mjs",
+    "qa:treatments": "npm run i18n:check && npm run i18n:treatments && node scripts/check-treatment-data.mjs",
     "check:env": "node scripts/check-production-env.mjs",
     "preview": "vite preview",
     "cap:sync": "cap sync",

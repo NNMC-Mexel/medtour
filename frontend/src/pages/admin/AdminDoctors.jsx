@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Camera, Check, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -11,6 +12,7 @@ import Badge from '../../components/ui/Badge'
 import ImageCropModal from '../../components/ui/ImageCropModal'
 import { useToast } from '../../components/ui/Toast'
 import api, { doctorsAPI, getMediaUrl, normalizeResponse, specializationsAPI, uploadFile } from '../../services/api'
+import { TREATMENT_DEPARTMENTS, localizeDepartment } from '../../data/treatmentDepartments'
 
 const defaultForm = {
   username: '',
@@ -19,6 +21,7 @@ const defaultForm = {
   confirmPassword: '',
   fullName: '',
   specialization: '',
+  treatmentDepartments: [],
   experience: '0',
   price: '8000',
   licenseNumber: '',
@@ -35,10 +38,25 @@ const defaultForm = {
   workingDays: '1,2,3,4,5',
 }
 
+const extractUser = (value) => {
+  if (!value) return null
+  if (Array.isArray(value)) return value[0] || null
+  return value
+}
+
+const extractCreatedUser = (response) => {
+  if (!response?.data) return null
+  if (response.data.user?.id) return response.data.user
+  if (response.data.id) return response.data
+  if (response.data.data?.id) return response.data.data
+  return null
+}
+
 function toPayload(form) {
   return {
     fullName: form.fullName.trim(),
     specialization: form.specialization ? Number(form.specialization) : null,
+    treatmentDepartments: form.treatmentDepartments,
     experience: Number(form.experience) || 0,
     price: Number(form.price) || 0,
     licenseNumber: form.licenseNumber.trim(),
@@ -57,7 +75,8 @@ function toPayload(form) {
 }
 
 function AdminDoctors({ readonly = false }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const [searchParams] = useSearchParams()
   const toast = useToast()
   const [doctors, setDoctors] = useState([])
   const [specializations, setSpecializations] = useState([])
@@ -74,20 +93,12 @@ function AdminDoctors({ readonly = false }) {
   const [cropModalOpen, setCropModalOpen] = useState(false)
   const [cropImageSrc, setCropImageSrc] = useState(null)
   const [doctorSaveState, setDoctorSaveState] = useState('idle')
-
-  const extractUser = (value) => {
-    if (!value) return null
-    if (Array.isArray(value)) return value[0] || null
-    return value
-  }
-
-  const extractCreatedUser = (response) => {
-    if (!response?.data) return null
-    if (response.data.user?.id) return response.data.user
-    if (response.data.id) return response.data
-    if (response.data.data?.id) return response.data.data
-    return null
-  }
+  const assignmentDepartment = TREATMENT_DEPARTMENTS.find((department) => department.slug === searchParams.get('department'))
+  const assignmentCopy = {
+    ru: { title: 'Назначение врачей', text: 'Откройте карточку врача и сохраните её — направление уже выбрано.', back: 'Завершить назначение' },
+    en: { title: 'Assign doctors', text: 'Open a doctor and save the profile — the department is already selected.', back: 'Finish assigning' },
+    kk: { title: 'Дәрігерлерді тағайындау', text: 'Дәрігер карточкасын ашып сақтаңыз — бөлім алдын ала таңдалған.', back: 'Тағайындауды аяқтау' },
+  }[['ru', 'en', 'kk'].includes(i18n.language) ? i18n.language : 'ru']
 
   const createDoctorUser = async () => {
     const payload = {
@@ -107,7 +118,7 @@ function AdminDoctors({ readonly = false }) {
     return created
   }
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
       const [doctorsRes, specsRes] = await Promise.all([
@@ -139,11 +150,11 @@ function AdminDoctors({ readonly = false }) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [loadData])
 
   const specializationOptions = useMemo(
     () =>
@@ -171,7 +182,10 @@ function AdminDoctors({ readonly = false }) {
 
   const openCreateModal = () => {
     setEditingDoctor(null)
-    setForm(defaultForm)
+    setForm({
+      ...defaultForm,
+      treatmentDepartments: assignmentDepartment ? [assignmentDepartment.slug] : [],
+    })
     setPhotoFile(null)
     setPhotoPreview('')
     setRemovePhoto(false)
@@ -192,6 +206,9 @@ function AdminDoctors({ readonly = false }) {
         typeof doctor.specialization === 'object'
           ? String(doctor.specialization?.id || '')
           : String(doctor.specialization || ''),
+      treatmentDepartments: assignmentDepartment
+        ? [...new Set([...(Array.isArray(doctor.treatmentDepartments) ? doctor.treatmentDepartments : []), assignmentDepartment.slug])]
+        : (Array.isArray(doctor.treatmentDepartments) ? doctor.treatmentDepartments : []),
       experience: String(doctor.experience || 0),
       price: String(doctor.price || 0),
       licenseNumber: doctor.licenseNumber || '',
@@ -393,6 +410,16 @@ function AdminDoctors({ readonly = false }) {
         )}
       </div>
 
+      {assignmentDepartment && (
+        <div className='flex flex-col gap-3 rounded-2xl border border-teal-200 bg-teal-50 p-4 sm:flex-row sm:items-center sm:justify-between'>
+          <div>
+            <p className='font-semibold text-teal-900'>{assignmentCopy.title}: {localizeDepartment(assignmentDepartment, i18n.language).displayTitle}</p>
+            <p className='mt-1 text-sm text-teal-800'>{assignmentCopy.text}</p>
+          </div>
+          <Link to='/admin/treatment-departments' className='text-sm font-semibold text-teal-800 underline underline-offset-4'>{assignmentCopy.back}</Link>
+        </div>
+      )}
+
       <div className='grid md:grid-cols-2 gap-4'>
         <Input
           value={search}
@@ -586,6 +613,35 @@ function AdminDoctors({ readonly = false }) {
               options={specializationOptions}
               placeholder={t('admin_doc.placeholder_spec')}
             />
+          </div>
+
+          <div className='rounded-xl border border-slate-200 p-4'>
+            <div>
+              <p className='text-sm font-medium text-slate-700'>{t('admin_doc.label_treatment_departments')}</p>
+              <p className='mt-1 text-xs text-slate-500'>{t('admin_doc.hint_treatment_departments')}</p>
+            </div>
+            <div className='mt-4 grid gap-2 sm:grid-cols-2'>
+              {TREATMENT_DEPARTMENTS.map((department) => {
+                const localized = localizeDepartment(department, i18n.language)
+                const checked = form.treatmentDepartments.includes(department.slug)
+                return (
+                  <label key={department.slug} className='flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50'>
+                    <input
+                      type='checkbox'
+                      checked={checked}
+                      onChange={() => setForm((prev) => ({
+                        ...prev,
+                        treatmentDepartments: checked
+                          ? prev.treatmentDepartments.filter((slug) => slug !== department.slug)
+                          : [...prev.treatmentDepartments, department.slug],
+                      }))}
+                      className='h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500'
+                    />
+                    <span className='text-sm font-medium text-slate-700'>{localized.displayTitle}</span>
+                  </label>
+                )
+              })}
+            </div>
           </div>
 
           <div className='grid md:grid-cols-3 gap-4'>

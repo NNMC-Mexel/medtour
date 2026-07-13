@@ -13,14 +13,10 @@ import {
     FileText,
     Heart,
     Brain,
-    Eye,
     Stethoscope,
-    Baby,
-    Pill,
     Users,
     Award,
     Zap,
-    Loader2,
     Phone,
     Mail,
     MapPin,
@@ -32,6 +28,10 @@ import {
     ChevronLeft,
     Send,
     ExternalLink,
+    Activity,
+    ScanLine,
+    Syringe,
+    Venus,
 } from "lucide-react";
 import Button from "../components/ui/Button";
 import { Card, CardContent } from "../components/ui/Card";
@@ -39,13 +39,13 @@ import PriceListSection from "../components/pricing/PriceListSection";
 import {
     contentAPI,
     doctorsAPI,
-    specializationsAPI,
     getMediaUrl,
     normalizeResponse,
 } from "../services/api";
 import { cn, getInitials, isDoctorOnline, getSpecName } from "../utils/helpers";
 import { DEFAULT_CONTENT_LOCALE } from "../utils/locales";
 import { SHOW_DOCTOR_PRICES } from "../utils/constants";
+import { TREATMENT_DEPARTMENTS, localizeDepartment, mergeTreatmentDepartments } from "../data/treatmentDepartments";
 
 const doctorCardColors = [
     "bg-gradient-to-br from-teal-400 to-teal-600",
@@ -61,24 +61,7 @@ const doctorCardColors = [
 const featureIcons = [Video, Shield, Clock, FileText];
 const advantageIcons = [HeartPulse, UserCheck, Headphones];
 
-const specializationIcons = {
-    Терапевт: Stethoscope,
-    Кардиолог: Heart,
-    Невролог: Brain,
-    Офтальмолог: Eye,
-    Педиатр: Baby,
-    Эндокринолог: Pill,
-    default: Stethoscope,
-};
-
-const fallbackSpecializations = [
-    { key: 'general_practitioner', icon: Stethoscope, label: { ru: 'Терапевт', en: 'General Practitioner', kk: 'Терапевт' } },
-    { key: 'cardiologist', icon: Heart, label: { ru: 'Кардиолог', en: 'Cardiologist', kk: 'Кардиолог' } },
-    { key: 'neurologist', icon: Brain, label: { ru: 'Невролог', en: 'Neurologist', kk: 'Невролог' } },
-    { key: 'ophthalmologist', icon: Eye, label: { ru: 'Офтальмолог', en: 'Ophthalmologist', kk: 'Офтальмолог' } },
-    { key: 'pediatrician', icon: Baby, label: { ru: 'Педиатр', en: 'Pediatrician', kk: 'Педиатр' } },
-    { key: 'endocrinologist', icon: Pill, label: { ru: 'Эндокринолог', en: 'Endocrinologist', kk: 'Эндокринолог' } },
-];
+const treatmentIcons = { Activity, Brain, Heart, HeartPulse, ScanLine, Stethoscope, Syringe, Venus };
 
 function mergeLandingConfig(base, incoming) {
     return {
@@ -153,11 +136,8 @@ function DoctorsCarousel({ doctors }) {
         return () => window.removeEventListener('resize', updateCardsPerPage);
     }, []);
 
-    useEffect(() => {
-        setCurrentPage(0);
-    }, [cardsPerPage]);
-
     const totalPages = Math.ceil(doctors.length / cardsPerPage);
+    const safeCurrentPage = totalPages > 0 ? currentPage % totalPages : 0;
 
     useEffect(() => {
         if (totalPages <= 1 || isHovered) return;
@@ -171,10 +151,10 @@ function DoctorsCarousel({ doctors }) {
         if (!carouselRef.current) return;
         const pageWidth = carouselRef.current.clientWidth;
         carouselRef.current.scrollTo({
-            left: pageWidth * currentPage,
+            left: pageWidth * safeCurrentPage,
             behavior: "smooth",
         });
-    }, [currentPage]);
+    }, [safeCurrentPage]);
 
     const goToPage = (page) => setCurrentPage(page);
     const goNext = () => setCurrentPage((prev) => (prev + 1) % totalPages);
@@ -373,7 +353,7 @@ function DoctorsCarousel({ doctors }) {
                                 onClick={() => goToPage(i)}
                                 className={cn(
                                     "h-2 rounded-full transition-all duration-300",
-                                    currentPage === i
+                                    safeCurrentPage === i
                                         ? "w-8 bg-teal-500"
                                         : "w-2 bg-slate-300 hover:bg-slate-400",
                                 )}
@@ -389,8 +369,7 @@ function DoctorsCarousel({ doctors }) {
 function LandingPage() {
     const { t, i18n } = useTranslation();
     const [doctors, setDoctors] = useState([]);
-    const [specializations, setSpecializations] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [treatmentDepartments, setTreatmentDepartments] = useState(TREATMENT_DEPARTMENTS);
     const [storedLandingConfig, setStoredLandingConfig] = useState(null);
 
     const cardRef = useRef(null);
@@ -532,29 +511,26 @@ function LandingPage() {
 
     useEffect(() => {
         const fetchData = async () => {
-            try {
-                const [doctorsRes, specsRes] = await Promise.all([
-                    doctorsAPI.getAll(),
-                    specializationsAPI.getAll(),
-                ]);
+            const [doctorsResult, globalResult] = await Promise.allSettled([
+                doctorsAPI.getAll(),
+                contentAPI.getGlobal(),
+            ]);
+
+            if (doctorsResult.status === 'fulfilled') {
+                const doctorsRes = doctorsResult.value;
                 const { data: doctorsData } = normalizeResponse(doctorsRes);
-                const { data: specsData } = normalizeResponse(specsRes);
-
                 setDoctors(doctorsData?.slice(0, 8) || []);
-                setSpecializations(specsData?.slice(0, 6) || []);
+            } else {
+                console.error("Error fetching landing doctors:", doctorsResult.reason);
+            }
 
-                try {
-                    const globalRes = await contentAPI.getGlobal();
-                    const { data: globalData } = normalizeResponse(globalRes);
-                    setStoredLandingConfig(globalData?.landingConfig || null);
-                } catch (contentError) {
-                    console.error("Error fetching landing content:", contentError);
-                    setStoredLandingConfig(null);
-                }
-            } catch (error) {
-                console.error("Error fetching landing data:", error);
-            } finally {
-                setIsLoading(false);
+            if (globalResult.status === 'fulfilled') {
+                const { data: globalData } = normalizeResponse(globalResult.value);
+                setStoredLandingConfig(globalData?.landingConfig || null);
+                setTreatmentDepartments(mergeTreatmentDepartments(globalData?.treatmentDepartments));
+            } else {
+                console.error("Error fetching landing content:", globalResult.reason);
+                setStoredLandingConfig(null);
             }
         };
 
@@ -726,7 +702,7 @@ function LandingPage() {
                 </div>
             </section>
 
-            {/* Specializations Section */}
+            {/* Treatment Departments Section */}
             <section id='specializations' className='py-24 bg-gradient-to-b from-slate-50 to-white'>
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
                     <div className='text-center mb-16'>
@@ -741,54 +717,33 @@ function LandingPage() {
                         </p>
                     </div>
 
-                    {isLoading ? (
-                        <div className='flex justify-center py-12'>
-                            <Loader2 className='w-8 h-8 text-teal-600 animate-spin' />
-                        </div>
-                    ) : specializations.length > 0 ? (
-                        <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6'>
-                            {specializations.map((spec) => {
-                                const IconComponent = specializationIcons[spec.name] || specializationIcons.default;
-                                return (
-                                    <Link key={spec.id} to='/register' className='group'>
-                                        <Card hover className='text-center transition-all group-hover:border-teal-500 group-hover:shadow-lg'>
-                                            <CardContent className='py-8'>
-                                                <div className='w-16 h-16 mx-auto mb-4 bg-teal-100 rounded-2xl flex items-center justify-center group-hover:bg-teal-500 transition-colors'>
-                                                    <IconComponent className='w-8 h-8 text-teal-600 group-hover:text-white transition-colors' />
+                    <div className='grid sm:grid-cols-2 lg:grid-cols-4 gap-6'>
+                        {treatmentDepartments.map((department) => {
+                            const item = localizeDepartment(department, i18n.language);
+                            const IconComponent = treatmentIcons[department.icon] || Stethoscope;
+                            return (
+                                <Link key={department.slug} to={`/treatments/${department.slug}`} className='group'>
+                                    <Card hover className='h-full text-left transition-all group-hover:border-teal-400 group-hover:shadow-xl group-hover:-translate-y-1'>
+                                        <CardContent className='h-full p-7 flex flex-col'>
+                                            <div className='flex items-start justify-between gap-4'>
+                                                <div className='w-14 h-14 bg-teal-100 rounded-2xl flex items-center justify-center group-hover:bg-teal-500 transition-colors'>
+                                                    <IconComponent className='w-7 h-7 text-teal-600 group-hover:text-white transition-colors' />
                                                 </div>
-                                                <h3 className='font-medium text-slate-900 group-hover:text-teal-600 transition-colors'>
-                                                    {getSpecName(spec, i18n.language)}
-                                                </h3>
-                                                {spec.doctorsCount > 0 && (
-                                                    <p className='text-sm text-slate-500 mt-1'>
-                                                        {t('landing.specializations.doctors_count', { count: spec.doctorsCount })}
-                                                    </p>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-                                    </Link>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6'>
-                            {fallbackSpecializations
-                                .map(({ key, icon: Icon, label }) => (
-                                    <Link key={key} to='/register' className='group'>
-                                        <Card hover className='text-center transition-all group-hover:border-teal-500'>
-                                            <CardContent className='py-8'>
-                                                <div className='w-16 h-16 mx-auto mb-4 bg-teal-100 rounded-2xl flex items-center justify-center group-hover:bg-teal-500 transition-colors'>
-                                                    <Icon className='w-8 h-8 text-teal-600 group-hover:text-white transition-colors' />
-                                                </div>
-                                                <h3 className='font-medium text-slate-900 group-hover:text-teal-600 transition-colors'>
-                                                    {label[i18n.language] || label.en}
-                                                </h3>
-                                            </CardContent>
-                                        </Card>
-                                    </Link>
-                                ))}
-                        </div>
-                    )}
+                                                <ArrowRight className='w-5 h-5 text-slate-300 group-hover:text-teal-600 group-hover:translate-x-1 transition-all' />
+                                            </div>
+                                            <h3 className='mt-6 text-lg font-semibold text-slate-900 group-hover:text-teal-700 transition-colors'>
+                                                {item.displayTitle}
+                                            </h3>
+                                            <p className='mt-2 text-sm leading-6 text-slate-500'>{item.displayShort}</p>
+                                            <p className='mt-auto pt-5 text-xs font-semibold uppercase tracking-wider text-teal-700'>
+                                                {department.programs.length} {i18n.language === 'en' ? 'programs' : i18n.language === 'kk' ? 'бағдарлама' : 'программ'}
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                </Link>
+                            );
+                        })}
+                    </div>
 
                     <div className='text-center mt-12'>
                         <Link to='/register'>
