@@ -19,5 +19,12 @@ export default {
       info: { apiName: 'appointment', type: 'content-api' },
       config: { policies: [] },
     },
+    {
+      method: 'PUT',
+      path: '/appointments/:id/output',
+      handler: 'appointment.saveOutput',
+      info: { apiName: 'appointment', type: 'content-api' },
+      config: { auth: false, policies: [] },
+    },
   ],
 };

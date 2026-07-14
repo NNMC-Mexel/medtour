@@ -33,12 +33,19 @@ export default factories.createCoreController(UID, () => ({
     if (caseFilter === null) return { data: [], meta: { pagination: { page: 1, pageSize: 0, pageCount: 0, total: 0 } } };
     const queryFilters = (ctx.query?.filters as any) || {};
     const role = getUserRole(user);
+    // Keep the case requested by the client and apply the user's access scope as
+    // an additional condition. Replacing `medical_case` here used to drop the
+    // requested case id and return events from every case available to the user.
     const accessFilters = isAdminUser(user)
       ? queryFilters
       : {
-        ...queryFilters,
-        medical_case: caseFilter,
-        ...(role === 'patient' && { eventType: { $in: PATIENT_VISIBLE_CASE_EVENT_TYPES } }),
+        $and: [
+          queryFilters,
+          { medical_case: caseFilter },
+          ...(role === 'patient'
+            ? [{ eventType: { $in: PATIENT_VISIBLE_CASE_EVENT_TYPES } }]
+            : []),
+        ],
       };
     const data = await strapi.documents(UID).findMany({
       filters: accessFilters,

@@ -6,6 +6,32 @@ export default {
   routes: [
     {
       method: 'GET',
+      path: '/medical-cases/:caseId/documents',
+      handler: 'medical-document.byCase',
+      info: {
+        apiName: 'medical-document',
+        type: 'content-api',
+      },
+      config: {
+        auth: false,
+        policies: [],
+      },
+    },
+    {
+      method: 'PUT',
+      path: '/medical-cases/:caseId/documents/:id/attach',
+      handler: 'medical-document.attachToCase',
+      info: {
+        apiName: 'medical-document',
+        type: 'content-api',
+      },
+      config: {
+        auth: false,
+        policies: [],
+      },
+    },
+    {
+      method: 'GET',
       path: '/medical-documents/my-doctors',
       handler: 'medical-document.myDoctors',
       info: {

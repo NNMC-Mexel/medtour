@@ -17,8 +17,6 @@ import {
   FolderOpen,
   Stethoscope,
   ArrowUpDown,
-  Share2,
-  UserCheck,
   Scan,
   Radio,
 } from 'lucide-react'
@@ -69,15 +67,12 @@ function PatientDocuments() {
   const canUploadDocuments = user?.userRole === 'patient'
   const {
     documents,
-    myDoctors,
     isLoading,
     isUploading,
     error,
     fetchDocuments,
     uploadDocument,
     deleteDocument,
-    shareDocument,
-    fetchMyDoctors,
   } = useDocumentStore()
 
   // View state
@@ -91,11 +86,6 @@ function PatientDocuments() {
   const [previewUrl, setPreviewUrl] = useState(null)
   const [previewError, setPreviewError] = useState(null)
   const [isPreviewLoading, setIsPreviewLoading] = useState(false)
-
-  // Share modal state
-  const [showShareModal, setShowShareModal] = useState(null) // document to share
-  const [selectedDoctorIds, setSelectedDoctorIds] = useState([])
-  const [isSaving, setIsSaving] = useState(false)
 
   // Upload form state
   const [uploadFileState, setUploadFileState] = useState(null)
@@ -114,9 +104,8 @@ function PatientDocuments() {
   useEffect(() => {
     if (user?.id) {
       fetchDocuments({ userId: user.id })
-      fetchMyDoctors()
     }
-  }, [user?.id, fetchDocuments, fetchMyDoctors])
+  }, [user?.id, fetchDocuments])
 
   useEffect(() => {
     let ignore = false
@@ -259,11 +248,6 @@ function PatientDocuments() {
     medicalCases.filter((item) => ACTIVE_CASE_STATUSES.has(item.status || ''))
   ), [medicalCases])
 
-  useEffect(() => {
-    if (uploadCaseId && activeMedicalCases.some((item) => (item.documentId || item.id) === uploadCaseId)) return
-    setUploadCaseId(activeMedicalCases[0]?.documentId || activeMedicalCases[0]?.id || '')
-  }, [activeMedicalCases, uploadCaseId])
-
   const stats = {
     total: documents.length,
     analysis: documents.filter(d => d.type === 'analysis').length,
@@ -317,7 +301,7 @@ function PatientDocuments() {
     setUploadTitle('')
     setUploadType('other')
     setUploadDescription('')
-    setUploadCaseId(activeMedicalCases[0]?.documentId || activeMedicalCases[0]?.id || '')
+    setUploadCaseId('')
   }
 
   const handleDelete = async (id) => {
@@ -331,32 +315,6 @@ function PatientDocuments() {
     } catch (error) {
       console.error('secure document open failed:', error)
     }
-  }
-
-  const openShareModal = (doc) => {
-    const currentShared = (doc.sharedWithDoctors || []).map(d => d.documentId)
-    setSelectedDoctorIds(currentShared)
-    setShowShareModal(doc)
-  }
-
-  const handleShare = async () => {
-    if (!showShareModal) return
-    setIsSaving(true)
-    const result = await shareDocument(showShareModal.documentId, selectedDoctorIds)
-    setIsSaving(false)
-    if (result.success) {
-      setShowShareModal(null)
-      // Re-fetch to update UI
-      fetchDocuments({ userId: user.id })
-    }
-  }
-
-  const toggleDoctorSelection = (doctorDocId) => {
-    setSelectedDoctorIds(prev =>
-      prev.includes(doctorDocId)
-        ? prev.filter(id => id !== doctorDocId)
-        : [...prev, doctorDocId]
-    )
   }
 
   const getFileSize = (file) => {
@@ -674,19 +632,6 @@ function PatientDocuments() {
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <Badge className={typeConfig.color}>{typeConfig.label}</Badge>
-                          {doc.sharedWithDoctors?.length > 0 && (
-                            <span className="flex items-center gap-1 text-xs text-teal-600" title={t('documents.shared_badge_title')}>
-                              <UserCheck className="w-3.5 h-3.5" />
-                              {doc.sharedWithDoctors.length}
-                            </span>
-                          )}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); openShareModal(doc) }}
-                            className="p-2 hover:bg-teal-100 rounded-lg text-slate-500 hover:text-teal-600"
-                            title={t('documents.share_title')}
-                          >
-                            <Share2 className="w-5 h-5" />
-                          </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDownload(doc) }}
                             className="p-2 hover:bg-slate-100 rounded-lg text-slate-500"
@@ -901,6 +846,7 @@ function PatientDocuments() {
                 onChange={(e) => setUploadCaseId(e.target.value)}
                 className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
               >
+                <option value="">{t('documents.personal_library_option')}</option>
                 {activeMedicalCases.map((item) => {
                   const id = item.documentId || item.id
                   const label = item.caseNumber || item.title || t('cases.case_title_label')
@@ -941,92 +887,6 @@ function PatientDocuments() {
         <p className="text-slate-600">{t('documents.delete_desc')}</p>
       </Modal>
 
-      {/* Share Modal */}
-      <Modal
-        isOpen={!!showShareModal}
-        onClose={() => setShowShareModal(null)}
-        title={t('documents.share_title')}
-        size="md"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowShareModal(null)}>{t('common.cancel')}</Button>
-            <Button onClick={handleShare} isLoading={isSaving}>
-              {t('common.save')}
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-slate-600">
-            {t('documents.share_desc')}
-            {showShareModal && <span className="font-medium"> «{showShareModal.title}»</span>}
-          </p>
-
-          {myDoctors.length === 0 ? (
-            <div className="text-center py-8">
-              <Stethoscope className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-              <p className="text-slate-500">{t('documents.no_doctors')}</p>
-              <p className="text-sm text-slate-400 mt-1">{t('documents.no_doctors_desc')}</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {myDoctors.map((doctor) => {
-                const isSelected = selectedDoctorIds.includes(doctor.documentId)
-                const specName = typeof doctor.specialization === 'object'
-                  ? doctor.specialization?.name
-                  : doctor.specialization
-                return (
-                  <button
-                    key={doctor.id}
-                    onClick={() => toggleDoctorSelection(doctor.documentId)}
-                    className={cn(
-                      'w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left',
-                      isSelected
-                        ? 'border-teal-500 bg-teal-50'
-                        : 'border-slate-200 hover:border-slate-300 bg-white'
-                    )}
-                  >
-                    <div className={cn(
-                      'w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold',
-                      isSelected ? 'bg-teal-500 text-white' : 'bg-slate-100 text-slate-600'
-                    )}>
-                      {isSelected ? <UserCheck className="w-5 h-5" /> : doctor.fullName?.charAt(0) || '?'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-900">{doctor.fullName}</p>
-                      {specName && <p className="text-sm text-slate-500">{specName}</p>}
-                    </div>
-                    <div className={cn(
-                      'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors',
-                      isSelected ? 'border-teal-500 bg-teal-500' : 'border-slate-300'
-                    )}>
-                      {isSelected && (
-                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-
-          {selectedDoctorIds.length > 0 && (
-            <p className="text-sm text-teal-600 flex items-center gap-1">
-              <Share2 className="w-4 h-4" />
-              {t('documents.shared_with', {
-                count: selectedDoctorIds.length,
-                word: selectedDoctorIds.length === 1
-                  ? t('documents.shared_word_1')
-                  : selectedDoctorIds.length <= 4
-                    ? t('documents.shared_word_2_4')
-                    : t('documents.shared_word_many')
-              })}
-            </p>
-          )}
-        </div>
-      </Modal>
     </div>
   )
 }

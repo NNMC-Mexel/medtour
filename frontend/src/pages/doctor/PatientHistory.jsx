@@ -29,7 +29,7 @@ import Button from '../../components/ui/Button'
 import Avatar from '../../components/ui/Avatar'
 import Badge from '../../components/ui/Badge'
 import useAuthStore from '../../stores/authStore'
-import api, { normalizeResponse, getMediaUrl, documentsAPI } from '../../services/api'
+import api, { normalizeResponse, getMediaUrl, documentsAPI, openMediaInNewTab } from '../../services/api'
 
 function PatientHistory() {
   const { t, i18n } = useTranslation()
@@ -69,26 +69,28 @@ function PatientHistory() {
         setPatient(aptsData[0].patient)
       }
 
-      // Get all medical documents for this patient visible to this doctor
-      const docsRes = await documentsAPI.getAll({ userId: patientId })
-      const allDocs = docsRes.data?.data || []
-
-      // Separate: appointment-linked docs (by this doctor) vs shared docs (by patient)
-      const aptDocs = []
-      const shared = []
-      for (const doc of allDocs) {
-        const isOwnDoc = doc.doctor?.id === doctorData.id || doc.doctor?.documentId === doctorData.documentId
-        const isShared = doc.sharedWithDoctors?.some(
-          (d) => d.id === doctorData.id || d.documentId === doctorData.documentId
-        )
-        if (isOwnDoc) {
-          aptDocs.push(doc)
-        } else if (isShared) {
-          shared.push(doc)
-        }
+      // Case assignment is the access boundary. Merge documents from the
+      // patient's cases assigned to this doctor; keep the patient-scoped query
+      // only for legacy appointments without a medical case.
+      const caseIds = [...new Set((aptsData || [])
+        .map(appointment => appointment.medical_case?.documentId || appointment.medical_case?.id)
+        .filter(Boolean))]
+      const caseResponses = await Promise.all(caseIds.map(caseId => documentsAPI.getByCase(caseId)))
+      let allDocs = caseResponses.flatMap(response => response.data?.data || [])
+      if (caseIds.length === 0) {
+        const legacyDocs = await documentsAPI.getAll({ userId: patientId })
+        allDocs = legacyDocs.data?.data || []
       }
-      setDocuments(aptDocs)
-      setSharedDocuments(shared)
+      const seen = new Set()
+      allDocs = allDocs.filter(doc => {
+        const id = doc.documentId || doc.id
+        if (seen.has(id)) return false
+        seen.add(id)
+        return true
+      })
+
+      setDocuments(allDocs)
+      setSharedDocuments(allDocs.filter(doc => !doc.appointment && !doc.doctor))
     } catch (error) {
       console.error('Error fetching patient history:', error)
     } finally {
@@ -315,8 +317,6 @@ function PatientHistory() {
                         aptDocs.map((doc) => {
                           const DocIcon = docTypeIcons[doc.type] || FileText
                           const colorClasses = docTypeColors[doc.type] || 'bg-slate-100 text-slate-600'
-                          const fileUrl = doc.file?.url ? getMediaUrl(doc.file) : null
-
                           return (
                             <div
                               key={doc.id}
@@ -331,15 +331,14 @@ function PatientHistory() {
                                     <h4 className="font-medium text-slate-900">
                                       {doc.title || docTypeLabels[doc.type] || t('patients.doc_fallback')}
                                     </h4>
-                                    {fileUrl && (
-                                      <a
-                                        href={fileUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                    {doc.file && (
+                                      <button
+                                        type="button"
+                                        onClick={() => openMediaInNewTab(doc.file)}
                                         className="p-1.5 rounded-lg text-teal-600 hover:bg-teal-50 transition-colors flex-shrink-0"
                                       >
                                         <ExternalLink className="w-4 h-4" />
-                                      </a>
+                                      </button>
                                     )}
                                   </div>
                                   <p className="text-xs text-slate-400 mt-0.5">
@@ -362,7 +361,9 @@ function PatientHistory() {
 
                       {/* Link to full appointment detail */}
                       <div className="pt-2">
-                        <Link to={`/doctor/appointments/${apt.documentId}`}>
+                        <Link to={apt.medical_case?.documentId || apt.medical_case?.id
+                          ? `/doctor/cases/${apt.medical_case.documentId || apt.medical_case.id}?tab=consultations&appointment=${apt.documentId || apt.id}`
+                          : `/doctor/appointments/${apt.documentId || apt.id}`}>
                           <Button variant="ghost" size="sm" className="text-teal-600">
                             {t('patients.visit_details')}
                             <ExternalLink className="w-3.5 h-3.5 ml-1.5" />
@@ -402,8 +403,6 @@ function PatientHistory() {
               {sharedDocuments.map((doc) => {
                 const DocIcon = docTypeIcons[doc.type] || FileText
                 const colorClasses = docTypeColors[doc.type] || 'bg-slate-100 text-slate-600'
-                const fileUrl = doc.file?.url ? getMediaUrl(doc.file) : null
-
                 return (
                   <Card key={doc.id}>
                     <CardContent>
@@ -416,15 +415,14 @@ function PatientHistory() {
                             <h4 className="font-medium text-slate-900">
                               {doc.title || docTypeLabels[doc.type] || t('patients.doc_fallback')}
                             </h4>
-                            {fileUrl && (
-                              <a
-                                href={fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                            {doc.file && (
+                              <button
+                                type="button"
+                                onClick={() => openMediaInNewTab(doc.file)}
                                 className="p-1.5 rounded-lg text-teal-600 hover:bg-teal-50 transition-colors flex-shrink-0"
                               >
                                 <Download className="w-4 h-4" />
-                              </a>
+                              </button>
                             )}
                           </div>
                           <p className="text-xs text-slate-400 mt-0.5">

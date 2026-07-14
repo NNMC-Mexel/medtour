@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Building2,
@@ -15,6 +15,7 @@ import {
   Stethoscope,
   UserRound,
   Info,
+  Video,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -26,6 +27,7 @@ import Input from '../../components/ui/Input'
 import { useToast } from '../../components/ui/Toast'
 import useAuthStore from '../../stores/authStore'
 import CaseSlotPicker from '../../components/cases/CaseSlotPicker'
+import CaseConsultationsPanel from '../../components/cases/CaseConsultationsPanel'
 import { cn } from '../../utils/helpers'
 import { formatDateTimeInTimeZone, getDeviceTimeZone, KAZAKHSTAN_TIME_ZONE } from '../../utils/kazakhstanTime'
 import {
@@ -41,6 +43,7 @@ import {
   visaRequestsAPI,
   tourismPackagesAPI,
   caseEventsAPI,
+  appointmentsAPI,
   uploadFile,
 } from '../../services/api'
 import {
@@ -71,21 +74,6 @@ function formatDesiredDate(value) {
   if (!value) return ''
   if (typeof value === 'string') return value
   return value.preferredArrivalDate || value.arrivalDate || value.from || ''
-}
-
-function formatAppointmentDateTime(value, locale) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleString(locale, {
-    timeZone: 'Asia/Almaty',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZoneName: 'short',
-  })
 }
 
 function formatFallbackEventType(type) {
@@ -215,6 +203,166 @@ function PatientNextStep({ status }) {
   )
 }
 
+const ACTIVE_CONSULTATION_STATUSES = new Set(['pending', 'confirmed', 'in_progress'])
+
+function getAppointmentStatus(appointment) {
+  return appointment?.statuse || appointment?.status || 'pending'
+}
+
+function getRelevantVideoAppointment(appointments = [], now = Date.now()) {
+  const candidates = appointments
+    .filter(appointment => (
+      appointment?.roomId
+      && appointment?.dateTime
+      && appointment?.type !== 'chat'
+      && ACTIVE_CONSULTATION_STATUSES.has(getAppointmentStatus(appointment))
+      && Number.isFinite(new Date(appointment.dateTime).getTime())
+    ))
+
+  if (candidates.length === 0) return null
+
+  const inProgress = candidates
+    .filter(appointment => getAppointmentStatus(appointment) === 'in_progress')
+    .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
+  if (inProgress[0]) return inProgress[0]
+
+  const future = candidates
+    .filter(appointment => new Date(appointment.dateTime).getTime() >= now)
+    .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())
+  if (future[0]) return future[0]
+
+  return candidates.sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())[0]
+}
+
+function CaseConsultationAccessCard({ medicalCase, role, timeZone, language, onOpenDetails }) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const appointment = useMemo(
+    () => getRelevantVideoAppointment(medicalCase?.appointments),
+    [medicalCase?.appointments],
+  )
+  const roomId = appointment?.roomId || ''
+  const canEnterRoom = ['patient', 'doctor', 'admin'].includes(role)
+  const [access, setAccess] = useState({
+    state: roomId && canEnterRoom ? 'checking' : 'idle',
+    reason: null,
+  })
+
+  const checkAccess = useCallback(async (showLoading = false) => {
+    if (!roomId || !canEnterRoom) return
+    if (showLoading) setAccess(previous => ({ ...previous, state: 'checking' }))
+    try {
+      const response = await appointmentsAPI.canJoin(roomId)
+      const payload = response?.data?.data || response?.data || {}
+      setAccess({
+        state: payload.allowed ? 'allowed' : 'denied',
+        reason: payload.reason || null,
+        windowStart: payload.windowStart || null,
+      })
+    } catch (error) {
+      setAccess({
+        state: 'error',
+        reason: error?.response?.status === 403 ? 'not_participant' : 'error',
+      })
+    }
+  }, [canEnterRoom, roomId])
+
+  useEffect(() => {
+    if (!roomId || !canEnterRoom) {
+      return undefined
+    }
+
+    const initialCheck = window.setTimeout(() => checkAccess(false), 0)
+    const interval = window.setInterval(() => checkAccess(false), 30_000)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') checkAccess(false)
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      window.clearTimeout(initialCheck)
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [canEnterRoom, checkAccess, roomId])
+
+  if (!appointment) return null
+
+  const appointmentTime = formatDateTimeInTimeZone(appointment.dateTime, timeZone, language)
+  const doctorName = appointment.doctor?.fullName || medicalCase?.doctor?.fullName
+  let accessHint = t('case_detail.consultation_scheduled_hint')
+
+  if (access.state === 'checking') {
+    accessHint = t('case_detail.join_checking')
+  } else if (access.state === 'allowed') {
+    accessHint = t('case_detail.join_available')
+  } else if (access.reason === 'too_early' && access.windowStart) {
+    accessHint = t('case_detail.join_opens_at', {
+      dateTime: formatDateTimeInTimeZone(access.windowStart, timeZone, language),
+    })
+  } else if (access.reason === 'too_late') {
+    accessHint = t('case_detail.join_closed')
+  } else if (access.state === 'error' || access.reason) {
+    accessHint = t('case_detail.join_unavailable')
+  }
+
+  return (
+    <section className="flex flex-col gap-4 rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-50 to-cyan-50 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between" aria-labelledby="case-consultation-access-title">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal-600 text-white shadow-sm shadow-teal-600/20">
+          <Video className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <h2 id="case-consultation-access-title" className="font-semibold text-slate-900">
+            {t('case_detail.upcoming_consultation_title')}
+          </h2>
+          <p className="mt-0.5 flex items-center gap-1.5 text-sm font-medium text-slate-700">
+            <Clock className="h-4 w-4 shrink-0 text-teal-600" />
+            {appointmentTime}
+          </p>
+          {doctorName && (
+            <p className="mt-0.5 truncate text-sm text-slate-600">
+              {t('case_detail.consultation_doctor', { name: doctorName })}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-slate-500" aria-live="polite">{accessHint}</p>
+        </div>
+      </div>
+
+      {canEnterRoom ? (
+        access.state === 'error' ? (
+          <Button
+            variant="outline"
+            onClick={() => checkAccess(true)}
+            leftIcon={<Video className="h-4 w-4" />}
+            className="w-full shrink-0 sm:w-auto"
+          >
+            {t('case_detail.join_retry')}
+          </Button>
+        ) : (
+          <Button
+            onClick={() => navigate(`/consultation/${encodeURIComponent(roomId)}`)}
+            disabled={access.state !== 'allowed'}
+            isLoading={access.state === 'checking'}
+            leftIcon={<Video className="h-4 w-4" />}
+            className="w-full shrink-0 sm:w-auto"
+          >
+            {t('case_detail.join_consultation')}
+          </Button>
+        )
+      ) : (
+        <Button
+          variant="outline"
+          onClick={onOpenDetails}
+          className="w-full shrink-0 sm:w-auto"
+        >
+          {t('case_detail.open_consultation_details')}
+        </Button>
+      )}
+    </section>
+  )
+}
+
 function CaseDocumentsPanel({ medicalCase, onUploaded }) {
   const { t } = useTranslation()
   const toast = useToast()
@@ -228,11 +376,33 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [savingDocId, setSavingDocId] = useState(null)
+  const [docs, setDocs] = useState(medicalCase.medical_documents || [])
+  const [libraryDocuments, setLibraryDocuments] = useState([])
+  const [isLoadingDocs, setIsLoadingDocs] = useState(false)
   // Synchronous guard against double-submit (the isUploading state disables the
   // button only after a re-render, leaving a fast double-click window).
   const uploadingRef = useRef(false)
 
-  const docs = medicalCase.medical_documents || []
+  const loadDocuments = useCallback(async () => {
+    const caseId = medicalCase.documentId || medicalCase.id
+    if (!caseId) return
+    setIsLoadingDocs(true)
+    try {
+      const response = await documentsAPI.getByCase(caseId)
+      setDocs(response.data?.data || [])
+      setLibraryDocuments(response.data?.meta?.libraryDocuments || [])
+    } catch (error) {
+      setDocs(medicalCase.medical_documents || [])
+      setLibraryDocuments([])
+      console.error('Could not load case documents:', error)
+    } finally {
+      setIsLoadingDocs(false)
+    }
+  }, [medicalCase.documentId, medicalCase.id, medicalCase.medical_documents])
+
+  useEffect(() => {
+    loadDocuments()
+  }, [loadDocuments])
 
   const resetUploadForm = () => {
     setFile(null)
@@ -269,7 +439,8 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
       toast.success(t('case_detail.toast_doc_uploaded'))
       resetUploadForm()
       setShowUploadModal(false)
-      onUploaded?.()
+      await loadDocuments()
+      await onUploaded?.()
     } catch (error) {
       toast.error(error?.response?.data?.error?.message || error.message || t('case_detail.toast_doc_error'))
       // Clear file on error to prevent double-upload if user retries
@@ -286,7 +457,8 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
     try {
       await documentsAPI.update(docId, patch)
       toast.success(t('case_detail.toast_doc_review_saved'))
-      onUploaded?.()
+      await loadDocuments()
+      await onUploaded?.()
     } catch (error) {
       toast.error(error?.response?.data?.error?.message || t('case_detail.toast_doc_review_error'))
     } finally {
@@ -299,6 +471,21 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
       await openMediaInNewTab(doc.file)
     } catch (error) {
       toast.error(error?.response?.data?.error?.message || t('documents.preview_unavailable'))
+    }
+  }
+
+  const attachLibraryDocument = async (doc) => {
+    const docId = doc.documentId || doc.id
+    setSavingDocId(docId)
+    try {
+      await documentsAPI.attachToCase(medicalCase.documentId || medicalCase.id, docId)
+      toast.success(t('case_detail.library_doc_attached'))
+      await loadDocuments()
+      await onUploaded?.()
+    } catch (error) {
+      toast.error(error?.response?.data?.error?.message || t('case_detail.library_doc_attach_error'))
+    } finally {
+      setSavingDocId(null)
     }
   }
 
@@ -317,7 +504,11 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
           </Button>
         </CardHeader>
         <CardContent>
-          {docs.length === 0 ? (
+          {isLoadingDocs ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="h-6 w-6 animate-spin text-teal-600" />
+            </div>
+          ) : docs.length === 0 ? (
             <div className="text-sm text-slate-500 bg-slate-50 rounded-xl p-4">
               {t('documents.empty_all')}
             </div>
@@ -376,6 +567,45 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {libraryDocuments.length > 0 && (
+            <div className="mt-6 border-t border-slate-100 pt-5">
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-slate-900">{t('case_detail.library_documents_title')}</h3>
+                <p className="mt-1 text-xs text-slate-500">{t('case_detail.library_documents_help')}</p>
+              </div>
+              <div className="space-y-2">
+                {libraryDocuments.map(doc => {
+                  const docId = doc.documentId || doc.id
+                  return (
+                    <div key={docId} className="flex flex-col gap-3 rounded-xl border border-slate-100 p-3 sm:flex-row sm:items-center">
+                      <FileText className="h-5 w-5 shrink-0 text-slate-400" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-slate-900">{doc.title}</p>
+                        <p className="text-xs text-slate-500">{doc.type || 'other'}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        {doc.file && (
+                          <Button size="sm" variant="ghost" onClick={() => openDocument(doc)}>
+                            {t('case_detail.doc_open_btn')}
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={savingDocId === docId}
+                          onClick={() => attachLibraryDocument(doc)}
+                          leftIcon={savingDocId === docId ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                        >
+                          {t('case_detail.attach_to_case')}
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
         </CardContent>
@@ -1140,6 +1370,7 @@ function MedicalCaseDetail() {
   const { t, i18n } = useTranslation()
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const toast = useToast()
   const { user } = useAuthStore()
   const role = user?.userRole || 'patient'
@@ -1170,7 +1401,6 @@ function MedicalCaseDetail() {
   const [form, setForm] = useState({})
   const [showSlotPicker, setShowSlotPicker] = useState(false)
   const [caseSaveState, setCaseSaveState] = useState('idle')
-  const [activeTab, setActiveTab] = useState('overview')
 
   const loadCase = async () => {
     setIsLoading(true)
@@ -1409,7 +1639,12 @@ function MedicalCaseDetail() {
   }, [medicalCase?.status, role])
   const caseSla = getCaseSla(medicalCase)
   const detailTabs = useMemo(() => {
-    const tabs = [{ id: 'overview', label: t('case_detail.tab_overview') }]
+    const tabs = [
+      { id: 'overview', label: t('case_detail.tab_overview') },
+      { id: 'documents', label: t('case_detail.tab_documents') },
+      { id: 'consultations', label: t('case_detail.tab_consultations') },
+      { id: 'treatment', label: t('case_detail.tab_treatment') },
+    ]
     if (canEditTravel) {
       tabs.push(
         { id: 'logistics', label: t('case_detail.tab_logistics') },
@@ -1420,11 +1655,29 @@ function MedicalCaseDetail() {
     return tabs
   }, [canEditTravel, t])
 
-  useEffect(() => {
-    if (!canEditTravel && activeTab !== 'overview') {
-      setActiveTab('overview')
-    }
-  }, [activeTab, canEditTravel])
+  // The URL is the only source of truth for tabs. Keeping a second local state
+  // caused the old query value to restore "consultations" between the click
+  // and the router update, effectively trapping the user on that tab.
+  const requestedTab = searchParams.get('tab') || 'overview'
+  const activeTab = detailTabs.some(tab => tab.id === requestedTab)
+    ? requestedTab
+    : 'overview'
+
+  const selectTab = (tabId) => {
+    const next = new URLSearchParams(searchParams)
+    if (tabId === 'overview') next.delete('tab')
+    else next.set('tab', tabId)
+    if (tabId !== 'consultations') next.delete('appointment')
+    setSearchParams(next, { replace: true })
+  }
+
+  const selectAppointment = useCallback((appointmentId) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', 'consultations')
+    if (appointmentId) next.set('appointment', appointmentId)
+    else next.delete('appointment')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const assignedDoctor = useMemo(() => {
     const docRef = getRef(medicalCase?.doctor)
@@ -1437,12 +1690,6 @@ function MedicalCaseDetail() {
     }
     return assignedDoctor
   }, [assignedDoctor, canManage, doctors, form.doctor])
-  const caseAppointments = useMemo(() => (
-    [...(medicalCase?.appointments || [])]
-      .filter(appointment => appointment?.dateTime)
-      .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
-  ), [medicalCase?.appointments])
-
   const caseStatus = normalizeCaseStatus(medicalCase?.status)
   const canShowCommissionDecision = canFinalizeCommission && caseStatus === 'COMMISSION_REVIEW'
   const BOOKING_STATUSES = ['DOCTOR_ASSIGNED', 'WAITING_PATIENT_CONFIRMATION', 'UNDER_REVIEW', 'DOCUMENTS_UPLOADED', 'CONSULTATION_COMPLETED']
@@ -1518,7 +1765,7 @@ function MedicalCaseDetail() {
           <button
             key={tab.id}
             type="button"
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => selectTab(tab.id)}
             className={cn(
               'shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
               activeTab === tab.id
@@ -1534,6 +1781,17 @@ function MedicalCaseDetail() {
       {role === 'patient' && (
         <PatientNextStep status={medicalCase.status} />
       )}
+
+      <CaseConsultationAccessCard
+        key={(medicalCase.appointments || [])
+          .map(appointment => `${getRef(appointment)}:${appointment.roomId || ''}:${getAppointmentStatus(appointment)}`)
+          .join('|') || 'no-consultation'}
+        medicalCase={medicalCase}
+        role={role}
+        timeZone={activityTimeZone}
+        language={activityLanguage}
+        onOpenDetails={() => selectTab('consultations')}
+      />
 
       {canBookAsPatient && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-teal-50 border border-teal-200 rounded-xl">
@@ -1749,22 +2007,9 @@ function MedicalCaseDetail() {
             </Card>
           )}
 
-          <CaseDocumentsPanel medicalCase={medicalCase} onUploaded={loadCase} />
-
           {canManage && (
             <DoctorFeedbackSummary medicalCase={medicalCase} plans={plans} />
           )}
-
-          <TreatmentPlanPanel
-            medicalCase={medicalCase}
-            plans={plans}
-            canEdit={canEditTreatmentPlan}
-            canApprove={canApproveTreatmentPlan}
-            onChanged={async () => {
-              await loadCase()
-              await loadReferenceData()
-            }}
-          />
 
           <Card>
             <CardHeader>
@@ -1790,43 +2035,6 @@ function MedicalCaseDetail() {
         </div>
 
         <div className="space-y-6">
-          {canManage && caseAppointments.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('case_detail.section_consultations')}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {caseAppointments.map(appointment => {
-                  const status = appointment.statuse || appointment.status || 'pending'
-                  return (
-                    <div
-                      key={appointment.documentId || appointment.id}
-                      className="rounded-xl border border-teal-100 bg-teal-50 p-4"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-teal-600">
-                          <Clock className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-slate-900">
-                            {formatAppointmentDateTime(appointment.dateTime, i18n.language)}
-                          </p>
-                          <p className="mt-1 text-sm text-slate-600">
-                            {appointment.doctor?.fullName || medicalCase.doctor?.fullName || t('case_detail.doctor_label')}
-                          </p>
-                          <Badge variant={status === 'cancelled' ? 'danger' : status === 'completed' ? 'success' : 'primary'} className="mt-2">
-                            {t(`appointment.status_${status}`, { defaultValue: status })}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-                <p className="text-xs text-slate-500">{t('case_detail.consultation_timezone_hint')}</p>
-              </CardContent>
-            </Card>
-          )}
-
           {!isDoctorRole && (
             <Card>
             <CardHeader>
@@ -1908,7 +2116,36 @@ function MedicalCaseDetail() {
       </div>
       )}
 
-      {activeTab !== 'overview' && canEditTravel && (
+      {activeTab === 'documents' && (
+        <CaseDocumentsPanel medicalCase={medicalCase} onUploaded={loadCase} />
+      )}
+
+      {activeTab === 'consultations' && (
+        <CaseConsultationsPanel
+          medicalCase={medicalCase}
+          selectedAppointmentId={searchParams.get('appointment') || ''}
+          onSelectAppointment={selectAppointment}
+          onChanged={async () => {
+            await loadCase()
+            await loadReferenceData()
+          }}
+        />
+      )}
+
+      {activeTab === 'treatment' && (
+        <TreatmentPlanPanel
+          medicalCase={medicalCase}
+          plans={plans}
+          canEdit={canEditTreatmentPlan}
+          canApprove={canApproveTreatmentPlan}
+          onChanged={async () => {
+            await loadCase()
+            await loadReferenceData()
+          }}
+        />
+      )}
+
+      {['logistics', 'visa', 'tourism'].includes(activeTab) && canEditTravel && (
         <LogisticsWorkspace
           medicalCase={medicalCase}
           checklists={checklists}

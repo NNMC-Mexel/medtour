@@ -15,7 +15,13 @@ const DEFAULT_POPULATE = {
   coordinator: { fields: ['id', 'documentId', 'fullName', 'email', 'phone'] },
   clinic: true,
   doctor: { populate: ['specialization', 'photo', 'clinic'] },
-  medical_documents: { populate: ['file'] },
+  medical_documents: {
+    populate: {
+      file: true,
+      doctor: { fields: ['id', 'documentId', 'fullName'] },
+      appointment: { fields: ['id', 'documentId', 'dateTime', 'statuse'] },
+    },
+  },
   appointments: {
     populate: {
       doctor: { populate: ['specialization'] },
@@ -62,6 +68,8 @@ const DOCTOR_DOCUMENT_FIELDS = [
   'createdAt',
   'updatedAt',
   'file',
+  'doctor',
+  'appointment',
 ];
 
 const FIELD_ALLOWLIST_BY_ROLE: Record<string, string[]> = {
@@ -261,7 +269,11 @@ function redactCaseForRole(medicalCase: any, role: string) {
           'dateTime',
           'type',
           'statuse',
+          'roomId',
           'consultationPurpose',
+          'chatLog',
+          'doctorDecision',
+          'doctorDecisionNotes',
         ]))
         : [],
       treatment_plans: medicalCase.treatment_plans || [],
@@ -357,7 +369,16 @@ async function includeAppointmentDocuments(strapi: any, medicalCase: any) {
   try {
     const appointmentDocs = await strapi.documents('api::medical-document.medical-document' as any).findMany({
       filters: { appointment: { documentId: { $in: appointmentDocumentIds } } },
-      populate: ['file', 'user', 'doctor', 'appointment', 'medical_case', 'sharedWithDoctors'],
+      // Conclusion documents are patient-visible, internal appointment fields
+      // are not. Keep the nested appointment projection intentionally narrow.
+      populate: {
+        file: true,
+        user: { fields: ['id', 'documentId', 'fullName'] },
+        doctor: { fields: ['id', 'documentId', 'fullName'] },
+        appointment: { fields: ['id', 'documentId', 'dateTime', 'statuse', 'type', 'consultationPurpose'] },
+        medical_case: { fields: ['id', 'documentId', 'caseNumber', 'status'] },
+        sharedWithDoctors: { fields: ['id', 'documentId', 'fullName'] },
+      } as any,
     });
     const seen = new Set((medicalCase.medical_documents || []).map((doc: any) => doc.documentId || doc.id));
     const mergedDocs = [...(medicalCase.medical_documents || [])];

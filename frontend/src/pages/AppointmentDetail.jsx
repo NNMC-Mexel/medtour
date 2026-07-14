@@ -81,6 +81,17 @@ function AppointmentDetail() {
     setDoctorDecisionNotes(appointment.doctorDecisionNotes || '')
   }, [appointment])
 
+  // Medical cases are the doctor's primary workspace. Keep this route only as
+  // a fallback for legacy appointments that were created without a case.
+  useEffect(() => {
+    if (!isDoctor || !appointment) return
+    const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
+    const appointmentId = appointment.documentId || appointment.id
+    if (caseId) {
+      navigate(`/doctor/cases/${caseId}?tab=consultations&appointment=${appointmentId}`, { replace: true })
+    }
+  }, [appointment, isDoctor, navigate])
+
   // Preload existing documents into notes fields
   useEffect(() => {
     if (!documents.length) return
@@ -195,6 +206,14 @@ function AppointmentDetail() {
           <p className="text-slate-500 mb-4">{t('appointment_detail.not_found')}</p>
           <Button onClick={() => navigate(backPath)}>{t('appointment_detail.back')}</Button>
         </div>
+      </div>
+    )
+  }
+
+  if (isDoctor && (appointment.medical_case?.documentId || appointment.medical_case?.id)) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
       </div>
     )
   }

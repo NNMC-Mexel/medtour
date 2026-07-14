@@ -662,6 +662,9 @@ export const appointmentsAPI = {
         return api.put(`/api/appointments/${id}`, { data: strapiData });
     },
 
+    saveOutput: (id, data) =>
+        api.put(`/api/appointments/${id}/output`, { data }),
+
     cancel: (id) =>
         api.put(`/api/appointments/${id}`, { data: { statuse: "cancelled" } }),
 
@@ -795,6 +798,12 @@ export const messagesAPI = {
 // ===========================================
 
 export const documentsAPI = {
+    getByCase: (caseId) =>
+        api.get(`/api/medical-cases/${encodeURIComponent(caseId)}/documents`),
+
+    attachToCase: (caseId, documentId) =>
+        api.put(`/api/medical-cases/${encodeURIComponent(caseId)}/documents/${encodeURIComponent(documentId)}/attach`),
+
     getAll: (params = {}) => {
         const query = new URLSearchParams();
         query.append("populate[file]", "*");

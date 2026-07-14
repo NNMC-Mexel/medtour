@@ -1,5 +1,5 @@
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { getUserRole, isAdminUser, userCanAccessMedicalCase } from '../../../utils/medtour-access';
+import { getMedicalCaseAccessFilter, getUserRole, isAdminUser, userCanAccessMedicalCase } from '../../../utils/medtour-access';
 
 const getS3Client = () =>
   new S3Client({
@@ -136,11 +136,29 @@ function canAccessMedicalDocumentFile(user: any, doc: any) {
   return false;
 }
 
+async function canStaffAccessPatientLibraryFile(user: any, doc: any) {
+  const role = getUserRole(user);
+  if (!['manager', 'coordinator'].includes(role) || !doc.user?.id) return false;
+
+  const accessFilter = await getMedicalCaseAccessFilter(strapi, user);
+  if (accessFilter === null) return false;
+
+  const accessibleCases = await strapi.documents('api::medical-case.medical-case' as any).findMany({
+    filters: {
+      patient: { id: doc.user.id },
+      ...accessFilter,
+    },
+    fields: ['id', 'documentId'],
+    limit: 1,
+  });
+  return accessibleCases.length > 0;
+}
+
 type AccessDecision =
   | { allowed: true; isMedicalDocument: boolean }
   | { allowed: false; reason: 'not-found' | 'unauthorized' };
 
-async function decideFileAccess(ctx, key: string): Promise<AccessDecision> {
+export async function decideFileAccess(ctx, key: string): Promise<AccessDecision> {
   const uploadFile = await findUploadFileByKey(key);
 
   // Default-deny: an unknown key is treated as not-found.
@@ -206,7 +224,7 @@ async function decideFileAccess(ctx, key: string): Promise<AccessDecision> {
     if (user && (isAdminUser(user) || memberAccess || caseAccess)) {
       return { allowed: true, isMedicalDocument: true };
     }
-    return { allowed: false, reason: 'not-found' };
+    return { allowed: false, reason: 'unauthorized' };
   }
 
   // 3. Otherwise, the file MUST be attached to a medical-document, and the
@@ -218,6 +236,11 @@ async function decideFileAccess(ctx, key: string): Promise<AccessDecision> {
       user: { fields: ['id'] },
       doctor: { populate: { users_permissions_user: { fields: ['id'] } } },
       sharedWithDoctors: { populate: { users_permissions_user: { fields: ['id'] } } },
+      appointment: {
+        populate: {
+          medical_case: { fields: ['id', 'documentId'] },
+        },
+      },
       medical_case: {
         populate: {
           patient: { fields: ['id'] },
@@ -229,21 +252,30 @@ async function decideFileAccess(ctx, key: string): Promise<AccessDecision> {
     } as any,
   });
 
-  const medicalDocument = medicalDocuments[0];
+  const medicalDocument: any = medicalDocuments[0];
 
   // 4. If the upload exists but is linked to nothing (orphan) — refuse.
   //    This covers race conditions during upload, failed link attempts,
   //    and files left over after parent records were deleted.
   if (!medicalDocument) return { allowed: false, reason: 'not-found' };
 
-  if (user && canAccessMedicalDocumentFile(user, medicalDocument)) {
+  const caseRef = medicalDocument?.medical_case || medicalDocument?.appointment?.medical_case;
+  const caseAccess = user && caseRef
+    ? await userCanAccessMedicalCase(strapi, user, caseRef)
+    : false;
+
+  if (user && (
+    canAccessMedicalDocumentFile(user, medicalDocument)
+    || caseAccess
+    || await canStaffAccessPatientLibraryFile(user, medicalDocument)
+  )) {
     return { allowed: true, isMedicalDocument: true };
   }
 
-  // Returning "not-found" rather than "unauthorized" prevents an attacker
-  // from learning whether a particular hash maps to an existing medical
-  // document.
-  return { allowed: false, reason: 'not-found' };
+  // The proxy still renders this as a uniform 404. Keeping the internal reason
+  // lets the direct-upload guard distinguish a protected medical file from an
+  // unrelated public/static upload without creating an existence oracle.
+  return { allowed: false, reason: 'unauthorized' };
 }
 
 function safeFilename(name: string | undefined | null) {

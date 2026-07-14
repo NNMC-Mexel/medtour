@@ -50,6 +50,14 @@ const generateAllTimeOptions = () => {
 
 const allTimeOptions = generateAllTimeOptions();
 
+function getAppointmentDetailsPath(appointment) {
+    const appointmentId = appointment.documentId || appointment.id;
+    const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id;
+    return caseId
+        ? `/doctor/cases/${caseId}?tab=consultations&appointment=${appointmentId}`
+        : `/doctor/appointments/${appointmentId}`;
+}
+
 // Функция генерации слотов на основе рабочих часов
 const generateWorkingSlots = (workingHours) => {
     const slots = [];
@@ -485,7 +493,7 @@ function DoctorSchedule() {
                                                                             </Link>
                                                                         )}
                                                                         {isPast && appointmentStatus !== 'cancelled' && appointment.roomId && (
-                                                                            <Link to={`/doctor/appointments/${appointment.documentId || appointment.id}`}>
+                                                                            <Link to={getAppointmentDetailsPath(appointment)}>
                                                                                 <Button size='sm' variant='secondary'>{t('schedule.details_btn')}</Button>
                                                                             </Link>
                                                                         )}

@@ -5,7 +5,12 @@
  * - Admin видит всё
  */
 import { factories } from '@strapi/strapi';
-import { getUserRole, userCanAccessMedicalCase } from '../../../utils/medtour-access';
+import {
+  getAuthenticatedUser,
+  getMedicalCaseAccessFilter,
+  getUserRole,
+  userCanAccessMedicalCase,
+} from '../../../utils/medtour-access';
 import { normalizeCaseStatus } from '../../../utils/medical-case-workflow';
 
 // Kazakhstan is UTC+5 with no DST (fixed offset, IANA: Asia/Almaty)
@@ -260,9 +265,20 @@ export default factories.createCoreController('api::appointment.appointment', ()
     }
 
     // Apply doctor filter (so patients only see bookings for the requested doctor)
+    const doctorDocumentIdFilter = queryFilters?.doctor?.documentId?.$eq;
     const doctorIdFilter = queryFilters?.doctor?.id?.$eq;
-    if (doctorIdFilter) {
+    if (doctorDocumentIdFilter) {
+      additionalFilters.doctor = { documentId: doctorDocumentIdFilter };
+    } else if (doctorIdFilter) {
       additionalFilters.doctor = { id: doctorIdFilter };
+    }
+
+    const patientDocumentIdFilter = queryFilters?.patient?.documentId?.$eq;
+    const patientIdFilter = queryFilters?.patient?.id?.$eq;
+    if (patientDocumentIdFilter) {
+      additionalFilters.patient = { documentId: patientDocumentIdFilter };
+    } else if (patientIdFilter) {
+      additionalFilters.patient = { id: patientIdFilter };
     }
 
     if (!isAdmin) {
@@ -289,7 +305,22 @@ export default factories.createCoreController('api::appointment.appointment', ()
 
         // Use ONLY documentId — avoids IDOR via numeric id cross-contamination
         const data = await strapi.documents('api::appointment.appointment').findMany({
-          filters: { doctor: { documentId: doctorRecord.documentId }, ...additionalFilters },
+          // Ownership goes last so a query-string doctor filter cannot replace it.
+          filters: { ...additionalFilters, doctor: { documentId: doctorRecord.documentId } },
+          sort,
+          populate,
+        });
+        return {
+          data: data.map((appointment: any) => redactAppointmentForRole(appointment, role)),
+          meta: { pagination: { page: 1, pageSize: data.length, pageCount: 1, total: data.length } },
+        };
+      } else if (['manager', 'coordinator'].includes(role)) {
+        const caseFilter = await getMedicalCaseAccessFilter(strapi, user);
+        if (caseFilter === null) {
+          return { data: [], meta: { pagination: { page: 1, pageSize: 0, pageCount: 0, total: 0 } } };
+        }
+        const data = await strapi.documents('api::appointment.appointment').findMany({
+          filters: { ...additionalFilters, medical_case: caseFilter },
           sort,
           populate,
         });
@@ -304,7 +335,8 @@ export default factories.createCoreController('api::appointment.appointment', ()
           return { data: [], meta: { pagination: { page: 1, pageSize: 0, pageCount: 0, total: 0 } } };
         }
         const data = await strapi.documents('api::appointment.appointment').findMany({
-          filters: { patient: { documentId: patientDocId }, ...additionalFilters },
+          // Ownership goes last so a query-string patient filter cannot replace it.
+          filters: { ...additionalFilters, patient: { documentId: patientDocId } },
           sort,
           populate,
         });
@@ -759,6 +791,154 @@ export default factories.createCoreController('api::appointment.appointment', ()
     }
 
     return { data: result.appointment };
+  },
+
+  /**
+   * Persist the post-consultation output as one clinical operation.
+   * The public conclusion is stored as a case/appointment document while the
+   * internal feedback remains on the appointment and is redacted from patients.
+   */
+  async saveOutput(ctx) {
+    const user = await getAuthenticatedUser(strapi, ctx);
+    if (!user) return ctx.forbidden('Not authenticated');
+
+    const documentId = String(ctx.params.id || '');
+    const body = (ctx.request.body as any)?.data || ctx.request.body || {};
+    const appointment: any = await strapi.documents('api::appointment.appointment').findOne({
+      documentId,
+      populate: {
+        patient: { fields: ['id', 'documentId'] },
+        doctor: {
+          fields: ['id', 'documentId', 'consultationDuration'],
+          populate: { users_permissions_user: { fields: ['id'] } },
+        },
+        medical_case: { fields: ['id', 'documentId'] },
+      },
+    });
+
+    if (!appointment) return ctx.notFound('Appointment not found');
+    if (!isAppointmentDoctor(appointment.doctor, user.id)) {
+      return ctx.forbidden('Only the assigned doctor can save consultation output');
+    }
+    if (['cancelled', 'no_show'].includes(appointment.statuse)) {
+      return ctx.badRequest('Consultation output cannot be saved for this status');
+    }
+
+    const consultationDuration = Number(appointment.doctor?.consultationDuration) || 30;
+    const consultationEnd = new Date(appointment.dateTime).getTime() + (consultationDuration + 5) * 60 * 1000;
+    const editWindowEnd = consultationEnd + 48 * 60 * 60 * 1000;
+    if (Date.now() < consultationEnd) return ctx.badRequest('The consultation has not ended yet');
+    if (Date.now() > editWindowEnd) return ctx.forbidden('The consultation output editing window has expired');
+
+    const allowedDecisions = ['treatment_required', 'no_treatment_needed', 'needs_more_documents'];
+    const decision = body.doctorDecision || null;
+    if (decision && !allowedDecisions.includes(decision)) {
+      return ctx.badRequest('Invalid doctorDecision value');
+    }
+
+    const conclusionText = String(body.conclusionText || '').slice(0, 20000);
+    const conclusionTitle = String(body.conclusionTitle || 'Medical conclusion').slice(0, 200);
+    const doctorDecisionNotes = String(body.doctorDecisionNotes || '').slice(0, 10000);
+    const conclusionFileId = body.conclusionFileId || undefined;
+    const existingConclusions: any[] = await strapi.documents('api::medical-document.medical-document' as any).findMany({
+      filters: {
+        appointment: { documentId },
+        type: 'certificate',
+      },
+      sort: ['createdAt:asc'],
+      limit: 1,
+      populate: ['file', 'medical_case'],
+    });
+    const existingConclusion = existingConclusions[0];
+
+    if (conclusionFileId) {
+      const uploadFile = await strapi.query('plugin::upload.file').findOne({
+        where: { id: conclusionFileId },
+      });
+      if (!uploadFile) return ctx.badRequest('Conclusion file not found');
+
+      // A new upload is not linked yet. Once linked, only this same conclusion
+      // may reuse it; otherwise a guessed upload id could copy another
+      // patient's private file into the current case.
+      const linkedDocuments: any[] = await strapi.documents('api::medical-document.medical-document' as any).findMany({
+        filters: { file: { id: conclusionFileId } } as any,
+        fields: ['id', 'documentId'],
+        limit: 10,
+      });
+      if (linkedDocuments.some(doc => doc.documentId !== existingConclusion?.documentId)) {
+        return ctx.forbidden('Conclusion file is already linked to another document');
+      }
+    }
+
+    const result = await strapi.db.transaction(async () => {
+      let conclusion = existingConclusion;
+      if (existingConclusion) {
+        conclusion = await strapi.documents('api::medical-document.medical-document' as any).update({
+          documentId: existingConclusion.documentId,
+          data: {
+            description: conclusionText,
+            ...(conclusionFileId ? { file: conclusionFileId } : {}),
+            ...(!existingConclusion.medical_case && appointment.medical_case?.documentId
+              ? { medical_case: appointment.medical_case.documentId }
+              : {}),
+          } as any,
+          status: 'published',
+          populate: ['file', 'doctor', 'appointment', 'medical_case'],
+        });
+      } else if (conclusionText.trim() || conclusionFileId) {
+        conclusion = await strapi.documents('api::medical-document.medical-document' as any).create({
+          data: {
+            title: conclusionTitle,
+            type: 'certificate',
+            description: conclusionText,
+            ...(conclusionFileId ? { file: conclusionFileId } : {}),
+            user: appointment.patient?.documentId,
+            doctor: appointment.doctor?.documentId,
+            appointment: documentId,
+            medical_case: appointment.medical_case?.documentId,
+          } as any,
+          status: 'published',
+          populate: ['file', 'doctor', 'appointment', 'medical_case'],
+        });
+      }
+
+      const savedAppointment = await strapi.documents('api::appointment.appointment').update({
+        documentId,
+        data: {
+          doctorDecision: decision,
+          doctorDecisionNotes,
+        },
+        status: 'published',
+      });
+
+      if (appointment.medical_case?.documentId) {
+        await strapi.documents('api::case-event.case-event' as any).create({
+          data: {
+            medical_case: appointment.medical_case.documentId,
+            actor: user.documentId || user.id,
+            eventType: 'DOCTOR_FEEDBACK_UPLOADED',
+            message: 'Doctor saved consultation conclusion and internal feedback',
+            metadata: {
+              appointmentId: documentId,
+              conclusionDocumentId: conclusion?.documentId || null,
+              doctorDecision: decision,
+            },
+          },
+        });
+      }
+
+      return { appointment: savedAppointment, conclusion };
+    });
+
+    strapi.log.info(JSON.stringify({
+      audit: 'CONSULTATION_OUTPUT_SAVED',
+      appointmentId: documentId,
+      doctorUserId: user.id,
+      caseId: appointment.medical_case?.documentId || null,
+      ts: new Date().toISOString(),
+    }));
+
+    return { data: result };
   },
 
   async update(ctx) {

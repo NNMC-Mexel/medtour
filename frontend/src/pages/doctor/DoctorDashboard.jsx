@@ -31,6 +31,14 @@ import {
     getKazakhstanDateKey,
 } from "../../utils/kazakhstanTime";
 
+function getAppointmentDetailsPath(appointment) {
+    const appointmentId = appointment.documentId || appointment.id;
+    const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id;
+    return caseId
+        ? `/doctor/cases/${caseId}?tab=consultations&appointment=${appointmentId}`
+        : `/doctor/appointments/${appointmentId}`;
+}
+
 function DoctorDashboard() {
     const { t, i18n } = useTranslation()
     const { user } = useAuthStore();
@@ -328,7 +336,7 @@ function DoctorDashboard() {
                                                     </Link>
                                                 )}
                                                 {!canJoin && isPastConsultation && appointment.roomId && (
-                                                    <Link to={`/doctor/appointments/${appointment.documentId || appointment.id}`} className='block mt-2'>
+                                                    <Link to={getAppointmentDetailsPath(appointment)} className='block mt-2'>
                                                         <Button size='sm' variant='secondary' className='w-full'>
                                                             {t('doctor.details')}
                                                         </Button>
@@ -375,7 +383,7 @@ function DoctorDashboard() {
                                                             </Button>
                                                         </Link>
                                                     ) : isPastConsultation && appointment.roomId ? (
-                                                        <Link to={`/doctor/appointments/${appointment.documentId || appointment.id}`}>
+                                                        <Link to={getAppointmentDetailsPath(appointment)}>
                                                             <Button size='sm' variant='secondary'>{t('doctor.details')}</Button>
                                                         </Link>
                                                     ) : null}

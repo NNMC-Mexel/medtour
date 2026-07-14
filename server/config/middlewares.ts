@@ -88,6 +88,9 @@ export default ({ env }) => {
     { name: 'global::upload-guard', config: {} },
     'strapi::session',
     'strapi::favicon',
+    // Must run immediately before strapi::public: local-provider medical files
+    // live under /uploads but are not public resources.
+    { name: 'global::private-uploads', config: {} },
     'strapi::public',
   ];
 };

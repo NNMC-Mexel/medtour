@@ -1,12 +1,16 @@
 /**
- * Medical-document controller с ownership-фильтрацией и sharing.
+ * Medical-document controller with ownership and medical-case access control.
  * - Patient видит только свои документы
- * - Doctor видит документы своих пациентов + расшаренные ему
+ * - Doctor видит документы назначенных ему medical cases
  * - Admin видит всё
+ *
+ * sharedWithDoctors remains readable for legacy data, but new workflows derive
+ * access from the medical case assignment.
  */
 import { factories } from '@strapi/strapi';
 import { normalizeCaseStatus } from '../../../utils/medical-case-workflow';
 import {
+  getAuthenticatedUser,
   getMedicalCaseAccessFilter,
   getUserRole,
   isAdminUser,
@@ -35,7 +39,14 @@ const STAFF_UPDATE_FIELDS = [
   'dueDate',
 ];
 const STAFF_CREATE_FIELDS = ['reviewStatus', 'reviewNotes', 'requestedLanguage', 'dueDate'];
-const TERMINAL_CASE_STATUSES = ['COMPLETED', 'CANCELLED'];
+const CASE_DOCUMENT_POPULATE = {
+  file: true,
+  doctor: { fields: ['id', 'documentId', 'fullName'] },
+  appointment: {
+    fields: ['id', 'documentId', 'dateTime', 'statuse', 'type', 'consultationPurpose'],
+  },
+  medical_case: { fields: ['id', 'documentId', 'caseNumber', 'status'] },
+} as any;
 
 function pickFields(body: Record<string, any>, fields: string[]) {
   return Object.fromEntries(Object.entries(body).filter(([key]) => fields.includes(key)));
@@ -46,50 +57,147 @@ function getRelationRef(value: any) {
   return typeof value === 'object' ? value.documentId || value.id : value;
 }
 
-function buildDocumentIntakeCaseNumber() {
-  const now = new Date();
-  const date = now.toISOString().slice(0, 10).replace(/-/g, '');
-  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
-  return `MT-${date}-${suffix}`;
-}
-
-async function findOrCreatePatientUploadCase(strapi: any, user: any) {
-  if (!user?.documentId) return undefined;
-
-  const activeCases = await strapi.documents('api::medical-case.medical-case' as any).findMany({
-    filters: {
-      patient: { documentId: user.documentId },
-      status: { $notIn: TERMINAL_CASE_STATUSES },
-    },
-    sort: ['updatedAt:desc'],
-    limit: 1,
-    fields: ['id', 'documentId', 'status'],
-  });
-
-  if (activeCases[0]?.documentId) {
-    return activeCases[0].documentId;
-  }
-
-  const created = await strapi.documents('api::medical-case.medical-case' as any).create({
-    data: {
-      title: 'Patient document upload',
-      caseNumber: buildDocumentIntakeCaseNumber(),
-      status: 'WAITING_FOR_DOCUMENTS',
-      patient: user.documentId,
-      country: user.country || '',
-      language: user.language || 'en',
-      timezone: user.timezone || '',
-      preferredContact: user.phone || user.email || '',
-      leadSource: 'patient_documents',
-    },
-    status: 'published',
-    fields: ['id', 'documentId', 'status'],
-  });
-
-  return created?.documentId;
-}
-
 export default factories.createCoreController('api::medical-document.medical-document', () => ({
+  /**
+   * Documents available in the context of one medical case.
+   *
+   * The case assignment is the access boundary. An assigned doctor receives
+   * every document attached to the case without patient-to-doctor sharing.
+   * Patient/staff also receive the patient's unattached uploads in metadata so
+   * they can attach a relevant historical document to the case.
+   */
+  async byCase(ctx) {
+    const user = await getAuthenticatedUser(strapi, ctx);
+    if (!user) return ctx.forbidden('Not authenticated');
+
+    const caseId = String(ctx.params.caseId || '');
+    if (!caseId || !(await userCanAccessMedicalCase(strapi, user, caseId))) {
+      return ctx.notFound('Medical case not found');
+    }
+
+    const medicalCase: any = await strapi.documents('api::medical-case.medical-case' as any).findOne({
+      documentId: caseId,
+      fields: ['id', 'documentId'],
+      populate: { patient: { fields: ['id', 'documentId'] } },
+    });
+    if (!medicalCase) return ctx.notFound('Medical case not found');
+
+    const [directDocuments, appointmentDocuments] = await Promise.all([
+      strapi.documents('api::medical-document.medical-document').findMany({
+        filters: { medical_case: { documentId: caseId } },
+        sort: ['createdAt:desc'],
+        populate: CASE_DOCUMENT_POPULATE,
+      }),
+      strapi.documents('api::medical-document.medical-document').findMany({
+        filters: { appointment: { medical_case: { documentId: caseId } } } as any,
+        sort: ['createdAt:desc'],
+        populate: CASE_DOCUMENT_POPULATE,
+      }),
+    ]);
+
+    const seen = new Set<string>();
+    const data = [...directDocuments, ...appointmentDocuments].filter((doc: any) => {
+      const key = String(doc.documentId || doc.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const role = getUserRole(user);
+    let libraryDocuments: any[] = [];
+    if (role !== 'doctor' && medicalCase.patient?.documentId) {
+      const patientUploads = await strapi.documents('api::medical-document.medical-document').findMany({
+        filters: {
+          user: { documentId: medicalCase.patient.documentId },
+          doctor: { id: { $null: true } },
+        } as any,
+        sort: ['createdAt:desc'],
+        populate: CASE_DOCUMENT_POPULATE,
+      });
+      libraryDocuments = patientUploads.filter((doc: any) => !seen.has(String(doc.documentId || doc.id)));
+    }
+
+    return {
+      data,
+      meta: {
+        caseId,
+        libraryDocuments,
+        accessMode: 'medical_case',
+      },
+    };
+  },
+
+  /** Attach an existing patient upload to this case without exposing it globally. */
+  async attachToCase(ctx) {
+    const user = await getAuthenticatedUser(strapi, ctx);
+    if (!user) return ctx.forbidden('Not authenticated');
+
+    const role = getUserRole(user);
+    if (!['patient', 'manager', 'coordinator', 'admin'].includes(role)) {
+      return ctx.forbidden('Only the patient or MedTour staff can attach library documents');
+    }
+
+    const caseId = String(ctx.params.caseId || '');
+    const documentId = String(ctx.params.id || '');
+    if (!(await userCanAccessMedicalCase(strapi, user, caseId))) {
+      return ctx.notFound('Medical case not found');
+    }
+
+    const [medicalCase, source]: any[] = await Promise.all([
+      strapi.documents('api::medical-case.medical-case' as any).findOne({
+        documentId: caseId,
+        fields: ['id', 'documentId'],
+        populate: { patient: { fields: ['id', 'documentId'] } },
+      }),
+      strapi.documents('api::medical-document.medical-document').findOne({
+        documentId,
+        populate: ['file', 'user', 'doctor', 'medical_case'] as any,
+      }),
+    ]);
+
+    if (!medicalCase || !source || source.user?.documentId !== medicalCase.patient?.documentId) {
+      return ctx.notFound('Document not found');
+    }
+    if (source.doctor) return ctx.forbidden('Doctor documents cannot be reused as patient uploads');
+    if (source.medical_case?.documentId === caseId) return { data: source };
+
+    const attached = source.medical_case
+      ? await strapi.documents('api::medical-document.medical-document').create({
+        data: {
+          title: source.title,
+          type: source.type || 'other',
+          description: source.description || '',
+          reviewStatus: 'UPLOADED',
+          file: source.file?.id,
+          user: medicalCase.patient.documentId,
+          medical_case: caseId,
+        } as any,
+        status: 'published',
+        populate: CASE_DOCUMENT_POPULATE,
+      })
+      : await strapi.documents('api::medical-document.medical-document').update({
+        documentId,
+        data: { medical_case: caseId } as any,
+        status: 'published',
+        populate: CASE_DOCUMENT_POPULATE,
+      });
+
+    await strapi.documents('api::case-event.case-event' as any).create({
+      data: {
+        medical_case: caseId,
+        actor: user.documentId || user.id,
+        eventType: 'DOCUMENT_UPLOADED',
+        message: 'Existing patient document attached to medical case',
+        metadata: {
+          documentId: attached.documentId || attached.id,
+          sourceDocumentId: source.documentId || source.id,
+        },
+      },
+    });
+
+    return { data: attached };
+  },
+
   async find(ctx) {
     const user = ctx.state.user;
     if (!user) return ctx.forbidden('Not authenticated');
@@ -214,7 +322,6 @@ export default factories.createCoreController('api::medical-document.medical-doc
     const isAdmin = isAdminUser(user);
     const isDoctor = role === 'doctor';
     const isStaff = ['manager', 'coordinator'].includes(role);
-    const isPatientSelfUpload = !isAdmin && !isDoctor && !isStaff;
     const canSetReviewFields = isAdmin || isDoctor || isStaff;
 
     // Resolve user (patient) documentId
@@ -297,10 +404,10 @@ export default factories.createCoreController('api::medical-document.medical-doc
 
     let medicalCaseDocId: string | undefined;
     let linkedCaseRecord: any;
-    const fallbackPatientCaseRef = (!body.medical_case && !appointmentRecord?.medical_case && isPatientSelfUpload)
-      ? await findOrCreatePatientUploadCase(strapi, user)
-      : undefined;
-    const requestedCaseRef = body.medical_case || appointmentRecord?.medical_case?.documentId || appointmentRecord?.medical_case?.id || fallbackPatientCaseRef;
+    // A patient upload without a case belongs to the personal document library.
+    // It must not create a synthetic medical case or silently attach itself to
+    // whichever active case happened to be updated most recently.
+    const requestedCaseRef = body.medical_case || appointmentRecord?.medical_case?.documentId || appointmentRecord?.medical_case?.id;
     if (requestedCaseRef) {
       let caseRecord: any;
       if (typeof requestedCaseRef === 'number') {
@@ -338,6 +445,7 @@ export default factories.createCoreController('api::medical-document.medical-doc
         if (!doctorRecord || caseRecord.doctor?.documentId !== doctorRecord.documentId) {
           return ctx.forbidden('You can only upload documents for assigned medical cases');
         }
+        if (!doctorDocId) doctorDocId = doctorRecord.documentId;
       }
     }
 

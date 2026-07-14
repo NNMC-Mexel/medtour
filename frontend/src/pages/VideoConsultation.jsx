@@ -43,7 +43,7 @@ import Avatar from '../components/ui/Avatar'
 import { useToast } from '../components/ui/Toast'
 import { cn, getSpecName } from '../utils/helpers'
 import useAuthStore from '../stores/authStore'
-import api, { appointmentsAPI, documentsAPI, uploadFile, getMediaUrl, getSignalingUrl, openMediaInNewTab } from '../services/api'
+import api, { appointmentsAPI, documentsAPI, uploadFile, getSignalingUrl, openMediaInNewTab } from '../services/api'
 import { formatDateTimeInTimeZone, getDeviceTimeZone, KAZAKHSTAN_TIME_ZONE } from '../utils/kazakhstanTime'
 
 const _TURN_USER = import.meta.env.VITE_TURN_USERNAME || '';
@@ -380,13 +380,18 @@ function VideoConsultation({
     fetchAppointment()
   }, [roomId])
 
-  // Fetch patient documents for doctor + load existing docs for this appointment
+  // Fetch documents through the medical case access boundary. This keeps the
+  // live consultation, case workspace and manager view on the same document set.
+  // Legacy appointments without a case retain the old patient-scoped fallback.
   useEffect(() => {
     const fetchPatientDocs = async () => {
       if (!isDoctor || !appointment?.patient?.id) return
       setIsLoadingDocs(true)
       try {
-        const response = await documentsAPI.getAll({ userId: appointment.patient.id })
+        const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
+        const response = caseId
+          ? await documentsAPI.getByCase(caseId)
+          : await documentsAPI.getAll({ userId: appointment.patient.id })
         const docs = response.data?.data || []
         setPatientDocuments(docs)
 
@@ -413,7 +418,7 @@ function VideoConsultation({
       }
     }
     fetchPatientDocs()
-  }, [appointment?.documentId, appointment?.id, appointment?.patient?.id, isDoctor])
+  }, [appointment?.documentId, appointment?.id, appointment?.patient?.id, appointment?.medical_case?.documentId, appointment?.medical_case?.id, isDoctor])
 
   const getParticipantInfo = () => {
     if (!appointment) {
@@ -622,7 +627,7 @@ function VideoConsultation({
       socketRef.current?.emit('leave-room')
       socketRef.current?.disconnect()
     }
-  }, [roomId, user, accessStatus])
+  }, [roomId, user?.id, user?.userRole, token, accessStatus])
 
   const handleReconnect = () => {
     if (reconnectAttemptsRef.current >= 3) {
@@ -964,11 +969,12 @@ function VideoConsultation({
       // 1. Upload file to media library
       const uploaded = await uploadFile(file)
 
-      // 2. Resolve doctor documentId for sharing
-      const doctorDocId = appointment.doctor?.documentId
+      // 2. Link the upload to this consultation. The server derives the
+      // medical case from the appointment, so the assigned doctor receives
+      // access automatically through the case.
       const aptDocId = appointment.documentId || appointment.id
 
-      // 3. Create medical-document linked to appointment + shared with doctor
+      // 3. Create medical-document linked to the consultation/case
       await documentsAPI.create({
         title: file.name.replace(/\.[^/.]+$/, ''),
         type: 'other',
@@ -976,7 +982,6 @@ function VideoConsultation({
         file: uploaded.id,
         user: user.id,
         appointment: aptDocId,
-        sharedWithDoctors: doctorDocId ? [doctorDocId] : [],
       })
 
       // 4. Send chat message so doctor sees notification instantly
@@ -997,7 +1002,10 @@ function VideoConsultation({
 
       // 5. Refresh doctor's document list if they have it open
       if (isDoctor && appointment?.patient?.id) {
-        const response = await documentsAPI.getAll({ userId: appointment.patient.id })
+        const caseId = appointment.medical_case?.documentId || appointment.medical_case?.id
+        const response = caseId
+          ? await documentsAPI.getByCase(caseId)
+          : await documentsAPI.getAll({ userId: appointment.patient.id })
         setPatientDocuments(response.data?.data || [])
       }
     } catch (err) {
@@ -1915,7 +1923,6 @@ function VideoConsultation({
                               </summary>
                               <div className="px-3 pb-3 space-y-1.5">
                                 {docs.map((doc) => {
-                                  const fileUrl = doc.file?.url ? getMediaUrl(doc.file) : null
                                   return (
                                     <div
                                       key={doc.id}
@@ -1935,17 +1942,16 @@ function VideoConsultation({
                                           <p className="text-xs text-slate-600 mt-1 line-clamp-2">{doc.description}</p>
                                         )}
                                       </div>
-                                      {fileUrl && (
-                                        <a
-                                          href={fileUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
+                                      {doc.file && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openMediaInNewTab(doc.file)}
                                           title={t('common.open')}
                                           aria-label={t('common.open')}
                                           className="p-1.5 rounded-lg text-teal-600 hover:bg-teal-50 transition-colors flex-shrink-0"
                                         >
                                           <ExternalLink className="w-4 h-4" />
-                                        </a>
+                                        </button>
                                       )}
                                     </div>
                                   )
