@@ -40,9 +40,11 @@ import { useTranslation } from 'react-i18next'
 import { io } from 'socket.io-client'
 import Button from '../components/ui/Button'
 import Avatar from '../components/ui/Avatar'
+import { useToast } from '../components/ui/Toast'
 import { cn, getSpecName } from '../utils/helpers'
 import useAuthStore from '../stores/authStore'
-import api, { appointmentsAPI, documentsAPI, uploadFile, getMediaUrl, getSignalingUrl } from '../services/api'
+import api, { appointmentsAPI, documentsAPI, uploadFile, getMediaUrl, getSignalingUrl, openMediaInNewTab } from '../services/api'
+import { formatDateTimeInTimeZone, getDeviceTimeZone, KAZAKHSTAN_TIME_ZONE } from '../utils/kazakhstanTime'
 
 const _TURN_USER = import.meta.env.VITE_TURN_USERNAME || '';
 const _TURN_CRED = import.meta.env.VITE_TURN_CREDENTIAL || '';
@@ -85,6 +87,7 @@ function VideoConsultation({
   const { t, i18n } = useTranslation()
   const timeLocale = i18n.language === 'kk' ? 'kk-KZ' : i18n.language === 'en' ? 'en-US' : 'ru-RU'
   const { user, token } = useAuthStore()
+  const toast = useToast()
 
   const [connectionState, setConnectionState] = useState('initializing')
   const [isMuted, setIsMuted] = useState(false)
@@ -132,9 +135,10 @@ function VideoConsultation({
   const [isUploadingChatFile, setIsUploadingChatFile] = useState(false)
   const chatFileInputRef = useRef(null)
 
-  // Force complete state (doctor)
+  // Call termination state. `leave` only disconnects the current participant,
+  // while `complete` also completes the appointment for both participants.
   const [isCompletingCall, setIsCompletingCall] = useState(false)
-  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
+  const [pendingEndAction, setPendingEndAction] = useState(null)
 
   const localVideoRef = useRef(null)
   const remoteVideoRef = useRef(null)
@@ -149,6 +153,7 @@ function VideoConsultation({
   const reconnectAttemptsRef = useRef(0)
   const reconnectTimerRef = useRef(null)
   const pendingIceCandidatesRef = useRef([])
+  const isEndingCallRef = useRef(false)
   const [miniPosition, setMiniPosition] = useState(null)
 
   useEffect(() => {
@@ -243,7 +248,9 @@ function VideoConsultation({
   }, [clampMiniPosition, getInitialMiniPosition, isMinimized])
 
   const handleMiniPointerDown = (event) => {
-    if (event.target.closest('button, a, input, textarea, select, label')) return
+    // Controls inside the floating window must receive the first pointer event.
+    // Otherwise pointer capture for dragging can swallow the subsequent click.
+    if (event.target.closest('button, a, input, textarea, select, label, [data-no-drag]')) return
     const startPosition = miniPosition || getInitialMiniPosition()
     miniDragRef.current = {
       pointerId: event.pointerId,
@@ -406,7 +413,7 @@ function VideoConsultation({
       }
     }
     fetchPatientDocs()
-  }, [appointment?.patient?.id, isDoctor])
+  }, [appointment?.documentId, appointment?.id, appointment?.patient?.id, isDoctor])
 
   const getParticipantInfo = () => {
     if (!appointment) {
@@ -569,6 +576,7 @@ function VideoConsultation({
             id: data.id,
             sender: data.userId != null && String(data.userId) === currentUserId ? 'me' : 'other',
             text: data.message,
+            attachment: data.attachment || null,
             senderName: data.senderName,
             time: new Date(data.timestamp),
           })))
@@ -580,6 +588,7 @@ function VideoConsultation({
             id: data.id,
             sender: (data.userId != null && String(data.userId) === currentUserId) ? 'me' : 'other',
             text: data.message,
+            attachment: data.attachment || null,
             senderName: data.senderName,
             time: new Date(data.timestamp),
           }])
@@ -851,33 +860,51 @@ function VideoConsultation({
     }
   }
 
-  const endCall = () => {
-    saveChatLog(messages)
-    cleanupCall()
-    if (isDoctor) {
-      onClose?.()
-      navigate('/doctor')
-    } else {
-      // Patient — show rating modal
-      setShowRatingModal(true)
+  const closeConsultation = (fallbackPath) => {
+    if (onClose) {
+      onClose()
+      return
     }
+    navigate(fallbackPath, { replace: true })
   }
 
-  const forceCompleteCall = async () => {
-    if (isCompletingCall) return
-    if (!appointment?.documentId) return
+  const requestEndCall = async (action = 'leave') => {
+    if (isEndingCallRef.current) return
+    // A confirmation rendered outside the browser's fullscreen element is not
+    // visible. Exit fullscreen first so the very first click always shows it.
+    if (document.fullscreenElement) {
+      try {
+        await document.exitFullscreen()
+      } catch (err) {
+        console.error('Error exiting fullscreen before ending call:', err)
+      }
+      setIsFullscreen(false)
+    }
+    setPendingEndAction(action)
+  }
+
+  const confirmEndCall = async () => {
+    if (isEndingCallRef.current || !pendingEndAction) return
+    const action = pendingEndAction
+    if (action === 'complete' && !appointment?.documentId) return
+
+    isEndingCallRef.current = true
     setIsCompletingCall(true)
     try {
       await saveChatLog(messages)
-      await appointmentsAPI.update(appointment.documentId, { status: 'completed' })
-      socketRef.current?.emit('force-end-call')
+      if (action === 'complete') {
+        await appointmentsAPI.update(appointment.documentId, { status: 'completed' })
+        socketRef.current?.emit('force-end-call')
+      }
       cleanupCall()
-      onClose?.()
-      navigate('/doctor')
+      setPendingEndAction(null)
+
+      closeConsultation(isDoctor ? '/doctor' : '/patient/appointments')
     } catch (err) {
       console.error('Error completing appointment:', err)
+      isEndingCallRef.current = false
+    } finally {
       setIsCompletingCall(false)
-      setShowCompleteConfirm(false)
     }
   }
 
@@ -888,22 +915,19 @@ function VideoConsultation({
       await appointmentsAPI.update(appointment.documentId, {
         rating,
         review: reviewText.trim() || undefined,
-        status: 'completed',
       })
     } catch (err) {
       console.error('Error submitting rating:', err)
     } finally {
       setIsSubmittingRating(false)
       setShowRatingModal(false)
-      onClose?.()
-      navigate('/patient/appointments')
+      closeConsultation('/patient/appointments')
     }
   }
 
   const skipRating = () => {
     setShowRatingModal(false)
-    onClose?.()
-    navigate('/patient/appointments')
+    closeConsultation('/patient/appointments')
   }
 
   const sendMessage = (e) => {
@@ -962,6 +986,13 @@ function VideoConsultation({
 
       socketRef.current?.emit('chat-message', {
         message: t('video.file_attached', { icon: fileIcon, name: file.name, size: sizeStr }),
+        attachment: {
+          id: uploaded.id,
+          name: file.name,
+          url: uploaded.url,
+          mime: uploaded.mime || file.type,
+          size: uploaded.size ? Math.round(uploaded.size * 1024) : file.size,
+        },
       })
 
       // 5. Refresh doctor's document list if they have it open
@@ -1030,6 +1061,63 @@ function VideoConsultation({
     }
   }
 
+  const endConfirmationModal = pendingEndAction ? (
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+        onClick={() => !isCompletingCall && setPendingEndAction(null)}
+      />
+      <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 animate-scaleIn">
+        <div className="text-center mb-5">
+          <div className={cn(
+            'w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3',
+            pendingEndAction === 'complete' ? 'bg-amber-100' : 'bg-rose-100'
+          )}>
+            <PhoneOff className={cn(
+              'w-7 h-7',
+              pendingEndAction === 'complete' ? 'text-amber-600' : 'text-rose-600'
+            )} />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900">
+            {t(pendingEndAction === 'complete' ? 'video.complete_confirm_title' : 'video.leave_confirm_title')}
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">
+            {t(pendingEndAction === 'complete' ? 'video.complete_confirm_desc' : 'video.leave_confirm_desc')}
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <Button
+            variant="secondary"
+            className="flex-1"
+            onClick={() => setPendingEndAction(null)}
+            disabled={isCompletingCall}
+          >
+            {t('video.cancel')}
+          </Button>
+          <Button
+            className={cn(
+              'flex-1 text-white',
+              pendingEndAction === 'complete'
+                ? 'bg-emerald-500 hover:bg-emerald-600'
+                : 'bg-rose-500 hover:bg-rose-600'
+            )}
+            onClick={confirmEndCall}
+            disabled={isCompletingCall || (pendingEndAction === 'complete' && !appointment?.documentId)}
+          >
+            {isCompletingCall ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : pendingEndAction === 'complete' ? (
+              <Check className="w-4 h-4 mr-2" />
+            ) : (
+              <PhoneOff className="w-4 h-4 mr-2" />
+            )}
+            {t(pendingEndAction === 'complete' ? 'video.complete' : 'video.leave')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  ) : null
+
   if (accessStatus === 'checking') {
     return (
       <div className="fixed inset-0 z-[900] bg-slate-900 flex flex-col items-center justify-center text-white px-6 pt-[var(--safe-top)]">
@@ -1040,24 +1128,18 @@ function VideoConsultation({
   }
 
   if (accessStatus === 'denied') {
-    const formatKz = (iso) => {
+    const accessTimeZone = user?.userRole === 'patient' ? getDeviceTimeZone() : KAZAKHSTAN_TIME_ZONE
+    const formatAccessTime = (iso) => {
       if (!iso) return ''
       try {
-        return new Date(iso).toLocaleString(timeLocale, {
-          timeZone: 'Asia/Almaty',
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })
+        return formatDateTimeInTimeZone(iso, accessTimeZone, i18n.language)
       } catch { return '' }
     }
     const reasonMap = {
       too_early: {
         title: t('video.deny_too_early_title'),
         detail: accessDenyInfo?.dateTime
-          ? t('video.deny_too_early_detail_time', { windowStart: formatKz(accessDenyInfo.windowStart), dateTime: formatKz(accessDenyInfo.dateTime) })
+          ? t('video.deny_too_early_detail_time', { windowStart: formatAccessTime(accessDenyInfo.windowStart), dateTime: formatAccessTime(accessDenyInfo.dateTime) })
           : t('video.deny_too_early_detail'),
       },
       too_late: {
@@ -1088,7 +1170,7 @@ function VideoConsultation({
     )
   }
 
-  if (isMinimized && !showRatingModal && !showCompleteConfirm) {
+  if (isMinimized && !showRatingModal) {
     const position = miniPosition || getInitialMiniPosition()
     const connectionLabel = {
       initializing: t('video.init_title'),
@@ -1100,7 +1182,8 @@ function VideoConsultation({
     }[connectionState] || connectionState
 
     return (
-      <div
+      <>
+        <div
         ref={miniWindowRef}
         className="fixed z-[1000] w-56 overflow-hidden rounded-2xl bg-slate-950 text-white shadow-2xl ring-1 ring-white/15 sm:w-80"
         style={{
@@ -1206,7 +1289,7 @@ function VideoConsultation({
               </button>
               <button
                 type="button"
-                onClick={endCall}
+                onClick={() => requestEndCall('leave')}
                 title={t('common.leave_call')}
                 aria-label={t('common.leave_call')}
                 className="flex h-9 w-10 items-center justify-center rounded-xl bg-rose-500 text-white transition-colors hover:bg-rose-600 sm:h-10 sm:w-12"
@@ -1216,7 +1299,9 @@ function VideoConsultation({
             </div>
           </div>
         </div>
-      </div>
+        </div>
+        {endConfirmationModal}
+      </>
     )
   }
 
@@ -1458,7 +1543,7 @@ function VideoConsultation({
           <div className="pointer-events-none absolute inset-x-0 bottom-[max(1rem,calc(env(safe-area-inset-bottom)+1rem))] z-20 flex flex-col items-center gap-2 px-3">
             {isDoctor && (
               <button
-                onClick={forceCompleteCall}
+                onClick={() => requestEndCall('complete')}
                 disabled={isCompletingCall}
                 title={t('video.complete_btn')}
                 aria-label={t('video.complete_btn')}
@@ -1516,7 +1601,7 @@ function VideoConsultation({
               </button>
 
               <button
-                onClick={endCall}
+                onClick={() => requestEndCall('leave')}
                 title={t('common.leave_call')}
                 aria-label={t('common.leave_call')}
                 className="h-12 w-16 rounded-2xl bg-rose-500 text-white flex items-center justify-center transition-all hover:bg-rose-600"
@@ -1605,6 +1690,29 @@ function VideoConsultation({
                         <p className="text-xs font-medium text-slate-500 mb-1">{msg.senderName}</p>
                       )}
                       <p className="text-sm">{msg.text}</p>
+                      {msg.attachment?.url && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await openMediaInNewTab(msg.attachment)
+                            } catch (openError) {
+                              console.error('Could not open chat attachment:', openError)
+                              toast.error(t('video.file_open_error'))
+                            }
+                          }}
+                          className={cn(
+                            'mt-2 inline-flex max-w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
+                            msg.sender === 'me'
+                              ? 'border-teal-300/60 bg-white/10 text-white hover:bg-white/20'
+                              : 'border-slate-200 bg-white text-teal-700 hover:bg-slate-50'
+                          )}
+                          title={msg.attachment.name || t('common.open')}
+                        >
+                          <ExternalLink className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{t('common.open')}</span>
+                        </button>
+                      )}
                       <p className={cn(
                         'text-xs mt-1',
                         msg.sender === 'me' ? 'text-teal-100' : 'text-slate-400'
@@ -1856,44 +1964,7 @@ function VideoConsultation({
         )}
       </div>
 
-      {/* Doctor: Confirm Complete Modal */}
-      {showCompleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowCompleteConfirm(false)} />
-          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6 animate-scaleIn">
-            <div className="text-center mb-5">
-              <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <PhoneOff className="w-7 h-7 text-amber-600" />
-              </div>
-              <h2 className="text-lg font-bold text-slate-900">{t('video.complete_confirm_title')}</h2>
-              <p className="text-slate-500 text-sm mt-1">
-                {t('video.complete_confirm_desc')}
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={() => setShowCompleteConfirm(false)}
-              >
-                {t('video.cancel')}
-              </Button>
-              <Button
-                className="flex-1 bg-emerald-500 hover:bg-emerald-600"
-                onClick={forceCompleteCall}
-                disabled={isCompletingCall}
-              >
-                {isCompletingCall ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <Check className="w-4 h-4 mr-2" />
-                )}
-                {t('video.complete')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {endConfirmationModal}
 
       {/* Patient Rating Modal */}
       {showRatingModal && (

@@ -469,6 +469,45 @@ export interface ApiAboutAbout extends Struct.SingleTypeSchema {
   };
 }
 
+export interface ApiAppointmentSlotAppointmentSlot
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'appointment_slots';
+  info: {
+    displayName: 'Appointment Slot Lock';
+    pluralName: 'appointment-slots';
+    singularName: 'appointment-slot';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    appointmentDocumentId: Schema.Attribute.String & Schema.Attribute.Private;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    dateTime: Schema.Attribute.DateTime &
+      Schema.Attribute.Required &
+      Schema.Attribute.Private;
+    doctorDocumentId: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::appointment-slot.appointment-slot'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    slotKey: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Private &
+      Schema.Attribute.Unique;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiAppointmentAppointment extends Struct.CollectionTypeSchema {
   collectionName: 'appointments';
   info: {
@@ -650,8 +689,10 @@ export interface ApiCaseEventCaseEvent extends Struct.CollectionTypeSchema {
         'CONSULTATION_COMPLETED',
         'DOCTOR_FEEDBACK_UPLOADED',
         'DOCTOR_DECISION',
+        'COMMISSION_DECISION',
         'PLAN_SENT',
         'PLAN_ACCEPTED',
+        'PLAN_DECLINED',
         'TRAVEL_UPDATED',
         'CHAT_MESSAGE_SENT',
         'CHAT_READ',
@@ -1189,7 +1230,10 @@ export interface ApiMedicalCaseMedicalCase extends Struct.CollectionTypeSchema {
       'manyToOne',
       'plugin::users-permissions.user'
     >;
-    preferredContact: Schema.Attribute.String;
+    preferredContact: Schema.Attribute.String &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 100;
+      }>;
     publishedAt: Schema.Attribute.DateTime;
     status: Schema.Attribute.Enumeration<
       [
@@ -2349,6 +2393,7 @@ declare module '@strapi/strapi' {
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
       'api::about.about': ApiAboutAbout;
+      'api::appointment-slot.appointment-slot': ApiAppointmentSlotAppointmentSlot;
       'api::appointment.appointment': ApiAppointmentAppointment;
       'api::article.article': ApiArticleArticle;
       'api::author.author': ApiAuthorAuthor;

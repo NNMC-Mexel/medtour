@@ -485,7 +485,9 @@ app.post('/api/slot/verify', async (req, res) => {
 
     // 2. Check Strapi DB — slot must not be already booked.
     // Fail CLOSED: if DB is unreachable we cannot confirm availability, so we reject.
-    const dateTime = new Date(`${date}T${time}:00`)
+    // Slot labels are Kazakhstan wall-clock time. Never let the signaling
+    // server's host timezone change the UTC instant used for conflict checks.
+    const dateTime = new Date(`${date}T${time}:00+05:00`)
     // Use the actual slot duration so we don't produce false conflicts.
     // Example with 30-min slots: booking 14:30 must NOT block 14:00 (ends at
     // 14:30, no overlap). A fixed 1h window would extend to 15:00 and
@@ -1185,15 +1187,41 @@ io.on('connection', (socket) => {
     })
   })
 
-  // Чат в комнате — имя и id берём из серверного состояния, не с клиента
-  socket.on('chat-message', ({ message }) => {
+  // Чат в комнате — имя и id берём из серверного состояния, не с клиента.
+  // Для вложений принимаем только URL нашего Strapi, чтобы чат нельзя было
+  // превратить в прокси для произвольных внешних адресов.
+  socket.on('chat-message', (payload = {}) => {
     const ctx = getJoinedRoom()
     if (!ctx) return
+    const { message } = payload || {}
     if (typeof message !== 'string' || !message.trim()) return
+    let attachment = null
+    const candidate = payload?.attachment
+    if (candidate && typeof candidate === 'object' && typeof candidate.url === 'string') {
+      try {
+        const strapiOrigin = new URL(STRAPI_API_URL).origin
+        const attachmentUrl = new URL(candidate.url, strapiOrigin)
+        const isAllowedPath = attachmentUrl.pathname.startsWith('/uploads/') ||
+          attachmentUrl.pathname.startsWith('/api/file-proxy/')
+        const isStrapiFile = attachmentUrl.origin === strapiOrigin && isAllowedPath
+        if (isStrapiFile) {
+          attachment = {
+            id: typeof candidate.id === 'number' || typeof candidate.id === 'string' ? candidate.id : null,
+            name: typeof candidate.name === 'string' ? candidate.name.slice(0, 255) : 'Attachment',
+            url: candidate.url.slice(0, 2048),
+            mime: typeof candidate.mime === 'string' ? candidate.mime.slice(0, 128) : '',
+            size: Number.isFinite(candidate.size) ? Math.max(0, Math.min(candidate.size, 10 * 1024 * 1024)) : null,
+          }
+        }
+      } catch {
+        // Invalid attachment URLs are ignored; the text message is still delivered.
+      }
+    }
     const { roomId, room, participant } = ctx
     const msgData = {
       id: Date.now(),
-      message,
+      message: message.trim().slice(0, 4000),
+      attachment,
       senderName: participant.name,
       senderId: socket.id,
       userId: participant.id,

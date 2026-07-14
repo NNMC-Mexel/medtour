@@ -8,6 +8,19 @@ import Button from '../ui/Button'
 import { cn } from '../../utils/helpers'
 import { appointmentsAPI, getBookedSlots } from '../../services/api'
 import { useToast } from '../ui/Toast'
+import {
+  buildKazakhstanDateTime,
+  formatDateInTimeZone,
+  formatShortDateInTimeZone,
+  formatTimeInTimeZone,
+  getCalendarDateKey,
+  getDateKeyInTimeZone,
+  getDeviceTimeZone,
+  getKazakhstanCalendarToday,
+  getKazakhstanDateKey,
+  getKazakhstanMinutesNow,
+  KAZAKHSTAN_TIME_ZONE,
+} from '../../utils/kazakhstanTime'
 
 // Free consultations are the current production default. Set
 // VITE_FREE_CONSULTATIONS=false only when paid consultations are re-enabled.
@@ -38,11 +51,8 @@ const generateTimeSlots = (doctor) => {
 }
 
 const filterPastSlots = (slots, date) => {
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const sel = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  if (sel > today) return slots
-  const nowMins = now.getHours() * 60 + now.getMinutes() + 30
+  if (getCalendarDateKey(date) !== getKazakhstanDateKey()) return slots
+  const nowMins = getKazakhstanMinutesNow() + 30
   return slots.filter(t => {
     const [h, m] = t.split(':').map(Number)
     return h * 60 + m > nowMins
@@ -65,6 +75,7 @@ export default function CaseSlotPicker({
   const dateLocale = i18n.language === 'kk' ? kk : i18n.language === 'en' ? enUS : ru
 
   const isStaff = ['manager', 'coordinator', 'admin'].includes(role)
+  const viewerTimeZone = isStaff ? KAZAKHSTAN_TIME_ZONE : getDeviceTimeZone()
 
   const [step, setStep] = useState(1) // 1 = date/time, 2 = payment (patient only, non-free)
   const [selectedDate, setSelectedDate] = useState(null)
@@ -73,7 +84,7 @@ export default function CaseSlotPicker({
   const [isLoadingSlots, setIsLoadingSlots] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
-  const dates = Array.from({ length: 14 }, (_, i) => addDays(new Date(), i))
+  const dates = Array.from({ length: 14 }, (_, i) => addDays(getKazakhstanCalendarToday(), i))
 
   const getWorkingDays = () => {
     if (!doctor?.workingDays) return [1, 2, 3, 4, 5]
@@ -99,7 +110,7 @@ export default function CaseSlotPicker({
 
   useEffect(() => {
     if (!selectedDate || !doctor?.id) return
-    const dateStr = format(selectedDate, 'yyyy-MM-dd')
+    const dateStr = getCalendarDateKey(selectedDate)
     setIsLoadingSlots(true)
     setBookedSlots([])
     getBookedSlots(doctor.id, dateStr)
@@ -115,11 +126,7 @@ export default function CaseSlotPicker({
   )
 
   const buildDateTime = () => {
-    if (!selectedDate || !selectedTime) return null
-    const [h, m] = selectedTime.split(':').map(Number)
-    const dt = new Date(selectedDate)
-    dt.setHours(h, m, 0, 0)
-    return dt
+    return buildKazakhstanDateTime(selectedDate, selectedTime)
   }
 
   // Staff books → pending/pending appointment, no case status change
@@ -187,10 +194,11 @@ export default function CaseSlotPicker({
     }
   }
 
-  const summaryText = selectedDate && selectedTime
+  const selectedInstant = buildDateTime()
+  const summaryText = selectedInstant
     ? t('case_slot.selected_summary', {
-        date: format(selectedDate, 'd MMMM yyyy', { locale: dateLocale }),
-        time: selectedTime,
+        date: formatDateInTimeZone(selectedInstant, viewerTimeZone, i18n.language),
+        time: formatTimeInTimeZone(selectedInstant, viewerTimeZone, i18n.language),
       })
     : null
 
@@ -285,6 +293,11 @@ export default function CaseSlotPicker({
                 <Clock className="inline w-4 h-4 mr-1 text-slate-400" />
                 {t('booking.select_time')}
               </label>
+              <p className="mb-3 text-xs text-slate-500">
+                {isStaff
+                  ? t('case_slot.timezone_hint')
+                  : t('case_slot.timezone_local_hint', { zone: viewerTimeZone })}
+              </p>
               {isLoadingSlots ? (
                 <div className="flex items-center justify-center py-8 gap-2 text-slate-500 text-sm">
                   <Loader2 className="w-5 h-5 animate-spin text-teal-500" />
@@ -296,20 +309,29 @@ export default function CaseSlotPicker({
                 </div>
               ) : (
                 <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                  {available.map(time => (
-                    <button
-                      key={time}
-                      onClick={() => setSelectedTime(time)}
-                      className={cn(
-                        'py-2 px-1 rounded-lg text-xs font-medium transition-all',
-                        selectedTime === time
-                          ? 'bg-teal-600 text-white'
-                          : 'bg-white border border-slate-200 hover:border-teal-500 hover:bg-teal-50'
-                      )}
-                    >
-                      {time}
-                    </button>
-                  ))}
+                  {available.map(time => {
+                    const instant = buildKazakhstanDateTime(selectedDate, time)
+                    const localDateDiffers = getDateKeyInTimeZone(instant, viewerTimeZone) !== getCalendarDateKey(selectedDate)
+                    return (
+                      <button
+                        key={time}
+                        onClick={() => setSelectedTime(time)}
+                        className={cn(
+                          'py-2 px-1 rounded-lg text-xs font-medium transition-all',
+                          selectedTime === time
+                            ? 'bg-teal-600 text-white'
+                            : 'bg-white border border-slate-200 hover:border-teal-500 hover:bg-teal-50'
+                        )}
+                      >
+                        <span>{formatTimeInTimeZone(instant, viewerTimeZone, i18n.language)}</span>
+                        {localDateDiffers && (
+                          <span className="block text-[10px] opacity-70">
+                            {formatShortDateInTimeZone(instant, viewerTimeZone, i18n.language)}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>

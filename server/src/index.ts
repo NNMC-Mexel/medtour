@@ -102,7 +102,6 @@ const medTourDoctorPermissions = [
   'api::treatment-plan.treatment-plan.update',
   'api::case-event.case-event.find',
   'api::case-event.case-event.findOne',
-  'api::case-event.case-event.create',
   'api::finance-ledger.finance-ledger.find',
   'api::finance-ledger.finance-ledger.findOne',
 ];
@@ -604,6 +603,23 @@ async function seedRolesAndPermissions(strapi: Core.Strapi) {
     }
   }
 
+  // Decision/audit events are now generated inside server transactions. Old
+  // deployments may still grant direct event creation to patients or doctors;
+  // revoke it so these actors cannot manufacture activity records.
+  for (const roleType of ['patient', 'doctor']) {
+    const role = await strapi
+      .query('plugin::users-permissions.role')
+      .findOne({ where: { type: roleType } });
+    if (!role) continue;
+    const stale = await strapi
+      .query('plugin::users-permissions.permission')
+      .findMany({ where: { action: 'api::case-event.case-event.create', role: role.id } });
+    for (const permission of stale) {
+      await strapi.query('plugin::users-permissions.permission').delete({ where: { id: permission.id } });
+      console.log(`  Revoked direct case-event creation from role "${roleType}".`);
+    }
+  }
+
   // Убираем опасные permissions из authenticated (если она осталась дефолтной)
   const authenticatedRole = await strapi
     .query('plugin::users-permissions.role')
@@ -792,6 +808,30 @@ async function enforceUsersPermissionsEmailSettings(strapi: Core.Strapi) {
   }
 }
 
+async function ensureAppointmentSlotUniqueIndex(strapi: Core.Strapi) {
+  const connection = (strapi.db as any).connection;
+  const tableName = 'appointment_slots';
+  const indexName = 'appointment_slots_slot_key_unique';
+  if (!(await connection.schema.hasTable(tableName))) {
+    throw new Error(`Required table ${tableName} was not created`);
+  }
+
+  try {
+    await connection.schema.alterTable(tableName, (table: any) => {
+      table.unique(['slot_key'], { indexName });
+    });
+    strapi.log.info(`Created cross-instance appointment slot constraint: ${indexName}`);
+  } catch (error: any) {
+    const code = String(error?.code || error?.original?.code || '');
+    const message = String(error?.message || error?.original?.message || '').toLowerCase();
+    const alreadyExists = code === '42P07'
+      || code === 'ER_DUP_KEYNAME'
+      || message.includes('already exists')
+      || message.includes('duplicate key name');
+    if (!alreadyExists) throw error;
+  }
+}
+
 export default {
   register({ strapi }: { strapi: Core.Strapi }) {
     // PII encryption-at-rest for iin / passportNumber (RK Law 94-V art.10).
@@ -822,6 +862,10 @@ export default {
   },
 
   async bootstrap({ strapi }: { strapi: Core.Strapi }) {
+    // Strapi validates `unique` attributes at the application layer but does not
+    // reliably create a physical unique index on every supported database. The
+    // DB constraint is required to prevent two app instances booking one slot.
+    await ensureAppointmentSlotUniqueIndex(strapi);
     await seedSpecializations(strapi);
     await seedClinics(strapi);
     await seedRolesAndPermissions(strapi);

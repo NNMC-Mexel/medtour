@@ -318,10 +318,31 @@ export const openMediaInNewTab = async (media) => {
     const url = getMediaUrl(media);
     if (!url) return;
 
-    const response = await api.get(url, { responseType: "blob" });
-    const objectUrl = URL.createObjectURL(response.data);
-    window.open(objectUrl, "_blank", "noopener,noreferrer");
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    // Open synchronously inside the user's click. Opening only after the
+    // authenticated request resolves is treated as a popup by Safari/Chrome.
+    const previewWindow = window.open("about:blank", "_blank");
+    if (previewWindow) previewWindow.opener = null;
+
+    try {
+        const response = await api.get(url, { responseType: "blob" });
+        const objectUrl = URL.createObjectURL(response.data);
+        if (previewWindow) {
+            previewWindow.location.replace(objectUrl);
+        } else {
+            // Popup blocking fallback: download the file instead of silently
+            // doing nothing or navigating away from an active consultation.
+            const link = document.createElement("a");
+            link.href = objectUrl;
+            link.download = media?.name || "document";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (error) {
+        previewWindow?.close();
+        throw error;
+    }
 };
 
 export const downloadMediaFile = async (media, filename = 'download') => {

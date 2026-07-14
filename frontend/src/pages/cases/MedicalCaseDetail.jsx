@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Building2,
   Calendar,
+  Clock,
   CheckCircle,
   FileText,
   Upload,
@@ -26,6 +27,7 @@ import { useToast } from '../../components/ui/Toast'
 import useAuthStore from '../../stores/authStore'
 import CaseSlotPicker from '../../components/cases/CaseSlotPicker'
 import { cn } from '../../utils/helpers'
+import { formatDateTimeInTimeZone, getDeviceTimeZone, KAZAKHSTAN_TIME_ZONE } from '../../utils/kazakhstanTime'
 import {
   documentsAPI,
   clinicsAPI,
@@ -71,6 +73,21 @@ function formatDesiredDate(value) {
   return value.preferredArrivalDate || value.arrivalDate || value.from || ''
 }
 
+function formatAppointmentDateTime(value, locale) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString(locale, {
+    timeZone: 'Asia/Almaty',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  })
+}
+
 function formatFallbackEventType(type) {
   return type ? type.replaceAll('_', ' ') : 'Event'
 }
@@ -102,6 +119,21 @@ function formatEventMessage(event, t) {
   }
   const translated = t(`case_detail.event_message.${type}`, { defaultValue: '' })
   return translated || event?.message || event?.createdAt || ''
+}
+
+function formatPreferredContact(value, t) {
+  if (!value) return ''
+  const normalized = String(value).trim()
+  if (normalized.startsWith('other:')) {
+    const customValue = normalized.slice('other:'.length).trim()
+    return customValue
+      ? `${t('cases.contact_method_other')}: ${customValue}`
+      : t('cases.contact_method_other')
+  }
+  const knownMethods = ['phone', 'whatsapp', 'telegram', 'email', 'instagram']
+  return knownMethods.includes(normalized)
+    ? t(`cases.contact_method_${normalized}`)
+    : normalized
 }
 
 function DetailRow({ label, value }) {
@@ -482,12 +514,6 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
         await treatmentPlansAPI.create(payload)
       }
 
-      if (form.status === 'ACCEPTED' && normalizeCaseStatus(medicalCase.status) === 'TREATMENT_IN_KAZAKHSTAN') {
-        await medicalCasesAPI.update(medicalCase.documentId || medicalCase.id, {
-          status: 'TRAVEL_PREPARATION',
-        })
-      }
-
       toast.success(t('case_detail.toast_plan_saved'))
       setSaveState('saved')
       onChanged?.()
@@ -503,31 +529,6 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
     setIsSaving(true)
     try {
       await treatmentPlansAPI.update(currentPlan.documentId || currentPlan.id, { status: planStatus })
-
-      const caseId = medicalCase.documentId || medicalCase.id
-      const currentCaseStatus = normalizeCaseStatus(medicalCase.status)
-
-      if (planStatus === 'ACCEPTED' && currentCaseStatus === 'WAITING_PATIENT_CONFIRMATION') {
-        await medicalCasesAPI.update(caseId, { status: 'WAITING_PAYMENT' })
-        await caseEventsAPI.create({
-          medical_case: caseId,
-          eventType: 'PLAN_ACCEPTED',
-          fromStatus: medicalCase.status,
-          toStatus: 'WAITING_PAYMENT',
-          message: 'Patient accepted the treatment plan.',
-          metadata: { planId: currentPlan.documentId || currentPlan.id },
-        })
-      } else if (planStatus === 'DECLINED' && currentCaseStatus === 'WAITING_PATIENT_CONFIRMATION') {
-        await medicalCasesAPI.update(caseId, { status: 'DOCTOR_ASSIGNED' })
-        await caseEventsAPI.create({
-          medical_case: caseId,
-          eventType: 'PLAN_DECLINED',
-          fromStatus: medicalCase.status,
-          toStatus: 'DOCTOR_ASSIGNED',
-          message: 'Patient declined the treatment plan.',
-          metadata: { planId: currentPlan.documentId || currentPlan.id },
-        })
-      }
 
       toast.success(planStatus === 'ACCEPTED' ? t('case_detail.toast_plan_accepted') : t('case_detail.toast_plan_declined'))
       onChanged?.()
@@ -1136,7 +1137,7 @@ function LogisticsWorkspace({ medicalCase, checklists, visas, tourism, canEdit, 
 }
 
 function MedicalCaseDetail() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { id } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
@@ -1149,6 +1150,8 @@ function MedicalCaseDetail() {
   const canViewBusinessFields = ['admin', 'manager'].includes(role)
   const canViewTravel = ['admin', 'manager', 'patient'].includes(role)
   const canEditTravel = ['admin', 'manager'].includes(role)
+  const activityTimeZone = role === 'patient' ? getDeviceTimeZone() : KAZAKHSTAN_TIME_ZONE
+  const activityLanguage = i18n.resolvedLanguage || i18n.language || 'ru'
 
   const [medicalCase, setMedicalCase] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -1318,23 +1321,12 @@ function MedicalCaseDetail() {
     }
 
     const nextStatus = 'COMMISSION_REVIEW'
-    const message = t(`case_detail.event_message.DOCTOR_DECISION.${decision}`)
-
     setIsSaving(true)
     try {
       await medicalCasesAPI.update(id, {
         status: nextStatus,
         doctorRecommendation: decision,
         doctorDecisionNotes: form.doctorDecisionNotes,
-      })
-      await caseEventsAPI.create({
-        medical_case: medicalCase.documentId || medicalCase.id,
-        actor: user?.documentId || user?.id,
-        eventType: 'DOCTOR_DECISION',
-        fromStatus: medicalCase.status,
-        toStatus: nextStatus,
-        message,
-        metadata: { decision },
       })
       toast.success(t('case_detail.toast_doctor_saved'))
       await loadCase()
@@ -1358,23 +1350,12 @@ function MedicalCaseDetail() {
         ? 'LOCAL_TREATMENT'
         : 'WAITING_FOR_DOCUMENTS'
 
-    const message = t(`case_detail.event_message.COMMISSION_DECISION.${decision}`)
-
     setIsSaving(true)
     try {
       await medicalCasesAPI.update(id, {
         status: nextStatus,
         commissionDecision: decision,
         commissionDecisionNotes: form.commissionDecisionNotes,
-      })
-      await caseEventsAPI.create({
-        medical_case: medicalCase.documentId || medicalCase.id,
-        actor: user?.documentId || user?.id,
-        eventType: 'COMMISSION_DECISION',
-        fromStatus: medicalCase.status,
-        toStatus: nextStatus,
-        message,
-        metadata: { decision },
       })
       toast.success(t('case_detail.toast_commission_saved'))
       await loadCase()
@@ -1456,6 +1437,11 @@ function MedicalCaseDetail() {
     }
     return assignedDoctor
   }, [assignedDoctor, canManage, doctors, form.doctor])
+  const caseAppointments = useMemo(() => (
+    [...(medicalCase?.appointments || [])]
+      .filter(appointment => appointment?.dateTime)
+      .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
+  ), [medicalCase?.appointments])
 
   const caseStatus = normalizeCaseStatus(medicalCase?.status)
   const canShowCommissionDecision = canFinalizeCommission && caseStatus === 'COMMISSION_REVIEW'
@@ -1578,7 +1564,7 @@ function MedicalCaseDetail() {
                     <DetailRow label={t('case_detail.label_country')} value={medicalCase.country || medicalCase.patient?.country} />
                     <DetailRow label={t('case_detail.label_language')} value={medicalCase.language || medicalCase.patient?.language} />
                     <DetailRow label={t('case_detail.label_timezone')} value={medicalCase.timezone || medicalCase.patient?.timezone} />
-                    <DetailRow label={t('case_detail.label_contact')} value={medicalCase.preferredContact} />
+                    <DetailRow label={t('case_detail.label_contact')} value={formatPreferredContact(medicalCase.preferredContact, t)} />
                   </>
                 )}
               </div>
@@ -1804,6 +1790,43 @@ function MedicalCaseDetail() {
         </div>
 
         <div className="space-y-6">
+          {canManage && caseAppointments.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('case_detail.section_consultations')}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {caseAppointments.map(appointment => {
+                  const status = appointment.statuse || appointment.status || 'pending'
+                  return (
+                    <div
+                      key={appointment.documentId || appointment.id}
+                      className="rounded-xl border border-teal-100 bg-teal-50 p-4"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-teal-600">
+                          <Clock className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-slate-900">
+                            {formatAppointmentDateTime(appointment.dateTime, i18n.language)}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-600">
+                            {appointment.doctor?.fullName || medicalCase.doctor?.fullName || t('case_detail.doctor_label')}
+                          </p>
+                          <Badge variant={status === 'cancelled' ? 'danger' : status === 'completed' ? 'success' : 'primary'} className="mt-2">
+                            {t(`appointment.status_${status}`, { defaultValue: status })}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+                <p className="text-xs text-slate-500">{t('case_detail.consultation_timezone_hint')}</p>
+              </CardContent>
+            </Card>
+          )}
+
           {!isDoctorRole && (
             <Card>
             <CardHeader>
@@ -1859,10 +1882,21 @@ function MedicalCaseDetail() {
               {events.length === 0 ? (
                 <p className="text-sm text-slate-500">{t('case_detail.no_activity')}</p>
               ) : (
-                <div className="space-y-3">
-                  {events.slice(-6).map(event => (
+                <div className="max-h-[32rem] space-y-3 overflow-y-auto pr-1">
+                  <p className="text-xs text-slate-500">
+                    {t('case_detail.activity_timezone', { zone: activityTimeZone })}
+                  </p>
+                  {events.slice().reverse().map(event => (
                     <div key={event.id || event.documentId} className="border-l-2 border-teal-200 pl-3">
-                      <p className="text-sm font-medium text-slate-900">{formatEventTitle(event, t)}</p>
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                        <p className="text-sm font-medium text-slate-900">{formatEventTitle(event, t)}</p>
+                        {event.createdAt && (
+                          <time dateTime={event.createdAt} className="inline-flex shrink-0 items-center gap-1 text-xs text-slate-500">
+                            <Clock className="h-3.5 w-3.5" />
+                            {formatDateTimeInTimeZone(event.createdAt, activityTimeZone, activityLanguage)}
+                          </time>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500">{formatEventMessage(event, t)}</p>
                     </div>
                   ))}

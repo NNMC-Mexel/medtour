@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import CaseCreatedGuide from '../../components/cases/CaseCreatedGuide'
@@ -43,6 +43,30 @@ function roleBase(role) {
 
 function formatStatus(status, t) {
   return formatCaseStatus(status, t)
+}
+
+const MAX_CUSTOM_CONTACT_LENGTH = 80
+const PREFERRED_CONTACT_METHODS = ['phone', 'whatsapp', 'telegram', 'email', 'instagram', 'other']
+const BOOKING_NEEDED_STATUSES = ['DOCTOR_ASSIGNED', 'WAITING_PATIENT_CONFIRMATION', 'UNDER_REVIEW', 'DOCUMENTS_UPLOADED']
+
+function needsPatientBooking(item) {
+  const status = normalizeCaseStatus(item.status)
+  return !!item.doctor && BOOKING_NEEDED_STATUSES.includes(status)
+}
+
+function isValidPreferredArrivalDate(value) {
+  if (!value) return true
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day
+}
+
+function serializePreferredContact(method, customValue) {
+  if (method === 'other') return `other:${customValue.trim()}`
+  return PREFERRED_CONTACT_METHODS.includes(method) ? method : ''
 }
 
 function StatusBadge({ status }) {
@@ -219,6 +243,7 @@ function CreateCaseModal({ onClose, onCreated }) {
   const [specializations, setSpecializations] = useState([])
   const [uploadedDocuments, setUploadedDocuments] = useState([])
   const [isUploading, setIsUploading] = useState(false)
+  const [arrivalDateError, setArrivalDateError] = useState('')
   const fileInputRef = useRef(null)
 
   const [form, setForm] = useState({
@@ -229,7 +254,8 @@ function CreateCaseModal({ onClose, onCreated }) {
     treatmentCategory: '',
     urgency: 'routine',
     preferredArrivalDate: '',
-    preferredContact: user?.phone || '',
+    preferredContactMethod: user?.phone ? 'phone' : user?.email ? 'email' : '',
+    preferredContactOther: '',
     visaSupportNeeded: 'unknown',
     tourismRequested: 'false',
     leadSource: '',
@@ -296,7 +322,12 @@ function CreateCaseModal({ onClose, onCreated }) {
   }
 
   const canProceedStep1 = form.title && form.country && form.treatmentCategory
+  const hasValidContact = PREFERRED_CONTACT_METHODS.includes(form.preferredContactMethod)
+    && (form.preferredContactMethod !== 'other' || Boolean(form.preferredContactOther.trim()))
   const canProceedStep2 = form.urgency
+    && !arrivalDateError
+    && isValidPreferredArrivalDate(form.preferredArrivalDate)
+    && hasValidContact
   const canProceedStep3 = form.visaSupportNeeded && form.leadSource
 
   const submit = async (event) => {
@@ -313,7 +344,7 @@ function CreateCaseModal({ onClose, onCreated }) {
         desiredDates: {
           preferredArrivalDate: form.preferredArrivalDate || null,
         },
-        preferredContact: form.preferredContact,
+        preferredContact: serializePreferredContact(form.preferredContactMethod, form.preferredContactOther),
         leadSource: form.leadSource,
         leadCampaign: form.leadCampaign,
         leadReferrer: typeof document !== 'undefined' ? document.referrer : '',
@@ -528,14 +559,48 @@ function CreateCaseModal({ onClose, onCreated }) {
               label={t('cases.arrival_date_label')}
               type="date"
               value={form.preferredArrivalDate}
-              onChange={(e) => update('preferredArrivalDate', e.target.value)}
+              max="9999-12-31"
+              maxLength={10}
+              error={arrivalDateError}
+              onChange={(e) => {
+                const value = e.target.value
+                if (value.length > 10 || !isValidPreferredArrivalDate(value)) {
+                  update('preferredArrivalDate', '')
+                  setArrivalDateError(t('cases.arrival_date_error'))
+                  return
+                }
+                update('preferredArrivalDate', value)
+                setArrivalDateError('')
+              }}
             />
-            <Input
+            <Select
               label={t('cases.contact_label')}
-              value={form.preferredContact}
-              onChange={(e) => update('preferredContact', e.target.value)}
+              value={form.preferredContactMethod}
+              onChange={(e) => {
+                update('preferredContactMethod', e.target.value)
+                if (e.target.value !== 'other') update('preferredContactOther', '')
+              }}
               placeholder={t('cases.contact_placeholder')}
+              options={PREFERRED_CONTACT_METHODS.map(method => ({
+                value: method,
+                label: t(`cases.contact_method_${method}`),
+              }))}
+              required
             />
+            {form.preferredContactMethod === 'other' && (
+              <Input
+                label={t('cases.contact_other_label')}
+                value={form.preferredContactOther}
+                onChange={(e) => update('preferredContactOther', e.target.value.slice(0, MAX_CUSTOM_CONTACT_LENGTH))}
+                placeholder={t('cases.contact_other_placeholder')}
+                maxLength={MAX_CUSTOM_CONTACT_LENGTH}
+                hint={t('cases.characters_counter', {
+                  current: form.preferredContactOther.length,
+                  max: MAX_CUSTOM_CONTACT_LENGTH,
+                })}
+                required
+              />
+            )}
           </div>
         )}
 
@@ -607,7 +672,7 @@ function MedicalCasesPage() {
   const base = roleBase(role)
   const canCreate = role === 'patient'
 
-  const loadCases = async () => {
+  const loadCases = useCallback(async () => {
     setIsLoading(true)
     try {
       const response = await medicalCasesAPI.getAll(status ? { status } : {})
@@ -618,11 +683,11 @@ function MedicalCasesPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [status, t, toast])
 
   useEffect(() => {
     loadCases()
-  }, [status])
+  }, [loadCases])
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -647,12 +712,6 @@ function MedicalCasesPage() {
       item.doctor?.fullName,
     ].filter(Boolean).some(value => String(value).toLowerCase().includes(term)))
   }, [cases, search])
-
-  const BOOKING_NEEDED_STATUSES = ['DOCTOR_ASSIGNED', 'WAITING_PATIENT_CONFIRMATION', 'UNDER_REVIEW', 'DOCUMENTS_UPLOADED']
-  const needsPatientBooking = (item) => {
-    const s = normalizeCaseStatus(item.status)
-    return !!item.doctor && BOOKING_NEEDED_STATUSES.includes(s)
-  }
 
   const stats = useMemo(() => ({
     total: cases.length,

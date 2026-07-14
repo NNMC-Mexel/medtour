@@ -22,10 +22,14 @@ import Badge from "../../components/ui/Badge";
 import useAuthStore from "../../stores/authStore";
 import api, { normalizeResponse, getMediaUrl, getServerNow } from "../../services/api";
 import {
-    formatRelativeDate,
     formatDate,
     getLocalizedField,
 } from "../../utils/helpers";
+import {
+    formatKazakhstanDateTime,
+    formatKazakhstanTime,
+    getKazakhstanDateKey,
+} from "../../utils/kazakhstanTime";
 
 function DoctorDashboard() {
     const { t, i18n } = useTranslation()
@@ -56,7 +60,7 @@ function DoctorDashboard() {
             setDoctor(doctorData);
 
             if (doctorData?.id) {
-                const today = new Date().toISOString().split("T")[0];
+                const today = getKazakhstanDateKey();
 
                 const appointmentsRes = await api.get(
                     `/api/appointments?populate=*&pagination[limit]=1000`,
@@ -89,7 +93,7 @@ function DoctorDashboard() {
 
                 const todayStr = today;
                 const todayAppts = doctorAppointments.filter((a) => {
-                    const aptDate = new Date(a.dateTime).toISOString().split("T")[0];
+                    const aptDate = getKazakhstanDateKey(a.dateTime);
                     return aptDate === todayStr && (a.statuse || a.status) === "confirmed";
                 });
 
@@ -135,8 +139,8 @@ function DoctorDashboard() {
     };
 
     const todayAppointments = appointments.filter((a) => {
-        const today = new Date().toISOString().split("T")[0];
-        const aptDate = new Date(a.dateTime).toISOString().split("T")[0];
+        const today = getKazakhstanDateKey();
+        const aptDate = getKazakhstanDateKey(a.dateTime);
         return aptDate === today;
     });
 
@@ -249,10 +253,7 @@ function DoctorDashboard() {
                                         appointment.patient?.fullName ||
                                         appointment.patient?.username ||
                                         t('doctor.patient_default');
-                                    const time = new Date(appointment.dateTime).toLocaleTimeString("ru-RU", {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                    });
+                                    const time = formatKazakhstanTime(appointment.dateTime, i18n.language);
                                     const now = getServerNow();
                                     const aptTime = new Date(appointment.dateTime);
 
@@ -271,6 +272,8 @@ function DoctorDashboard() {
 
                                     const isPastConsultation =
                                         now > consultationEnd || appointment.statuse === 'completed';
+                                    const hasJoinRoom = !!appointment.roomId && !isPastConsultation &&
+                                        ["confirmed", "pending", "in_progress"].includes(appointment.statuse || appointment.status);
 
                                     const isNow = Math.abs(now - aptTime) < 30 * 60 * 1000;
 
@@ -317,9 +320,9 @@ function DoctorDashboard() {
                                                         )}
                                                     </div>
                                                 </div>
-                                                {canJoin && appointment.roomId && (
+                                                {hasJoinRoom && (
                                                     <Link to={`/consultation/${appointment.roomId}`} className='block mt-2'>
-                                                        <Button size='sm' className='w-full' leftIcon={<Video className='w-4 h-4' />}>
+                                                        <Button size='sm' variant={canJoin ? 'primary' : 'secondary'} className='w-full' leftIcon={<Video className='w-4 h-4' />}>
                                                             {t('doctor.start_appointment')}
                                                         </Button>
                                                     </Link>
@@ -365,9 +368,9 @@ function DoctorDashboard() {
                                                     ) : (
                                                         getStatusBadge(appointment.statuse || appointment.status)
                                                     )}
-                                                    {canJoin && appointment.roomId ? (
+                                                    {hasJoinRoom ? (
                                                         <Link to={`/consultation/${appointment.roomId}`}>
-                                                            <Button size='sm' leftIcon={<Video className='w-4 h-4' />}>
+                                                            <Button size='sm' variant={canJoin ? 'primary' : 'secondary'} leftIcon={<Video className='w-4 h-4' />}>
                                                                 {t('doctor.connect')}
                                                             </Button>
                                                         </Link>
@@ -421,13 +424,13 @@ function DoctorDashboard() {
                                                     {(getLocalizedField(nextAppointment.patient, 'fullName', i18n.language) || nextAppointment.patient?.fullName)?.split(" ").slice(0, 2).join(" ") || t('doctor.patient_default')}
                                                 </h4>
                                                 <p className='text-white/80 text-sm'>
-                                                    {formatRelativeDate(nextAppointment.dateTime)}
+                                                    {formatKazakhstanDateTime(nextAppointment.dateTime, i18n.language)}
                                                 </p>
                                             </div>
                                         </div>
-                                        {nextAppointment.roomId && canJoinNext ? (
+                                        {nextAppointment.roomId ? (
                                             <Link to={`/consultation/${nextAppointment.roomId}`}>
-                                                <Button className='w-full mt-4 text-teal-600 hover:bg-white/90'>
+                                                <Button variant={canJoinNext ? 'primary' : 'secondary'} className='w-full mt-4 text-teal-600 hover:bg-white/90'>
                                                     <Video className='w-4 h-4 mr-2' />
                                                     {t('doctor.start_appointment')}
                                                 </Button>

@@ -21,9 +21,10 @@ import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
 import useAuthStore from '../../stores/authStore'
 import useAppointmentStore from '../../stores/appointmentStore'
-import { formatPrice, formatDate, getSpecName } from '../../utils/helpers'
+import { formatPrice, getSpecName } from '../../utils/helpers'
 import { SHOW_DOCTOR_PRICES } from '../../utils/constants'
 import { getMediaUrl, getServerNow } from '../../services/api'
+import { formatDateInTimeZone, formatTimeInTimeZone, getDeviceTimeZone } from '../../utils/kazakhstanTime'
 
 const ITEMS_PER_PAGE = 10
 
@@ -73,7 +74,7 @@ const CancelResultNotification = ({ show, refundable, amount, onClose, t }) => {
 
 function PatientAppointments() {
   const { t, i18n } = useTranslation()
-  const timeLocale = i18n.language === 'kk' ? 'kk-KZ' : i18n.language === 'en' ? 'en-US' : 'ru-RU'
+  const viewerTimeZone = getDeviceTimeZone()
   const { user } = useAuthStore()
   const { appointments, fetchAppointments, cancelAppointment, isLoading, error } = useAppointmentStore()
 
@@ -350,6 +351,7 @@ function PatientAppointments() {
               const canJoin = ['confirmed', 'pending', 'in_progress'].includes(appointment.status) &&
                              now >= fifteenMinBefore &&
                              now <= consultationEnd
+              const hasJoinRoom = isUpcoming && !!appointment.roomId
 
               return (
                 <Card key={appointment.id} hover>
@@ -368,14 +370,11 @@ function PatientAppointments() {
                           <div className="flex items-center gap-3 mt-2 text-sm text-slate-500">
                             <div className="flex items-center gap-1">
                               <Calendar className="w-4 h-4" />
-                              {formatDate(appointment.dateTime, i18n.language)}
+                              {formatDateInTimeZone(appointment.dateTime, viewerTimeZone, i18n.language)}
                             </div>
                             <div className="flex items-center gap-1">
                               <Clock className="w-4 h-4" />
-                              {new Date(appointment.dateTime).toLocaleTimeString(timeLocale, {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
+                              {formatTimeInTimeZone(appointment.dateTime, viewerTimeZone, i18n.language)}
                             </div>
                           </div>
                         </div>
@@ -403,9 +402,9 @@ function PatientAppointments() {
                             </span>
                           )}
 
-                          {canJoin && appointment.roomId ? (
+                          {hasJoinRoom ? (
                             <Link to={`/consultation/${appointment.roomId}`}>
-                              <Button size="sm" leftIcon={<Video className="w-4 h-4" />}>
+                              <Button size="sm" variant={canJoin ? 'primary' : 'secondary'} leftIcon={<Video className="w-4 h-4" />}>
                                 {t('appointments.connect')}
                               </Button>
                             </Link>
@@ -510,11 +509,8 @@ function PatientAppointments() {
               </p>
               {selectedAppointment && (
                 <p className="text-sm text-slate-500 mt-2">
-                  {formatDate(selectedAppointment.dateTime, i18n.language)}{' '}
-                  {new Date(selectedAppointment.dateTime).toLocaleTimeString(timeLocale, {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {formatDateInTimeZone(selectedAppointment.dateTime, viewerTimeZone, i18n.language)}{' '}
+                  {formatTimeInTimeZone(selectedAppointment.dateTime, viewerTimeZone, i18n.language)}
                 </p>
               )}
               <div className={`mt-4 p-4 rounded-xl ${refund.refundable ? 'bg-green-50 border border-green-200' : 'bg-rose-50 border border-rose-200'}`}>

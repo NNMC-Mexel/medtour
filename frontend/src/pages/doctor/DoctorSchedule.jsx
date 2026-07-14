@@ -27,6 +27,12 @@ import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 import { ru, kk, enUS } from "date-fns/locale";
 import useAuthStore from "../../stores/authStore";
 import api, { normalizeResponse, getMediaUrl, getServerNow } from "../../services/api";
+import {
+    formatKazakhstanTime,
+    getCalendarDateKey,
+    getKazakhstanCalendarToday,
+    getKazakhstanDateKey,
+} from "../../utils/kazakhstanTime";
 
 // Генерируем все возможные временные слоты для выбора в настройках (каждые 30 минут)
 const generateAllTimeOptions = () => {
@@ -98,8 +104,8 @@ function DoctorSchedule() {
     const [appointments, setAppointments] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    const [currentDate, setCurrentDate] = useState(new Date());
-    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [currentDate, setCurrentDate] = useState(getKazakhstanCalendarToday);
+    const [selectedDate, setSelectedDate] = useState(getKazakhstanCalendarToday);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [workingHours, setWorkingHours] = useState({
         startTime: "09:00",
@@ -164,8 +170,8 @@ function DoctorSchedule() {
                         apt.doctor?.id === doctorData.id ||
                         (doctorData.documentId && apt.doctor?.documentId === doctorData.documentId);
                     if (!matchesDoctor) return false;
-                    const aptDate = new Date(apt.dateTime);
-                    return aptDate >= weekStart && aptDate < weekEnd;
+                    const aptDate = getKazakhstanDateKey(apt.dateTime);
+                    return aptDate >= getCalendarDateKey(weekStart) && aptDate < getCalendarDateKey(weekEnd);
                 });
                 
                 console.log("Doctor appointments:", doctorAppointments);
@@ -184,14 +190,15 @@ function DoctorSchedule() {
     const goToPreviousWeek = () => setCurrentDate(addDays(currentDate, -7));
     const goToNextWeek = () => setCurrentDate(addDays(currentDate, 7));
     const goToToday = () => {
-        setCurrentDate(new Date());
-        setSelectedDate(new Date());
+        const today = getKazakhstanCalendarToday();
+        setCurrentDate(today);
+        setSelectedDate(today);
     };
 
     const getAppointmentsForDate = (date) => {
-        const dateStr = format(date, "yyyy-MM-dd");
+        const dateStr = getCalendarDateKey(date);
         return appointments.filter((apt) => {
-            const aptDate = format(new Date(apt.dateTime), "yyyy-MM-dd");
+            const aptDate = getKazakhstanDateKey(apt.dateTime);
             return aptDate === dateStr;
         });
     };
@@ -313,7 +320,7 @@ function DoctorSchedule() {
                         {weekDays.map((day, index) => {
                             const dayAppointments = getAppointmentsForDate(day);
                             const isSelected = isSameDay(day, selectedDate);
-                            const isToday = isSameDay(day, new Date());
+                            const isToday = getCalendarDateKey(day) === getKazakhstanDateKey();
                             const isWorking = isWorkingDay(day);
 
                             return (
@@ -381,10 +388,7 @@ function DoctorSchedule() {
                                     {daySlots.map(({ time, isBreak }) => {
                                         const appointment =
                                             selectedAppointments.find((a) => {
-                                                const aptTime = format(
-                                                    new Date(a.dateTime),
-                                                    "HH:mm"
-                                                );
+                                                const aptTime = formatKazakhstanTime(a.dateTime, 'en');
                                                 return aptTime === time;
                                             });
 
@@ -452,6 +456,8 @@ function DoctorSchedule() {
                                                                 const canJoin = ['confirmed', 'pending'].includes(appointmentStatus) &&
                                                                     now >= fifteenMinBefore && now <= consultationEnd;
                                                                 const isPast = now > consultationEnd || appointmentStatus === 'completed';
+                                                                const hasJoinRoom = !!appointment.roomId && !isPast &&
+                                                                    ['confirmed', 'pending', 'in_progress'].includes(appointmentStatus);
 
                                                                 return (
                                                                     <>
@@ -473,9 +479,9 @@ function DoctorSchedule() {
                                                                                     : t('schedule.status_cancelled')}
                                                                             </Badge>
                                                                         )}
-                                                                        {canJoin && appointment.roomId && (
+                                                                        {hasJoinRoom && (
                                                                             <Link to={`/consultation/${appointment.roomId}`}>
-                                                                                <Button size='sm'>{t('schedule.start_btn')}</Button>
+                                                                                <Button size='sm' variant={canJoin ? 'primary' : 'secondary'}>{t('schedule.start_btn')}</Button>
                                                                             </Link>
                                                                         )}
                                                                         {isPast && appointmentStatus !== 'cancelled' && appointment.roomId && (

@@ -6,7 +6,6 @@ import {
     format,
     addDays,
     isSameDay,
-    isToday,
 } from "date-fns";
 import { ru, kk, enUS } from "date-fns/locale";
 import {
@@ -32,6 +31,18 @@ import useAuthStore from "../../stores/authStore";
 import { useToast } from "../ui/Toast";
 import { normalizeCaseStatus } from "../../utils/medicalCaseWorkflow";
 import { SHOW_DOCTOR_PRICES } from "../../utils/constants";
+import {
+    buildKazakhstanDateTime,
+    formatDateInTimeZone,
+    formatShortDateInTimeZone,
+    formatTimeInTimeZone,
+    getCalendarDateKey,
+    getDateKeyInTimeZone,
+    getDeviceTimeZone,
+    getKazakhstanCalendarToday,
+    getKazakhstanDateKey,
+    getKazakhstanMinutesNow,
+} from "../../utils/kazakhstanTime";
 
 // Функция генерации временных слотов на основе настроек врача
 const generateTimeSlots = (doctor) => {
@@ -85,14 +96,10 @@ const generateTimeSlots = (doctor) => {
 
 // Функция фильтрации прошедших слотов для сегодняшнего дня
 const filterPastSlots = (slots, selectedDate) => {
-    if (!isToday(selectedDate)) {
+    if (getCalendarDateKey(selectedDate) !== getKazakhstanDateKey()) {
         return slots; // Если не сегодня - показываем все слоты
     }
-
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMin = now.getMinutes();
-    const currentTotalMins = currentHour * 60 + currentMin;
+    const currentTotalMins = getKazakhstanMinutesNow();
 
     return slots.filter((slot) => {
         const [slotHour, slotMin] = slot.split(":").map(Number);
@@ -161,6 +168,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
     const { createAppointment, fetchTimeSlots, timeSlots } =
         useAppointmentStore();
     const toast = useToast();
+    const viewerTimeZone = getDeviceTimeZone();
 
     const paymentMethods = IS_PAYMENTS_LIVE
         ? LIVE_PAYMENT_BASE.map((m) => ({
@@ -218,7 +226,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
         return () => clearInterval(id)
     }, [reservedByOthers.size])
 
-    const dates = Array.from({ length: 14 }, (_, i) => addDays(new Date(), i));
+    const dates = Array.from({ length: 14 }, (_, i) => addDays(getKazakhstanCalendarToday(), i));
 
     useEffect(() => {
         if (!isOpen || !user?.id) return;
@@ -275,7 +283,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
         if (selectedDate && doctor?.id) {
                 setIsLoadingSlots(true);
                 try {
-            const dateStr = format(selectedDate, "yyyy-MM-dd");
+            const dateStr = getCalendarDateKey(selectedDate);
                     // Загружаем временные слоты из базы (если есть)
             fetchTimeSlots(doctor.id, dateStr);
                     // Загружаем уже занятые слоты из записей
@@ -296,7 +304,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
     useEffect(() => {
         if (!isOpen || !doctor?.id || !selectedDate) return
 
-        const dateStr = format(selectedDate, "yyyy-MM-dd")
+        const dateStr = getCalendarDateKey(selectedDate)
 
         const socket = io(SIGNALING_URL, { transports: ["websocket"], auth: { token } })
         socketRef.current = socket
@@ -383,13 +391,13 @@ function BookingModal({ isOpen, onClose, doctor }) {
             socket.disconnect()
             socketRef.current = null
         }
-    }, [isOpen, doctor?.id, selectedDate])
+    }, [isOpen, doctor?.id, selectedDate, t, toast, token])
 
     // Emit reserve / release when selected time changes
     useEffect(() => {
         const socket = socketRef.current
         if (!socket || !doctor?.id || !selectedDate) return
-        const dateStr = format(selectedDate, "yyyy-MM-dd")
+        const dateStr = getCalendarDateKey(selectedDate)
         if (selectedTime) {
             socket.emit("reserve-slot", {
                 doctorId: doctor.id,
@@ -399,7 +407,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
             })
         }
         // release is handled server-side when a new reserve comes in from same socket
-    }, [selectedTime])
+    }, [doctor?.id, selectedDate, selectedTime, user?.id])
 
     const getAvailableSlots = () => {
         if (!selectedDate) return [];
@@ -424,6 +432,9 @@ function BookingModal({ isOpen, onClose, doctor }) {
     };
 
     const availableSlots = getAvailableSlots();
+    const selectedInstant = selectedDate && selectedTime
+        ? buildKazakhstanDateTime(selectedDate, selectedTime)
+        : null;
 
     const handleNext = () => {
         // In free mode skip the payment step (3) — go 2 → 4 directly.
@@ -439,7 +450,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
 
     // Shared: fresh slot check (DB + socket reservation) + build dateTime
     const verifySlotAndBuildDateTime = async () => {
-        const dateStr = format(selectedDate, "yyyy-MM-dd");
+        const dateStr = getCalendarDateKey(selectedDate);
 
         // 1. Check booked slots in Strapi DB
         const freshBooked = await getBookedSlots(doctor.id, dateStr);
@@ -482,10 +493,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
             return null;
         }
 
-        const dateTime = new Date(selectedDate);
-        const [hours, minutes] = selectedTime.split(":");
-        dateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-        return dateTime;
+        return buildKazakhstanDateTime(selectedDate, selectedTime);
     };
 
     // Broadcast confirmed booking to all open BookingModals for this doctor/date
@@ -495,7 +503,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
         if (!socket || !doctor?.id || !selectedDate || !selectedTime) return;
         socket.emit("slot-confirmed", {
             doctorId: doctor.id,
-            date: format(selectedDate, "yyyy-MM-dd"),
+            date: getCalendarDateKey(selectedDate),
             time: selectedTime,
         });
     };
@@ -857,7 +865,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
         // Release slot reservation if one is active before closing
         const socket = socketRef.current;
         if (socket && selectedTime && selectedDate && doctor?.id) {
-            const dateStr = format(selectedDate, "yyyy-MM-dd");
+            const dateStr = getCalendarDateKey(selectedDate);
             socket.emit("release-slot", {
                 doctorId: doctor.id,
                 date: dateStr,
@@ -1094,11 +1102,8 @@ function BookingModal({ isOpen, onClose, doctor }) {
                     <p className='text-slate-600 mb-6'>
                         {t('booking.complete_desc', { name: doctorName })}
                         <br />
-                        {selectedDate &&
-                            format(selectedDate, "d MMMM yyyy", {
-                                locale: dateLocale,
-                            })}{" "}
-                        {selectedTime}
+                        {selectedInstant && formatDateInTimeZone(selectedInstant, viewerTimeZone, i18n.language)}{" "}
+                        {selectedInstant && formatTimeInTimeZone(selectedInstant, viewerTimeZone, i18n.language)}
                     </p>
 
                     {/* Kaspi payment instructions */}
@@ -1281,6 +1286,9 @@ function BookingModal({ isOpen, onClose, doctor }) {
                                     <label className='block text-sm font-medium text-slate-700 mb-3'>
                                         {t('booking.select_time')}
                                     </label>
+                                    <p className='mb-3 text-xs text-slate-500'>
+                                        {t('booking.timezone_local_hint', { zone: viewerTimeZone })}
+                                    </p>
                                     {isLoadingSlots ? (
                                         <div className='flex items-center justify-center py-8'>
                                             <div className='w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full animate-spin'></div>
@@ -1300,6 +1308,8 @@ function BookingModal({ isOpen, onClose, doctor }) {
                                         <div className='grid grid-cols-4 sm:grid-cols-7 gap-2'>
                                             {availableSlots.map((time) => {
                                                 const isSelected = selectedTime === time;
+                                                const instant = buildKazakhstanDateTime(selectedDate, time);
+                                                const localDateDiffers = getDateKeyInTimeZone(instant, viewerTimeZone) !== getCalendarDateKey(selectedDate);
                                                 const heldExpiresAt = reservedByOthers.get(time);
                                                 // Only treat as held-by-others if it's not our own selected slot
                                                 const isHeld = !isSelected && !!heldExpiresAt && heldExpiresAt > Date.now();
@@ -1319,7 +1329,12 @@ function BookingModal({ isOpen, onClose, doctor }) {
                                                                 : "bg-white border border-slate-200 hover:border-teal-500 hover:bg-teal-50"
                                                         )}>
                                                         {isHeld && <Lock className="w-3 h-3 opacity-70" />}
-                                                        {time}
+                                                        <span>{formatTimeInTimeZone(instant, viewerTimeZone, i18n.language)}</span>
+                                                        {localDateDiffers && (
+                                                            <span className='text-[10px] opacity-70'>
+                                                                {formatShortDateInTimeZone(instant, viewerTimeZone, i18n.language)}
+                                                            </span>
+                                                        )}
                                                     </button>
                                                 );
                                             })}
@@ -1573,12 +1588,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
                                 <div className='p-4 flex justify-between'>
                                     <span className='text-slate-600'>{t('booking.field_date')}</span>
                                     <span className='font-medium text-slate-900'>
-                                        {selectedDate &&
-                                            format(
-                                                selectedDate,
-                                                "d MMMM yyyy",
-                                                { locale: dateLocale }
-                                            )}
+                                        {selectedInstant && formatDateInTimeZone(selectedInstant, viewerTimeZone, i18n.language)}
                                     </span>
                                 </div>
                                 <div className='p-4 flex justify-between'>
@@ -1586,7 +1596,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
                                         {t('booking.field_time')}
                                     </span>
                                     <span className='font-medium text-slate-900'>
-                                        {selectedTime}
+                                        {selectedInstant && formatTimeInTimeZone(selectedInstant, viewerTimeZone, i18n.language)}
                                     </span>
                                 </div>
                                 <div className='p-4 flex justify-between'>

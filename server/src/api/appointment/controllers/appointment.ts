@@ -11,6 +11,23 @@ import { normalizeCaseStatus } from '../../../utils/medical-case-workflow';
 // Kazakhstan is UTC+5 with no DST (fixed offset, IANA: Asia/Almaty)
 const KZ_OFFSET_MS = 5 * 60 * 60 * 1000;
 const KZ_OFFSET_MIN = 5 * 60;
+const APPOINTMENT_SLOT_UID = 'api::appointment-slot.appointment-slot' as any;
+
+function timeToMinutes(value: string): number {
+  const [hours, minutes] = value.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+function formatKzDateTime(value: string | Date): string {
+  return new Date(value).toLocaleString('ru-RU', {
+    timeZone: 'Asia/Almaty',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 function sameId(a: unknown, b: unknown) {
   return a != null && b != null && String(a) === String(b);
@@ -174,6 +191,32 @@ function withSlotLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
     }
   });
   return next;
+}
+
+function isUniqueConstraintError(error: any): boolean {
+  const code = String(error?.code || error?.original?.code || '');
+  const message = String(error?.message || error?.original?.message || '').toLowerCase();
+  const isSlotKeyValidation = Array.isArray(error?.details?.errors)
+    && error.details.errors.some((item: any) => item?.path?.includes('slotKey') && String(item?.message || '').toLowerCase().includes('unique'));
+  return code === '23505'
+    || code === 'SQLITE_CONSTRAINT'
+    || code === 'SQLITE_CONSTRAINT_UNIQUE'
+    || isSlotKeyValidation
+    || message.includes('must be unique')
+    || message.includes('unique constraint')
+    || message.includes('duplicate key');
+}
+
+async function releaseAppointmentSlot(strapi: any, appointmentDocumentId: string): Promise<void> {
+  const locks = await strapi.documents(APPOINTMENT_SLOT_UID).findMany({
+    filters: { appointmentDocumentId },
+    limit: 10,
+  });
+  for (const lock of locks as any[]) {
+    await strapi.documents(APPOINTMENT_SLOT_UID).delete({
+      documentId: lock.documentId,
+    });
+  }
 }
 
 export default factories.createCoreController('api::appointment.appointment', () => ({
@@ -392,15 +435,11 @@ export default factories.createCoreController('api::appointment.appointment', ()
 
         // Check working hours — times stored as "HH:MM"
         // Используем UTC+5 (Астана/Алматы) для сравнения с рабочими часами врача
-        const toMinutes = (t: string) => {
-          const [h, m] = t.split(':').map(Number);
-          return h * 60 + m;
-        };
         const apptMinutes = (parsedDate.getUTCHours() * 60 + parsedDate.getUTCMinutes() + KZ_OFFSET_MIN) % 1440;
-        const workStart = toMinutes(drForHours.workStartTime || '09:00');
-        const workEnd   = toMinutes(drForHours.workEndTime   || '18:00');
-        const breakStart = toMinutes(drForHours.breakStart    || '13:00');
-        const breakEnd   = toMinutes(drForHours.breakEnd      || '14:00');
+        const workStart = timeToMinutes(drForHours.workStartTime || '09:00');
+        const workEnd   = timeToMinutes(drForHours.workEndTime   || '18:00');
+        const breakStart = timeToMinutes(drForHours.breakStart    || '13:00');
+        const breakEnd   = timeToMinutes(drForHours.breakEnd      || '14:00');
 
         if (apptMinutes < workStart || apptMinutes >= workEnd) {
           return ctx.badRequest('Appointment time is outside doctor working hours');
@@ -441,6 +480,28 @@ export default factories.createCoreController('api::appointment.appointment', ()
     // --- Validate price against canonical doctor price ---
     if (!doctorRecord) {
       return ctx.badRequest('Doctor not found');
+    }
+
+    // Accept only canonical doctor slots. Besides protecting the schedule from
+    // malformed direct API calls, this guarantees that the unique DB lock below
+    // represents the complete consultation interval rather than just a timestamp.
+    const doctorSlotMinutes = Number(doctorRecord.slotDuration) || 30;
+    const appointmentMinutesKz = (
+      parsedDate.getUTCHours() * 60
+      + parsedDate.getUTCMinutes()
+      + KZ_OFFSET_MIN
+    ) % 1440;
+    const doctorWorkStart = timeToMinutes(doctorRecord.workStartTime || '09:00');
+    const slotOffset = ((appointmentMinutesKz - doctorWorkStart) % doctorSlotMinutes + doctorSlotMinutes) % doctorSlotMinutes;
+    if (
+      !Number.isInteger(doctorSlotMinutes)
+      || doctorSlotMinutes < 5
+      || doctorSlotMinutes > 240
+      || parsedDate.getUTCSeconds() !== 0
+      || parsedDate.getUTCMilliseconds() !== 0
+      || slotOffset !== 0
+    ) {
+      return ctx.badRequest('Appointment time must match an available doctor time slot');
     }
 
     if (isPatient) {
@@ -513,123 +574,124 @@ export default factories.createCoreController('api::appointment.appointment', ()
       }
     }
 
-    // --- Atomic check + create using mutex (prevents race condition) ---
-    const lockKey = `${doctorDocId}:${body.dateTime}`;
+    // The in-process mutex avoids redundant work locally. The unique slot record
+    // is the actual cross-process guarantee for horizontally scaled instances.
+    const canonicalDateTime = parsedDate.toISOString();
+    const lockKey = `${doctorDocId}:${canonicalDateTime}`;
 
     let result: any;
     try {
       result = await withSlotLock(lockKey, async () => {
-      if (body.dateTime && doctorDocId) {
-        const requestedTime = new Date(body.dateTime);
-
-        // Find doctor to get slotDuration
-        const doctorRecord = await strapi.documents('api::doctor.doctor').findOne({
-          documentId: doctorDocId,
-          fields: ['id', 'slotDuration'],
-        });
-        const slotMinutes = (doctorRecord as any)?.slotDuration || 30;
-
-        // Check for existing active appointments at the same time for this doctor
-        const slotStart = new Date(requestedTime);
-        const slotEnd = new Date(requestedTime.getTime() + slotMinutes * 60 * 1000);
-
-        // Filter by documentId (same for draft + published) so this works
-        // with Strapi v5's default draft-biased findMany. Keeping it on drafts
-        // also means cancelled bookings (default update writes to draft) are
-        // treated as free, letting the slot be re-booked.
-        const existing = await strapi.documents('api::appointment.appointment').findMany({
-          filters: {
-            doctor: { documentId: doctorDocId },
-            dateTime: {
-              $gte: slotStart.toISOString(),
-              $lt: slotEnd.toISOString(),
-            },
-            statuse: { $in: ['pending', 'confirmed', 'in_progress'] },
-          },
-        });
-
-        if (existing.length > 0) {
-          return { conflict: true };
-        }
-      }
-
-      // Create appointment inside the lock — no one else can create for same slot.
-      //
-      // The medical_case relation is deliberately NOT part of the create data.
-      // In Strapi v5 the document service maps the case documentId to the DRAFT
-      // entity id, while validation of a published entry only accepts PUBLISHED
-      // entity ids — so create() (and publish() of a draft) consistently fails
-      // with "relation(s) ... do not exist" even though both versions of the
-      // case exist. The relation is attached right after create at the DB layer
-      // (entity ids, draft↔draft / published↔published), which bypasses that
-      // broken validation and never loses the link.
-      const linkedCaseDocId = linkedCaseRef ? String(linkedCaseRef) : null;
-      const appointmentData: any = {
-        dateTime: body.dateTime,
-        type: body.type || 'video',
-        consultationPurpose,
-        statuse: requestedStatus,
-        price: actualPrice,
-        roomId: body.roomId,
-        paymentStatus: requestedPaymentStatus,
-        patient: patientDocId,
-        doctor: doctorDocId,
-      };
-      const populate: any = {
-        doctor: { populate: ['specialization', 'photo'] },
-        patient: { fields: ['id', 'fullName', 'email', 'phone'] },
-      };
-
-      let appointment: any = await strapi.documents('api::appointment.appointment').create({
-        data: appointmentData,
-        status: 'published',
-        populate,
-      });
-
-      if (linkedCaseDocId) {
         try {
-          const caseRows = await strapi.db.query('api::medical-case.medical-case').findMany({
-            where: { documentId: linkedCaseDocId },
-            select: ['id', 'publishedAt'],
-          });
-          const apptRows = await strapi.db.query('api::appointment.appointment').findMany({
-            where: { documentId: appointment.documentId },
-            select: ['id', 'publishedAt'],
-          });
-          if (!caseRows.length || !apptRows.length) {
-            throw new Error('medical case or appointment versions not found');
-          }
-          for (const apptRow of apptRows) {
-            const caseRow =
-              caseRows.find((c: any) => !!c.publishedAt === !!apptRow.publishedAt) || caseRows[0];
-            await strapi.db.query('api::appointment.appointment').update({
-              where: { id: apptRow.id },
-              data: { medical_case: caseRow.id },
+          return await strapi.db.transaction(async () => {
+            const slotStart = new Date(parsedDate.getTime() - doctorSlotMinutes * 60 * 1000);
+            const slotEnd = new Date(parsedDate.getTime() + doctorSlotMinutes * 60 * 1000);
+            const existing = await strapi.documents('api::appointment.appointment').findMany({
+              filters: {
+                doctor: { documentId: doctorDocId },
+                dateTime: {
+                  $gt: slotStart.toISOString(),
+                  $lt: slotEnd.toISOString(),
+                },
+                statuse: { $in: ['pending', 'confirmed', 'in_progress'] },
+              },
             });
-          }
-          // Re-read so the response carries the persisted link.
-          appointment = await strapi.documents('api::appointment.appointment').findOne({
-            documentId: appointment.documentId,
-            status: 'published',
-            populate: {
-              ...populate,
-              medical_case: { fields: ['id', 'documentId', 'status'] },
-            },
-          });
-        } catch (linkErr: any) {
-          // An appointment must not exist without its case link — roll back and fail.
-          strapi.log.error(
-            `appointment.create: failed to link medical_case ${linkedCaseDocId}, rolling appointment back: ${linkErr?.message}`
-          );
-          await strapi.documents('api::appointment.appointment').delete({
-            documentId: appointment.documentId,
-          });
-          throw new Error('Failed to link the appointment to the medical case');
-        }
-      }
+            if (existing.length > 0) return { conflict: true };
 
-      return { conflict: false, appointment };
-    });
+            const persistentLock: any = await strapi.documents(APPOINTMENT_SLOT_UID).create({
+              data: {
+                slotKey: lockKey,
+                doctorDocumentId: doctorDocId,
+                dateTime: canonicalDateTime,
+              },
+            });
+
+            // The medical_case relation is deliberately attached at the DB layer:
+            // draft and published entries have different numeric relation targets.
+            const linkedCaseDocId = linkedCaseRef ? String(linkedCaseRef) : null;
+            const populate: any = {
+              doctor: { populate: ['specialization', 'photo'] },
+              patient: { fields: ['id', 'fullName', 'email', 'phone'] },
+            };
+            let appointment: any = await strapi.documents('api::appointment.appointment').create({
+              data: {
+                dateTime: canonicalDateTime,
+                type: body.type || 'video',
+                consultationPurpose,
+                statuse: requestedStatus,
+                price: actualPrice,
+                roomId: body.roomId,
+                paymentStatus: requestedPaymentStatus,
+                patient: patientDocId,
+                doctor: doctorDocId,
+              },
+              status: 'published',
+              populate,
+            });
+
+            if (linkedCaseDocId) {
+              const caseRows = await strapi.db.query('api::medical-case.medical-case').findMany({
+                where: { documentId: linkedCaseDocId },
+                select: ['id', 'publishedAt'],
+              });
+              const apptRows = await strapi.db.query('api::appointment.appointment').findMany({
+                where: { documentId: appointment.documentId },
+                select: ['id', 'publishedAt'],
+              });
+              if (!caseRows.length || !apptRows.length) {
+                throw new Error('medical case or appointment versions not found');
+              }
+              for (const apptRow of apptRows) {
+                const caseRow = caseRows.find((item: any) => !!item.publishedAt === !!apptRow.publishedAt) || caseRows[0];
+                await strapi.db.query('api::appointment.appointment').update({
+                  where: { id: apptRow.id },
+                  data: { medical_case: caseRow.id },
+                });
+              }
+              appointment = await strapi.documents('api::appointment.appointment').findOne({
+                documentId: appointment.documentId,
+                status: 'published',
+                populate: {
+                  ...populate,
+                  medical_case: { fields: ['id', 'documentId', 'status'] },
+                },
+              });
+            }
+
+            await strapi.documents(APPOINTMENT_SLOT_UID).update({
+              documentId: persistentLock.documentId,
+              data: { appointmentDocumentId: appointment.documentId },
+            });
+
+            if (linkedCaseDocId) {
+              await strapi.documents('api::medical-case.medical-case' as any).update({
+                documentId: linkedCaseDocId,
+                data: { status: 'CONSULTATION_BOOKED' } as any,
+                status: 'published',
+              });
+              await strapi.documents('api::case-event.case-event' as any).create({
+                data: {
+                  medical_case: linkedCaseDocId,
+                  ...(user ? { actor: user.documentId || user.id } : {}),
+                  eventType: 'CONSULTATION_SCHEDULED',
+                  message: `Consultation scheduled: ${formatKzDateTime(canonicalDateTime)}`,
+                  metadata: {
+                    appointmentId: appointment.documentId,
+                    dateTime: canonicalDateTime,
+                    doctorName: appointment.doctor?.fullName || null,
+                    scheduledBy: isPatient ? 'patient' : isStaff ? 'staff' : 'system',
+                  },
+                },
+              });
+            }
+
+            return { conflict: false, appointment };
+          });
+        } catch (error) {
+          if (isUniqueConstraintError(error)) return { conflict: true };
+          throw error;
+        }
+      });
     } catch (err: any) {
       const message = err?.message || '';
       if (message.includes('do not exist') || err?.name === 'YupValidationError' || err?.name === 'ValidationError') {
@@ -657,26 +719,41 @@ export default factories.createCoreController('api::appointment.appointment', ()
       ts: new Date().toISOString(),
     }));
 
-    // When the appointment is linked to a medical case, advance the case status
-    // server-side so the patient doesn't need a separate permission-restricted call.
+    // The case status and activity event were committed with the appointment.
+    // User notifications happen afterwards and may safely be retried independently.
     const linkedCase = body.medical_case || body.medicalCase;
     if (linkedCase) {
       const caseDocId = typeof linkedCase === 'string' ? linkedCase : String(linkedCase);
-      try {
-        await strapi.documents('api::medical-case.medical-case' as any).update({
-          documentId: caseDocId,
-          data: { status: 'CONSULTATION_BOOKED' } as any,
-          status: 'published',
-        });
-      } catch {
-        // If published update fails, try draft-only update
+      if (isPatient) {
         try {
-          await strapi.documents('api::medical-case.medical-case' as any).update({
+          const caseWithStaff: any = await strapi.documents('api::medical-case.medical-case' as any).findOne({
             documentId: caseDocId,
-            data: { status: 'CONSULTATION_BOOKED' } as any,
+            populate: {
+              manager: { fields: ['id', 'fullName'] },
+              coordinator: { fields: ['id', 'fullName'] },
+            },
           });
+          const patientName = result.appointment?.patient?.fullName || 'Пациент';
+          const doctorName = result.appointment?.doctor?.fullName || 'врач';
+          const when = formatKzDateTime(body.dateTime);
+          const appointmentId = result.appointment?.documentId;
+
+          const recipients = [
+            { user: caseWithStaff?.manager, role: 'manager' },
+            { user: caseWithStaff?.coordinator, role: 'coordinator' },
+          ].filter((item, index, items) => item.user?.id && items.findIndex(other => other.user?.id === item.user.id) === index);
+
+          const notificationService = strapi.service('api::notification.notification');
+          await Promise.all(recipients.map(({ user: recipient, role }) => notificationService.notifyUser(recipient.id, {
+            title: 'Пациент выбрал время консультации',
+            message: `${patientName} записался(лась) к врачу ${doctorName} — ${when} (время Алматы)`,
+            type: 'appointment',
+            link: `/${role}/cases/${caseDocId}`,
+            metadata: { appointmentId, caseId: caseDocId, dateTime: body.dateTime },
+          })));
         } catch (err: any) {
-          strapi.log.warn(`Could not set CONSULTATION_BOOKED on case ${caseDocId}: ${err?.message}`);
+          // Booking must remain successful even if an auxiliary notification fails.
+          strapi.log.warn(`Could not notify case staff about appointment: ${err?.message}`);
         }
       }
     }
@@ -696,10 +773,16 @@ export default factories.createCoreController('api::appointment.appointment', ()
 
     // Admins bypass field restrictions
     if (isAdmin) {
-      const updated = await strapi.documents('api::appointment.appointment').update({
-        documentId,
-        data: body,
-        status: 'published',
+      const updated = await strapi.db.transaction(async () => {
+        const saved = await strapi.documents('api::appointment.appointment').update({
+          documentId,
+          data: body,
+          status: 'published',
+        });
+        if (body.statuse === 'cancelled') {
+          await releaseAppointmentSlot(strapi, documentId);
+        }
+        return saved;
       });
       return { data: updated };
     }
@@ -780,37 +863,45 @@ export default factories.createCoreController('api::appointment.appointment', ()
       return ctx.badRequest('No allowed fields to update');
     }
 
-    const updated = await strapi.documents('api::appointment.appointment').update({
-      documentId,
-      data: allowed,
-      status: 'published',
-    });
-
     const linkedCase = (appointment as any).medical_case;
-    if (allowed.statuse === 'completed' && linkedCase?.documentId) {
-      const previousCaseStatus = normalizeCaseStatus(linkedCase.status);
-      const statusesToComplete = ['WAITING_PAYMENT', 'CONSULTATION_BOOKED'];
-
-      if (statusesToComplete.includes(previousCaseStatus || '')) {
-        await strapi.documents('api::medical-case.medical-case' as any).update({
-          documentId: linkedCase.documentId,
-          data: { status: 'CONSULTATION_COMPLETED' } as any,
-          status: 'published',
-        });
-
-        await strapi.documents('api::case-event.case-event' as any).create({
-          data: {
-            medical_case: linkedCase.documentId,
-            actor: user.documentId || user.id,
-            eventType: 'CONSULTATION_COMPLETED',
-            fromStatus: previousCaseStatus,
-            toStatus: 'CONSULTATION_COMPLETED',
-            message: 'Consultation completed by doctor',
-            metadata: { appointmentId: documentId },
-          },
-        });
+    const updated = await strapi.db.transaction(async () => {
+      const saved = await strapi.documents('api::appointment.appointment').update({
+        documentId,
+        data: allowed,
+        status: 'published',
+      });
+      if (allowed.statuse === 'cancelled') {
+        await releaseAppointmentSlot(strapi, documentId);
       }
-    }
+
+      if (allowed.statuse === 'completed' && linkedCase?.documentId) {
+        const previousCaseStatus = normalizeCaseStatus(linkedCase.status);
+        const statusesToComplete = ['WAITING_PAYMENT', 'CONSULTATION_BOOKED'];
+        if (statusesToComplete.includes(previousCaseStatus || '')) {
+          // Do not use Document Service here. In Strapi v5 a published update
+          // can replace the numeric row while the inverse appointment relation
+          // still points at the previous row, causing relation validation to
+          // reject the whole completion request. Updating both document rows
+          // in place keeps the draft/published relation IDs stable.
+          await strapi.db.query('api::medical-case.medical-case').updateMany({
+            where: { documentId: linkedCase.documentId },
+            data: { status: 'CONSULTATION_COMPLETED' } as any,
+          });
+          await strapi.documents('api::case-event.case-event' as any).create({
+            data: {
+              medical_case: linkedCase.documentId,
+              actor: user.documentId || user.id,
+              eventType: 'CONSULTATION_COMPLETED',
+              fromStatus: previousCaseStatus,
+              toStatus: 'CONSULTATION_COMPLETED',
+              message: 'Consultation completed by doctor',
+              metadata: { appointmentId: documentId },
+            },
+          });
+        }
+      }
+      return saved;
+    });
 
     strapi.log.info(JSON.stringify({
       audit: 'APPOINTMENT_UPDATED',
@@ -823,6 +914,32 @@ export default factories.createCoreController('api::appointment.appointment', ()
     }));
 
     return { data: updated };
+  },
+
+  async delete(ctx) {
+    const user = ctx.state.user;
+    if (!user) return ctx.forbidden('Not authenticated');
+    const isAdmin = user.role?.type === 'admin' || user.userRole === 'admin';
+    if (!isAdmin) return ctx.forbidden('Only administrators can delete appointments');
+
+    const { id: documentId } = ctx.params;
+    const existing = await strapi.documents('api::appointment.appointment').findOne({ documentId });
+    if (!existing) return ctx.notFound('Appointment not found');
+
+    const deleted = await strapi.db.transaction(async () => {
+      const result = await strapi.documents('api::appointment.appointment').delete({ documentId });
+      await releaseAppointmentSlot(strapi, documentId);
+      return result;
+    });
+
+    strapi.log.info(JSON.stringify({
+      audit: 'APPOINTMENT_DELETED',
+      documentId,
+      deletedBy: user.id,
+      ip: ctx.request.ip,
+      ts: new Date().toISOString(),
+    }));
+    return { data: deleted };
   },
 
   /**

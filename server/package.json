@@ -17,6 +17,8 @@
     "migrate:case-chats:dry": "node ./scripts/backfill-case-chats.js --dry-run",
     "check:chat-permissions": "node ./scripts/check-chat-permissions.js",
     "check:env": "node ./scripts/check-production-env.js",
+    "audit:appointment-slots": "node ./scripts/audit-duplicate-appointments.js",
+    "repair:appointment-slots": "node ./scripts/audit-duplicate-appointments.js --fix",
     "smoke:chat-workspace": "node ./scripts/smoke-chat-workspace-api.js",
     "start": "strapi start",
     "strapi": "strapi",

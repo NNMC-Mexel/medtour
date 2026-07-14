@@ -1,0 +1,35 @@
+{
+  "kind": "collectionType",
+  "collectionName": "appointment_slots",
+  "info": {
+    "singularName": "appointment-slot",
+    "pluralName": "appointment-slots",
+    "displayName": "Appointment Slot Lock"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "slotKey": {
+      "type": "string",
+      "required": true,
+      "unique": true,
+      "private": true
+    },
+    "doctorDocumentId": {
+      "type": "string",
+      "required": true,
+      "private": true
+    },
+    "dateTime": {
+      "type": "datetime",
+      "required": true,
+      "private": true
+    },
+    "appointmentDocumentId": {
+      "type": "string",
+      "private": true
+    }
+  }
+}

@@ -7,6 +7,7 @@ import {
   normalizeCaseStatus,
 } from '../../../utils/medical-case-workflow';
 import { sendCaseStatusEmail, sendNewLeadEmailToStaff } from '../../../utils/case-email';
+import { PATIENT_VISIBLE_CASE_EVENT_TYPES } from '../../../utils/case-event-policy';
 
 const DEFAULT_POPULATE = {
   patient: { fields: ['id', 'documentId', 'fullName', 'email', 'phone', 'country', 'language', 'timezone'] },
@@ -163,7 +164,8 @@ function hasAssignmentChange(data: Record<string, any>) {
 }
 
 const CASE_DECISIONS = ['treatment_in_kazakhstan', 'local_treatment', 'needs_more_documents'];
-const PATIENT_HIDDEN_EVENT_TYPES = ['DOCTOR_DECISION', 'COMMISSION_DECISION'];
+const PREFERRED_CONTACT_METHODS = ['phone', 'whatsapp', 'telegram', 'email', 'instagram'];
+const MAX_CUSTOM_CONTACT_LENGTH = 80;
 const COMMISSION_STATUS_DECISIONS: Record<string, string> = {
   TREATMENT_IN_KAZAKHSTAN: 'treatment_in_kazakhstan',
   LOCAL_TREATMENT: 'local_treatment',
@@ -174,6 +176,41 @@ function validateCaseDecision(value: any, field: string) {
   if (value === undefined || value === null || value === '') return null;
   if (!CASE_DECISIONS.includes(value)) return `${field} must be one of: ${CASE_DECISIONS.join(', ')}`;
   return null;
+}
+
+function validatePreferredArrivalDate(desiredDates: any) {
+  if (desiredDates === undefined || desiredDates === null) return null;
+  const value = typeof desiredDates === 'string'
+    ? desiredDates
+    : desiredDates?.preferredArrivalDate;
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return 'preferredArrivalDate must use YYYY-MM-DD with a four-digit year';
+  }
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    return 'preferredArrivalDate must be a valid calendar date';
+  }
+  return null;
+}
+
+function validatePreferredContact(value: any, required = false) {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return required ? 'preferredContact is required' : null;
+  }
+  if (typeof value !== 'string') return 'preferredContact must be a string';
+  const normalized = value.trim();
+  if (PREFERRED_CONTACT_METHODS.includes(normalized)) return null;
+  if (normalized.startsWith('other:')) {
+    const customValue = normalized.slice('other:'.length).trim();
+    if (!customValue) return 'Custom preferredContact is required';
+    if (customValue.length > MAX_CUSTOM_CONTACT_LENGTH) {
+      return `Custom preferredContact must not exceed ${MAX_CUSTOM_CONTACT_LENGTH} characters`;
+    }
+    return null;
+  }
+  return `preferredContact must be one of: ${[...PREFERRED_CONTACT_METHODS, 'other'].join(', ')}`;
 }
 
 function redactCaseForRole(medicalCase: any, role: string) {
@@ -197,7 +234,12 @@ function redactCaseForRole(medicalCase: any, role: string) {
         })
         : [],
       case_events: Array.isArray(medicalCase.case_events)
-        ? medicalCase.case_events.filter((event: any) => !PATIENT_HIDDEN_EVENT_TYPES.includes(event?.eventType))
+        ? medicalCase.case_events
+          .filter((event: any) => PATIENT_VISIBLE_CASE_EVENT_TYPES.includes(event?.eventType))
+          .map((event: any) => ({
+            ...event,
+            actor: event.actor ? pickObjectFields(event.actor, ['id', 'documentId', 'fullName', 'userRole']) : null,
+          }))
         : [],
       clinic: null,
     };
@@ -250,11 +292,17 @@ function redactCaseForRole(medicalCase: any, role: string) {
   return { ...medicalCase, clinic: null };
 }
 
-async function createCaseEvent(strapi: any, payload: Record<string, any>) {
+async function createCaseEvent(
+  strapi: any,
+  payload: Record<string, any>,
+  options: { required?: boolean } = {},
+) {
   try {
-    await strapi.documents('api::case-event.case-event').create({ data: payload });
+    return await strapi.documents('api::case-event.case-event').create({ data: payload });
   } catch (error) {
     strapi.log.error('medical-case case-event create failed:', error);
+    if (options.required) throw error;
+    return null;
   }
 }
 
@@ -396,6 +444,11 @@ export default factories.createCoreController('api::medical-case.medical-case' a
     if (createDoctorRecommendationError) return ctx.badRequest(createDoctorRecommendationError);
     const createCommissionDecisionError = validateCaseDecision(data.commissionDecision, 'commissionDecision');
     if (createCommissionDecisionError) return ctx.badRequest(createCommissionDecisionError);
+    const createArrivalDateError = validatePreferredArrivalDate(data.desiredDates);
+    if (createArrivalDateError) return ctx.badRequest(createArrivalDateError);
+    const createPreferredContactError = validatePreferredContact(data.preferredContact, role === 'patient');
+    if (createPreferredContactError) return ctx.badRequest(createPreferredContactError);
+    if (typeof data.preferredContact === 'string') data.preferredContact = data.preferredContact.trim();
 
     if (role === 'patient') {
       data.patient = user.documentId;
@@ -404,19 +457,21 @@ export default factories.createCoreController('api::medical-case.medical-case' a
       data.patient = await resolveUserDocumentId(strapi, body.patient);
     }
 
-    const created = await strapi.documents('api::medical-case.medical-case' as any).create({
-      data,
-      status: 'published',
-      populate: DEFAULT_POPULATE,
-    });
-
-    await createCaseEvent(strapi, {
-      medical_case: created.documentId || created.id,
-      actor: user.documentId || user.id,
-      eventType: 'CREATED',
-      toStatus: created.status || 'NEW_LEAD',
-      message: 'Medical case created',
-      metadata: { role },
+    const created = await strapi.db.transaction(async () => {
+      const saved = await strapi.documents('api::medical-case.medical-case' as any).create({
+        data,
+        status: 'published',
+        populate: DEFAULT_POPULATE,
+      });
+      await createCaseEvent(strapi, {
+        medical_case: saved.documentId || saved.id,
+        actor: user.documentId || user.id,
+        eventType: 'CREATED',
+        toStatus: saved.status || 'NEW_LEAD',
+        message: 'Medical case created',
+        metadata: { role },
+      }, { required: true });
+      return saved;
     });
 
     try {
@@ -456,6 +511,13 @@ export default factories.createCoreController('api::medical-case.medical-case' a
     if (doctorRecommendationError) return ctx.badRequest(doctorRecommendationError);
     const commissionDecisionError = validateCaseDecision(data.commissionDecision, 'commissionDecision');
     if (commissionDecisionError) return ctx.badRequest(commissionDecisionError);
+    const arrivalDateError = validatePreferredArrivalDate(data.desiredDates);
+    if (arrivalDateError) return ctx.badRequest(arrivalDateError);
+    if (data.preferredContact !== undefined) {
+      const preferredContactError = validatePreferredContact(data.preferredContact, role === 'patient');
+      if (preferredContactError) return ctx.badRequest(preferredContactError);
+      data.preferredContact = data.preferredContact.trim();
+    }
 
     if (data.status !== undefined) {
       const normalizedToStatus = normalizeCaseStatus(data.status);
@@ -490,47 +552,91 @@ export default factories.createCoreController('api::medical-case.medical-case' a
       data.coordinator = await resolveUserDocumentId(strapi, data.coordinator);
     }
 
-    const updated = await strapi.documents('api::medical-case.medical-case' as any).update({
-      documentId: ctx.params.id,
-      data,
-      status: 'published',
-      populate: DEFAULT_POPULATE,
-    });
-
     const previousStatus = normalizeCaseStatus((existingCase as any).status) || (existingCase as any).status;
-    if (data.status && data.status !== previousStatus) {
-      await createCaseEvent(strapi, {
-        medical_case: updated.documentId || updated.id,
-        actor: user.documentId || user.id,
-        eventType: 'STATUS_CHANGED',
-        fromStatus: previousStatus,
-        toStatus: data.status,
-        message: `Status changed from ${previousStatus} to ${data.status}`,
-        metadata: { role },
-      });
+    const isDoctorDecision = role === 'doctor'
+      && previousStatus !== 'COMMISSION_REVIEW'
+      && data.status === 'COMMISSION_REVIEW';
+    const isCommissionDecision = previousStatus === 'COMMISSION_REVIEW' && !!COMMISSION_STATUS_DECISIONS[data.status];
+    let updated: any;
 
-      // Email patient about the status change (async — don't block response)
+    try {
+      // Status, assignment and decision events form one business operation. Strapi's
+      // transaction context automatically binds both Document Service calls to the
+      // same DB transaction, so a failed audit event cannot leave a half-saved case.
+      updated = await strapi.db.transaction(async () => {
+        const saved = await strapi.documents('api::medical-case.medical-case' as any).update({
+          documentId: ctx.params.id,
+          data,
+          status: 'published',
+          populate: DEFAULT_POPULATE,
+        });
+
+        if (data.status && data.status !== previousStatus) {
+          await createCaseEvent(strapi, {
+            medical_case: saved.documentId || saved.id,
+            actor: user.documentId || user.id,
+            eventType: 'STATUS_CHANGED',
+            fromStatus: previousStatus,
+            toStatus: data.status,
+            message: `Status changed from ${previousStatus} to ${data.status}`,
+            metadata: { role },
+          }, { required: true });
+        }
+
+        if (isDoctorDecision) {
+          await createCaseEvent(strapi, {
+            medical_case: saved.documentId || saved.id,
+            actor: user.documentId || user.id,
+            eventType: 'DOCTOR_DECISION',
+            fromStatus: previousStatus,
+            toStatus: data.status,
+            message: 'Doctor submitted a recommendation for commission review.',
+            metadata: { decision: data.doctorRecommendation },
+          }, { required: true });
+        }
+
+        if (isCommissionDecision) {
+          await createCaseEvent(strapi, {
+            medical_case: saved.documentId || saved.id,
+            actor: user.documentId || user.id,
+            eventType: 'COMMISSION_DECISION',
+            fromStatus: previousStatus,
+            toStatus: data.status,
+            message: 'Commission finalized the medical case decision.',
+            metadata: { decision: data.commissionDecision },
+          }, { required: true });
+        }
+
+        if (hasAssignmentChange(data)) {
+          await createCaseEvent(strapi, {
+            medical_case: saved.documentId || saved.id,
+            actor: user.documentId || user.id,
+            eventType: 'ASSIGNED',
+            fromStatus: previousStatus,
+            toStatus: saved.status,
+            message: 'Case assignment updated',
+            metadata: {
+              role,
+              changedFields: Object.keys(data).filter((field) => ['manager', 'coordinator', 'clinic', 'doctor'].includes(field)),
+            },
+          }, { required: true });
+        }
+
+        return saved;
+      });
+    } catch (error) {
+      strapi.log.error(`medical-case atomic update failed for ${ctx.params.id}:`, error);
+      return ctx.internalServerError('Medical case update failed. No changes were saved.');
+    }
+
+    if (data.status && data.status !== previousStatus) {
+      // Notifications are intentionally sent only after the DB transaction commits.
       sendCaseStatusEmail(strapi, updated as any, data.status).catch(() => {});
     }
 
     if (data.status === 'DOCTOR_ASSIGNED' && data.doctor) {
       // Also email when doctor is newly assigned even if status didn't change
       sendCaseStatusEmail(strapi, updated as any, 'DOCTOR_ASSIGNED').catch(() => {});
-    }
-
-    if (hasAssignmentChange(data)) {
-      await createCaseEvent(strapi, {
-        medical_case: updated.documentId || updated.id,
-        actor: user.documentId || user.id,
-        eventType: 'ASSIGNED',
-        fromStatus: previousStatus,
-        toStatus: updated.status,
-        message: 'Case assignment updated',
-        metadata: {
-          role,
-          changedFields: Object.keys(data).filter((field) => ['manager', 'coordinator', 'clinic', 'doctor'].includes(field)),
-        },
-      });
     }
 
     return { data: redactCaseForRole(updated, role) };

@@ -11,6 +11,7 @@ import {
   Bell,
   Loader2,
   MessageCircle,
+  ChevronDown,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -20,13 +21,14 @@ import useAuthStore from '../../stores/authStore'
 import useAppointmentStore from '../../stores/appointmentStore'
 import useDocumentStore from '../../stores/documentStore'
 import useChatStore from '../../stores/chatStore'
-import { formatRelativeDate } from '../../utils/helpers'
 import { getMediaUrl, getServerNow, medicalCasesAPI, normalizeResponse } from '../../services/api'
 import { formatCaseStatus, normalizeCaseStatus } from '../../utils/medicalCaseWorkflow'
 import CaseSlotPicker from '../../components/cases/CaseSlotPicker'
+import { formatDateTimeInTimeZone, getDeviceTimeZone } from '../../utils/kazakhstanTime'
 
 function PatientDashboard() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const viewerTimeZone = getDeviceTimeZone()
   const { user } = useAuthStore()
   const { appointments, fetchAppointments, isLoading: appointmentsLoading } = useAppointmentStore()
   const { documents, fetchDocuments, isLoading: documentsLoading } = useDocumentStore()
@@ -34,6 +36,7 @@ function PatientDashboard() {
   const [medicalCases, setMedicalCases] = useState([])
   const [casesLoading, setCasesLoading] = useState(false)
   const [slotPickerCase, setSlotPickerCase] = useState(null)
+  const [statsExpandedOverride, setStatsExpandedOverride] = useState(null)
 
   const [stats, setStats] = useState({
     totalConsultations: 0,
@@ -124,6 +127,9 @@ function PatientDashboard() {
   ]
 
   const isLoading = appointmentsLoading || documentsLoading
+  const statsLoading = appointmentsLoading || documentsLoading || chatsLoading
+  const hasStatsActivity = Object.values(stats).some(value => value > 0)
+  const statsExpanded = statsExpandedOverride ?? (!statsLoading && hasStatsActivity)
 
   const BOOKING_NEEDED_STATUSES = ['DOCTOR_ASSIGNED', 'WAITING_PATIENT_CONFIRMATION', 'UNDER_REVIEW', 'DOCUMENTS_UPLOADED']
   const casesNeedingBooking = medicalCases.filter(item =>
@@ -227,51 +233,75 @@ function PatientDashboard() {
       </Card>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4 sm:p-6">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-sky-500 flex items-center justify-center shrink-0">
-              <Video className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">{stats.totalConsultations}</p>
-              <p className="text-sm text-slate-500">{t('patient.stat_consultations')}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4 sm:p-6">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 flex items-center justify-center shrink-0">
-              <Calendar className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">{stats.upcomingCount}</p>
-              <p className="text-sm text-slate-500">{t('patient.stat_upcoming')}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4 sm:p-6">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shrink-0">
-              <FileText className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">{stats.documentsCount}</p>
-              <p className="text-sm text-slate-500">{t('patient.stat_documents')}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 p-4 sm:p-6">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center shrink-0">
-              <MessageCircle className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">{stats.unreadMessages}</p>
-              <p className="text-sm text-slate-500">{t('patient.stat_messages')}</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="space-y-3">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl text-left hover:border-slate-300 transition-colors"
+          aria-expanded={statsExpanded}
+          aria-controls="patient-dashboard-stats"
+          onClick={() => setStatsExpandedOverride(!statsExpanded)}
+        >
+          <div>
+            <p className="font-semibold text-slate-900">{t('patient.stats_title')}</p>
+            {!statsLoading && !hasStatsActivity && (
+              <p className="text-sm text-slate-500 mt-0.5">{t('patient.stats_empty')}</p>
+            )}
+          </div>
+          {statsLoading ? (
+            <Loader2 className="w-5 h-5 text-slate-400 animate-spin shrink-0" />
+          ) : (
+            <ChevronDown className={`w-5 h-5 text-slate-500 shrink-0 transition-transform ${statsExpanded ? 'rotate-180' : ''}`} />
+          )}
+        </button>
+
+        {statsExpanded && (
+          <div id="patient-dashboard-stats" className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
+            <Card>
+              <CardContent className="flex items-center gap-4 p-4 sm:p-6">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-sky-500 flex items-center justify-center shrink-0">
+                  <Video className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{stats.totalConsultations}</p>
+                  <p className="text-sm text-slate-500">{t('patient.stat_consultations')}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-4 p-4 sm:p-6">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 flex items-center justify-center shrink-0">
+                  <Calendar className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{stats.upcomingCount}</p>
+                  <p className="text-sm text-slate-500">{t('patient.stat_upcoming')}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-4 p-4 sm:p-6">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shrink-0">
+                  <FileText className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{stats.documentsCount}</p>
+                  <p className="text-sm text-slate-500">{t('patient.stat_documents')}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-4 p-4 sm:p-6">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center shrink-0">
+                  <MessageCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-slate-900">{stats.unreadMessages}</p>
+                  <p className="text-sm text-slate-500">{t('patient.stat_messages')}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
 
       {/* Quick Actions */}
@@ -347,7 +377,7 @@ function PatientDashboard() {
                           <div className="flex items-center gap-2 mt-1">
                             <Clock className="w-3 h-3 text-slate-400" />
                             <span className="text-xs text-slate-600">
-                              {formatRelativeDate(appointment.dateTime)}
+                              {formatDateTimeInTimeZone(appointment.dateTime, viewerTimeZone, i18n.language)}
                             </span>
                           </div>
                         </div>
@@ -356,9 +386,9 @@ function PatientDashboard() {
                         <Badge variant={appointment.status === 'confirmed' ? 'primary' : 'default'}>
                           {appointment.type === 'video' ? t('patient.type_video') : t('patient.type_chat')}
                         </Badge>
-                        {canJoin && appointment.roomId && (
+                        {appointment.roomId && (
                           <Link to={`/consultation/${appointment.roomId}`}>
-                            <Button size="sm" leftIcon={<Video className="w-4 h-4" />}>
+                            <Button size="sm" variant={canJoin ? 'primary' : 'secondary'} leftIcon={<Video className="w-4 h-4" />}>
                               {t('patient.join')}
                             </Button>
                           </Link>

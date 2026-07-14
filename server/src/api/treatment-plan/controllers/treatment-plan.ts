@@ -143,16 +143,50 @@ export default factories.createCoreController(UID, () => ({
       if (!(existing as any).sentAt && !data.sentAt) data.sentAt = new Date().toISOString();
     }
 
-    const item = await strapi.documents(UID).update({ documentId: ctx.params.id, data, status: 'published', populate: '*' });
-
     const caseStatus = normalizeCaseStatus((existing as any).medical_case?.status);
-    if (data.status === 'ACCEPTED' && (existing as any).medical_case?.documentId && caseStatus === 'TREATMENT_IN_KAZAKHSTAN') {
-      await strapi.documents('api::medical-case.medical-case' as any).update({
-        documentId: (existing as any).medical_case.documentId,
-        data: { status: 'TRAVEL_PREPARATION' } as any,
-        status: 'published',
-      });
+    const caseDocumentId = (existing as any).medical_case?.documentId;
+    const isPatientDecision = role === 'patient' && ['ACCEPTED', 'DECLINED'].includes(data.status);
+    let nextCaseStatus: string | undefined;
+    if (isPatientDecision && caseStatus === 'WAITING_PATIENT_CONFIRMATION') {
+      nextCaseStatus = data.status === 'ACCEPTED' ? 'WAITING_PAYMENT' : 'DOCTOR_ASSIGNED';
+    } else if (isPatientDecision && data.status === 'ACCEPTED' && caseStatus === 'TREATMENT_IN_KAZAKHSTAN') {
+      nextCaseStatus = 'TRAVEL_PREPARATION';
     }
+
+    const item = await strapi.db.transaction(async () => {
+      const saved = await strapi.documents(UID).update({
+        documentId: ctx.params.id,
+        data,
+        status: 'published',
+        populate: '*',
+      });
+
+      if (nextCaseStatus && caseDocumentId) {
+        await strapi.documents('api::medical-case.medical-case' as any).update({
+          documentId: caseDocumentId,
+          data: { status: nextCaseStatus } as any,
+          status: 'published',
+        });
+      }
+
+      if (isPatientDecision && caseDocumentId) {
+        await strapi.documents('api::case-event.case-event' as any).create({
+          data: {
+            medical_case: caseDocumentId,
+            actor: user.documentId || user.id,
+            eventType: data.status === 'ACCEPTED' ? 'PLAN_ACCEPTED' : 'PLAN_DECLINED',
+            fromStatus: caseStatus,
+            toStatus: nextCaseStatus || caseStatus,
+            message: data.status === 'ACCEPTED'
+              ? 'Patient accepted the treatment plan.'
+              : 'Patient declined the treatment plan.',
+            metadata: { planId: (existing as any).documentId || (existing as any).id },
+          },
+        });
+      }
+
+      return saved;
+    });
 
     return { data: item };
   },

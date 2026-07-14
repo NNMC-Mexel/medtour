@@ -108,7 +108,8 @@
       "type": "string"
     },
     "preferredContact": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 100
     },
     "leadSource": {
       "type": "string"
