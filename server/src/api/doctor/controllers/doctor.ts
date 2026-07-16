@@ -22,21 +22,16 @@ const ADMIN_ONLY_FIELDS = [
   'treatmentDepartments',
 ];
 
-const TREATMENT_DEPARTMENT_SLUGS = new Set([
-  'neurosurgery',
-  'therapy',
-  'urology',
-  'general-thoracic-surgery',
-  'interventional-cardiology',
-  'arrhythmology',
-  'gynecology',
-  'cardiac-surgery',
-]);
+const TREATMENT_DEPARTMENT_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function hasValidTreatmentDepartments(value: unknown) {
   return Array.isArray(value)
     && new Set(value).size === value.length
-    && value.every((slug) => typeof slug === 'string' && TREATMENT_DEPARTMENT_SLUGS.has(slug));
+    && value.every((slug) => (
+      typeof slug === 'string'
+      && slug.length <= 80
+      && TREATMENT_DEPARTMENT_SLUG_PATTERN.test(slug)
+    ));
 }
 
 export default factories.createCoreController('api::doctor.doctor', ({ strapi }) => ({

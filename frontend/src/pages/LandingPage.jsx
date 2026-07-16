@@ -736,7 +736,7 @@ function LandingPage() {
                                             </h3>
                                             <p className='mt-2 text-sm leading-6 text-slate-500'>{item.displayShort}</p>
                                             <p className='mt-auto pt-5 text-xs font-semibold uppercase tracking-wider text-teal-700'>
-                                                {department.programs.length} {i18n.language === 'en' ? 'programs' : i18n.language === 'kk' ? 'бағдарлама' : 'программ'}
+                                                {(item.programs || []).length} {i18n.language === 'en' ? 'programs' : i18n.language === 'kk' ? 'бағдарлама' : 'программ'}
                                             </p>
                                         </CardContent>
                                     </Card>

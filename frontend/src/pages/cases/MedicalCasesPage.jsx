@@ -762,6 +762,7 @@ function MedicalCasesPage() {
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
                 placeholder={t('cases.all_statuses')}
+                allowEmptySelection
                 className="min-w-48"
                 options={MEDICAL_CASE_STATUSES.map(value => ({ value, label: formatStatus(value, t) }))}
               />

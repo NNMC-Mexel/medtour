@@ -11,12 +11,13 @@ import Modal from '../../components/ui/Modal'
 import Badge from '../../components/ui/Badge'
 import ImageCropModal from '../../components/ui/ImageCropModal'
 import { useToast } from '../../components/ui/Toast'
-import api, { doctorsAPI, getMediaUrl, normalizeResponse, specializationsAPI, uploadFile } from '../../services/api'
-import { TREATMENT_DEPARTMENTS, localizeDepartment } from '../../data/treatmentDepartments'
+import api, { contentAPI, doctorsAPI, getMediaUrl, normalizeResponse, specializationsAPI, uploadFile } from '../../services/api'
+import { TREATMENT_DEPARTMENTS, localizeDepartment, mergeTreatmentDepartments } from '../../data/treatmentDepartments'
 
 const defaultForm = {
   username: '',
   email: '',
+  phone: '',
   password: '',
   confirmPassword: '',
   fullName: '',
@@ -36,6 +37,71 @@ const defaultForm = {
   breakEnd: '14:00',
   slotDuration: '30',
   workingDays: '1,2,3,4,5',
+}
+
+const timeOptions = Array.from({ length: 96 }, (_, index) => {
+  const hours = String(Math.floor(index / 4)).padStart(2, '0')
+  const minutes = String((index % 4) * 15).padStart(2, '0')
+  const value = `${hours}:${minutes}`
+  return { value, label: value }
+})
+
+const weekdayKeys = [
+  'weekday_mon',
+  'weekday_tue',
+  'weekday_wed',
+  'weekday_thu',
+  'weekday_fri',
+  'weekday_sat',
+  'weekday_sun',
+]
+
+function WorkingDaysSelect({ value, onChange, t }) {
+  const selectedDays = String(value || '')
+    .split(',')
+    .map(Number)
+    .filter((day) => day >= 1 && day <= 7)
+
+  const toggleDay = (day) => {
+    const nextDays = selectedDays.includes(day)
+      ? selectedDays.filter((selectedDay) => selectedDay !== day)
+      : [...selectedDays, day]
+
+    onChange(nextDays.sort((a, b) => a - b).join(','))
+  }
+
+  const summary = selectedDays.length
+    ? selectedDays.map((day) => t(`admin_doc.${weekdayKeys[day - 1]}`)).join(', ')
+    : t('admin_doc.working_days_placeholder')
+
+  return (
+    <div className='space-y-1.5'>
+      <label className='block text-sm font-medium text-slate-700'>{t('admin_doc.label_working_days')}</label>
+      <details className='group relative'>
+        <summary className='flex w-full cursor-pointer list-none items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 transition-colors hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500'>
+          <span className={selectedDays.length ? '' : 'text-slate-400'}>{summary}</span>
+          <span className='text-slate-400 transition-transform group-open:rotate-180'>⌄</span>
+        </summary>
+        <div className='mt-2 grid w-full gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-lg sm:grid-cols-2'>
+          {weekdayKeys.map((key, index) => {
+            const day = index + 1
+            return (
+              <label key={key} className='flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 hover:bg-slate-50'>
+                <input
+                  type='checkbox'
+                  checked={selectedDays.includes(day)}
+                  onChange={() => toggleDay(day)}
+                  className='h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500'
+                />
+                <span className='text-sm text-slate-700'>{t(`admin_doc.${key}`)}</span>
+              </label>
+            )
+          })}
+        </div>
+      </details>
+      <p className='text-sm text-slate-500'>{t('admin_doc.hint_working_days')}</p>
+    </div>
+  )
 }
 
 const extractUser = (value) => {
@@ -80,6 +146,7 @@ function AdminDoctors({ readonly = false }) {
   const toast = useToast()
   const [doctors, setDoctors] = useState([])
   const [specializations, setSpecializations] = useState([])
+  const [treatmentDepartments, setTreatmentDepartments] = useState(TREATMENT_DEPARTMENTS)
   const [search, setSearch] = useState('')
   const [specFilter, setSpecFilter] = useState('all')
   const [isLoading, setIsLoading] = useState(true)
@@ -93,7 +160,7 @@ function AdminDoctors({ readonly = false }) {
   const [cropModalOpen, setCropModalOpen] = useState(false)
   const [cropImageSrc, setCropImageSrc] = useState(null)
   const [doctorSaveState, setDoctorSaveState] = useState('idle')
-  const assignmentDepartment = TREATMENT_DEPARTMENTS.find((department) => department.slug === searchParams.get('department'))
+  const assignmentDepartment = treatmentDepartments.find((department) => department.slug === searchParams.get('department'))
   const assignmentCopy = {
     ru: { title: 'Назначение врачей', text: 'Откройте карточку врача и сохраните её — направление уже выбрано.', back: 'Завершить назначение' },
     en: { title: 'Assign doctors', text: 'Open a doctor and save the profile — the department is already selected.', back: 'Finish assigning' },
@@ -109,6 +176,7 @@ function AdminDoctors({ readonly = false }) {
       blocked: false,
       userRole: 'doctor',
       fullName: form.fullName.trim(),
+      phone: form.phone.trim() || null,
     }
     const response = await api.post('/api/users', payload)
     const created = extractCreatedUser(response)
@@ -121,13 +189,15 @@ function AdminDoctors({ readonly = false }) {
   const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
-      const [doctorsRes, specsRes] = await Promise.all([
+      const [doctorsRes, specsRes, globalRes] = await Promise.all([
         doctorsAPI.getAll({ includeInactive: true }),
         specializationsAPI.getAll(),
+        contentAPI.getGlobal().catch(() => null),
       ])
 
       const { data: doctorsData } = normalizeResponse(doctorsRes)
       const { data: specsData } = normalizeResponse(specsRes)
+      const { data: globalData } = normalizeResponse(globalRes) || {}
       const usersRes = await api.get('/api/users?populate[role][fields][0]=id&populate[role][fields][1]=type&populate[role][fields][2]=name&pagination[limit]=1000')
       const usersData = Array.isArray(usersRes.data) ? usersRes.data : []
       const usersMap = new Map(usersData.map((user) => [user.id, user]))
@@ -145,6 +215,7 @@ function AdminDoctors({ readonly = false }) {
 
       setDoctors(normalizedDoctors)
       setSpecializations(specsData || [])
+      setTreatmentDepartments(mergeTreatmentDepartments(globalData?.treatmentDepartments))
     } catch (error) {
       console.error('Error loading admin doctors:', error)
     } finally {
@@ -199,6 +270,7 @@ function AdminDoctors({ readonly = false }) {
     setForm({
       username: linkedUser?.username || '',
       email: linkedUser?.email || '',
+      phone: linkedUser?.phone || '',
       password: '',
       confirmPassword: '',
       fullName: doctor.fullName || '',
@@ -330,6 +402,7 @@ function AdminDoctors({ readonly = false }) {
             email: form.email.trim().toLowerCase(),
             userRole: 'doctor',
             fullName: form.fullName.trim(),
+            phone: form.phone.trim() || null,
           }
           if (form.password) {
             userPayload.password = form.password
@@ -537,7 +610,7 @@ function AdminDoctors({ readonly = false }) {
         }
       >
         <form onSubmit={handleSave} className='space-y-4'>
-          <div className='grid md:grid-cols-2 gap-4'>
+          <div className='grid md:grid-cols-3 gap-4'>
             <Input
               label={t('admin_doc.label_login')}
               required
@@ -552,6 +625,14 @@ function AdminDoctors({ readonly = false }) {
               value={form.email}
               onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
               placeholder='doctor@example.com'
+            />
+            <Input
+              label={t('admin_doc.label_phone')}
+              type='tel'
+              value={form.phone}
+              onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+              placeholder='+7 700 000 0000'
+              autoComplete='tel'
             />
           </div>
 
@@ -621,7 +702,7 @@ function AdminDoctors({ readonly = false }) {
               <p className='mt-1 text-xs text-slate-500'>{t('admin_doc.hint_treatment_departments')}</p>
             </div>
             <div className='mt-4 grid gap-2 sm:grid-cols-2'>
-              {TREATMENT_DEPARTMENTS.map((department) => {
+              {treatmentDepartments.map((department) => {
                 const localized = localizeDepartment(department, i18n.language)
                 const checked = form.treatmentDepartments.includes(department.slug)
                 return (
@@ -692,41 +773,39 @@ function AdminDoctors({ readonly = false }) {
           </div>
 
           <div className='grid md:grid-cols-2 gap-4'>
-            <Input
+            <Select
               label={t('admin_doc.label_start')}
               value={form.workStartTime}
               onChange={(e) => setForm((prev) => ({ ...prev, workStartTime: e.target.value }))}
-              placeholder='09:00'
+              options={timeOptions}
             />
-            <Input
+            <Select
               label={t('admin_doc.label_end')}
               value={form.workEndTime}
               onChange={(e) => setForm((prev) => ({ ...prev, workEndTime: e.target.value }))}
-              placeholder='18:00'
+              options={timeOptions}
             />
           </div>
 
           <div className='grid md:grid-cols-2 gap-4'>
-            <Input
+            <Select
               label={t('admin_doc.label_break_start')}
               value={form.breakStart}
               onChange={(e) => setForm((prev) => ({ ...prev, breakStart: e.target.value }))}
-              placeholder='12:00'
+              options={timeOptions}
             />
-            <Input
+            <Select
               label={t('admin_doc.label_break_end')}
               value={form.breakEnd}
               onChange={(e) => setForm((prev) => ({ ...prev, breakEnd: e.target.value }))}
-              placeholder='14:00'
+              options={timeOptions}
             />
           </div>
 
-          <Input
-            label={t('admin_doc.label_working_days')}
+          <WorkingDaysSelect
             value={form.workingDays}
-            onChange={(e) => setForm((prev) => ({ ...prev, workingDays: e.target.value }))}
-            placeholder='1,2,3,4,5'
-            hint={t('admin_doc.hint_working_days')}
+            onChange={(workingDays) => setForm((prev) => ({ ...prev, workingDays }))}
+            t={t}
           />
 
           <Textarea

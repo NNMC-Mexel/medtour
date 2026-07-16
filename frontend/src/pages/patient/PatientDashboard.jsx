@@ -26,6 +26,10 @@ import { formatCaseStatus, normalizeCaseStatus } from '../../utils/medicalCaseWo
 import CaseSlotPicker from '../../components/cases/CaseSlotPicker'
 import { formatDateTimeInTimeZone, getDeviceTimeZone } from '../../utils/kazakhstanTime'
 
+// The compact quick-action counters below replace the larger duplicated block.
+// Keep the accordion implementation available so it can be restored if needed.
+const SHOW_STATS_ACCORDION = false
+
 function PatientDashboard() {
   const { t, i18n } = useTranslation()
   const viewerTimeZone = getDeviceTimeZone()
@@ -114,14 +118,51 @@ function PatientDashboard() {
   )
 
   const quickActions = [
-    { label: t('patient.quick_book'), icon: Activity, to: '/patient/cases?create=1', color: 'bg-teal-500' },
+    {
+      label: t('patient.quick_book'),
+      icon: Activity,
+      to: '/patient/cases?create=1',
+      color: 'bg-teal-500',
+      primary: true,
+      metric: casesLoading ? t('common.loading') : t('patient.quick_cases_metric', { count: medicalCases.length }),
+    },
     ...(hasConsultationAccess
-      ? [{ label: t('patient.quick_appointments'), icon: Clock, to: '/patient/appointments', color: 'bg-sky-500' }]
+      ? [{
+          label: t('patient.quick_appointments'),
+          icon: Clock,
+          to: '/patient/appointments',
+          color: 'bg-sky-500',
+          surface: 'border-sky-200/70 bg-gradient-to-br from-sky-50 to-cyan-50/80 group-hover:border-sky-300',
+          metric: appointmentsLoading
+            ? t('common.loading')
+            : t('patient.quick_consultations_metric', {
+                total: stats.totalConsultations,
+                upcoming: stats.upcomingCount,
+              }),
+        }]
       : []),
     ...(hasMedicalCase
       ? [
-          { label: t('patient.quick_messages'), icon: MessageCircle, to: '/patient/chat', color: 'bg-violet-500' },
-          { label: t('patient.quick_documents'), icon: FileText, to: '/patient/documents', color: 'bg-amber-500' },
+          {
+            label: t('patient.quick_messages'),
+            icon: MessageCircle,
+            to: '/patient/chat',
+            color: 'bg-violet-500',
+            surface: 'border-violet-200/70 bg-gradient-to-br from-violet-50 to-purple-50/80 group-hover:border-violet-300',
+            metric: chatsLoading
+              ? t('common.loading')
+              : t('patient.quick_messages_metric', { count: stats.unreadMessages }),
+          },
+          {
+            label: t('patient.quick_documents'),
+            icon: FileText,
+            to: '/patient/documents',
+            color: 'bg-amber-500',
+            surface: 'border-amber-200/70 bg-gradient-to-br from-amber-50 to-orange-50/80 group-hover:border-amber-300',
+            metric: documentsLoading
+              ? t('common.loading')
+              : t('patient.quick_documents_metric', { count: stats.documentsCount }),
+          },
         ]
       : []),
   ]
@@ -232,8 +273,8 @@ function PatientDashboard() {
         </CardContent>
       </Card>
 
-      {/* Stats */}
-      <div className="space-y-3">
+      {/* Temporarily hidden: these metrics are now shown compactly in Quick Actions. */}
+      {SHOW_STATS_ACCORDION && <div>
         <button
           type="button"
           className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl text-left hover:border-slate-300 transition-colors"
@@ -250,12 +291,21 @@ function PatientDashboard() {
           {statsLoading ? (
             <Loader2 className="w-5 h-5 text-slate-400 animate-spin shrink-0" />
           ) : (
-            <ChevronDown className={`w-5 h-5 text-slate-500 shrink-0 transition-transform ${statsExpanded ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-5 h-5 text-slate-500 shrink-0 transition-transform duration-300 ease-in-out motion-reduce:transition-none ${statsExpanded ? 'rotate-180' : ''}`} />
           )}
         </button>
 
-        {statsExpanded && (
-          <div id="patient-dashboard-stats" className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
+        <div
+          id="patient-dashboard-stats"
+          aria-hidden={!statsExpanded}
+          className={`grid transition-[grid-template-rows,opacity,margin] duration-300 ease-in-out motion-reduce:transition-none ${
+            statsExpanded
+              ? 'grid-rows-[1fr] opacity-100 mt-3'
+              : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'
+          }`}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
             <Card>
               <CardContent className="flex items-center gap-4 p-4 sm:p-6">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-sky-500 flex items-center justify-center shrink-0">
@@ -300,20 +350,54 @@ function PatientDashboard() {
                 </div>
               </CardContent>
             </Card>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      </div>}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        {quickActions.map((action, index) => (
-          <Link key={index} to={action.to}>
-            <Card hover className="text-center cursor-pointer">
-              <CardContent className="p-4 sm:p-6">
-                <div className={`w-10 h-10 sm:w-12 sm:h-12 mx-auto ${action.color} rounded-xl flex items-center justify-center mb-2 sm:mb-3`}>
-                  <action.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+        {quickActions.map((action) => (
+          <Link
+            key={action.to}
+            to={action.to}
+            className={`group block h-full rounded-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/30 ${
+              action.primary ? 'col-span-2 md:col-span-1' : ''
+            }`}
+          >
+            <Card
+              hover={!action.primary}
+              className={action.primary
+                ? 'relative isolate h-full cursor-pointer overflow-hidden border-teal-400/60 bg-gradient-to-br from-teal-600 via-teal-500 to-cyan-500 text-center shadow-lg shadow-teal-600/20 transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl group-hover:shadow-teal-600/30'
+                : `h-full cursor-pointer text-center transition-colors duration-300 ${action.surface || 'border-slate-200 bg-slate-50'}`}
+            >
+              {action.primary && (
+                <>
+                  <div className="pointer-events-none absolute -right-10 -top-12 -z-10 h-36 w-36 rounded-full bg-white/10" />
+                  <div className="pointer-events-none absolute -bottom-16 -left-10 -z-10 h-40 w-40 rounded-full bg-cyan-200/10" />
+                  <div className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/20 transition-transform duration-300 group-hover:translate-x-1">
+                    <ChevronRight className="h-4 w-4" />
+                  </div>
+                </>
+              )}
+              <CardContent className={action.primary ? 'p-5 sm:p-6' : 'p-4 sm:p-6'}>
+                <div className={`mx-auto flex items-center justify-center rounded-xl ${
+                  action.primary
+                    ? 'mb-3 h-14 w-14 bg-white/20 shadow-inner ring-1 ring-white/30'
+                    : `mb-2 h-10 w-10 sm:mb-3 sm:h-12 sm:w-12 ${action.color}`
+                }`}>
+                  <action.icon className={action.primary ? 'h-7 w-7 text-white' : 'h-5 w-5 text-white sm:h-6 sm:w-6'} />
                 </div>
-                <p className="font-medium text-slate-900 text-xs sm:text-sm">{action.label}</p>
+                <p className={action.primary
+                  ? 'text-sm font-bold text-white sm:text-base'
+                  : 'font-medium text-slate-900 text-xs sm:text-sm'}>
+                  {action.label}
+                </p>
+                <p className={`mt-1 text-[11px] leading-tight sm:text-xs ${
+                  action.primary ? 'font-medium text-white/80' : 'text-slate-500'
+                }`}>
+                  {action.metric}
+                </p>
               </CardContent>
             </Card>
           </Link>

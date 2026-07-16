@@ -34,6 +34,7 @@ const copyByLanguage = {
     discard: 'Отменить изменения', discardConfirm: 'Отменить все несохранённые изменения?', leaveConfirm: 'Есть несохранённые изменения. Покинуть страницу?',
     invalidContent: 'Заполните название, краткое и полное описание, услуги и программы на всех языках.', invalidSettings: 'Проверьте иконку, цвет и уникальный порядок отделений.',
     doctorsAssigned: 'врачей в направлении', noDoctors: 'Врачи не назначены', assignDoctors: 'Назначить врачей', cleanupWarning: 'Контент сохранён, но старое изображение не удалось удалить.', imageHint: 'JPEG, PNG или WebP, до 10 МБ.',
+    addDepartment: 'Добавить отдел', newDepartmentName: 'Название нового отдела', newDepartmentFallback: 'Новый отдел', draft: 'Черновик',
   },
   en: {
     title: 'Treatment departments', subtitle: 'Edit public treatment department pages', save: 'Save changes', saved: 'Saved',
@@ -48,6 +49,7 @@ const copyByLanguage = {
     discard: 'Discard changes', discardConfirm: 'Discard all unsaved changes?', leaveConfirm: 'You have unsaved changes. Leave this page?',
     invalidContent: 'Complete the name, short and full descriptions, services and programs in every language.', invalidSettings: 'Check the icon, color and unique department order.',
     doctorsAssigned: 'doctors in department', noDoctors: 'No doctors assigned', assignDoctors: 'Assign doctors', cleanupWarning: 'Content was saved, but the previous image could not be deleted.', imageHint: 'JPEG, PNG or WebP, up to 10 MB.',
+    addDepartment: 'Add department', newDepartmentName: 'New department name', newDepartmentFallback: 'New department', draft: 'Draft',
   },
   kk: {
     title: 'Емдеу бөлімдері', subtitle: 'Емдеу бағыттарының ашық беттерін өңдеу', save: 'Өзгерістерді сақтау', saved: 'Сақталды',
@@ -62,6 +64,7 @@ const copyByLanguage = {
     discard: 'Өзгерістерден бас тарту', discardConfirm: 'Барлық сақталмаған өзгерістерден бас тарту керек пе?', leaveConfirm: 'Сақталмаған өзгерістер бар. Беттен шығу керек пе?',
     invalidContent: 'Барлық тілде атауды, қысқаша және толық сипаттаманы, қызметтер мен бағдарламаларды толтырыңыз.', invalidSettings: 'Белгішені, түсті және бөлімдердің бірегей ретін тексеріңіз.',
     doctorsAssigned: 'бағыттағы дәрігер', noDoctors: 'Дәрігерлер тағайындалмаған', assignDoctors: 'Дәрігер тағайындау', cleanupWarning: 'Мазмұн сақталды, бірақ алдыңғы суретті жою мүмкін болмады.', imageHint: 'JPEG, PNG немесе WebP, 10 МБ-қа дейін.',
+    addDepartment: 'Бөлім қосу', newDepartmentName: 'Жаңа бөлімнің атауы', newDepartmentFallback: 'Жаңа бөлім', draft: 'Жоба',
   },
 }
 
@@ -71,6 +74,7 @@ const validIcons = new Set(['Activity', 'Brain', 'Heart', 'HeartPulse', 'ScanLin
 const validAccents = new Set(['teal', 'sky', 'violet', 'amber', 'rose', 'indigo', 'pink', 'red'])
 const imageTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const maxHeroBytes = 10 * 1024 * 1024
+const defaultHeroImage = '/treatments/medical-department-hero.png'
 
 const cloneDepartments = (departments) => JSON.parse(JSON.stringify(departments))
 const getMediaId = (media) => media && typeof media === 'object' ? Number(media.id) || null : null
@@ -102,7 +106,7 @@ const isValidHeroMedia = (media) => {
   )
 }
 
-const isValidDepartmentContent = (department) => ['ru', 'en', 'kk'].every((locale) => {
+const isValidDepartmentContent = (department) => department.isActive === false || ['ru', 'en', 'kk'].every((locale) => {
   const content = department.content?.[locale]
   const requiredLists = ['services', 'conditions', 'technology', 'journey', 'benefits']
   return Boolean(
@@ -130,22 +134,50 @@ function LinesTextarea({ value, onCommit, onDirty, ...props }) {
   )
 }
 
-const mergeStoredWithDefaults = (stored, defaults) => defaults.map((fallback) => {
-  const incoming = Array.isArray(stored) ? stored.find((item) => item?.slug === fallback.slug) : null
-  if (!incoming) return fallback
-  return {
-    ...fallback,
-    ...incoming,
-    heroImage: normalizeLegacyHeroImage(incoming.heroImage || fallback.heroImage),
-    specialtyMatches: Array.isArray(incoming.specialtyMatches) ? incoming.specialtyMatches : fallback.specialtyMatches,
-    content: {
-      ...fallback.content,
-      ...(incoming.content || {}),
-      ru: { ...fallback.content.ru, ...(incoming.content?.ru || {}) },
-      en: { ...fallback.content.en, ...(incoming.content?.en || {}) },
-      kk: { ...fallback.content.kk, ...(incoming.content?.kk || {}) },
-    },
-  }
+const mergeStoredWithDefaults = (stored, defaults) => {
+  const mergedDefaults = defaults.map((fallback) => {
+    const incoming = Array.isArray(stored) ? stored.find((item) => item?.slug === fallback.slug) : null
+    if (!incoming) return fallback
+    return {
+      ...fallback,
+      ...incoming,
+      heroImage: normalizeLegacyHeroImage(incoming.heroImage || fallback.heroImage),
+      specialtyMatches: Array.isArray(incoming.specialtyMatches) ? incoming.specialtyMatches : fallback.specialtyMatches,
+      content: {
+        ...fallback.content,
+        ...(incoming.content || {}),
+        ru: { ...fallback.content.ru, ...(incoming.content?.ru || {}) },
+        en: { ...fallback.content.en, ...(incoming.content?.en || {}) },
+        kk: { ...fallback.content.kk, ...(incoming.content?.kk || {}) },
+      },
+    }
+  })
+  const defaultSlugs = new Set(defaults.map((item) => item.slug))
+  const customDepartments = Array.isArray(stored)
+    ? stored.filter((item) => item?.slug && !defaultSlugs.has(item.slug)).map((item) => ({
+        ...item,
+        heroImage: normalizeLegacyHeroImage(item.heroImage || defaultHeroImage),
+      }))
+    : []
+  return [...mergedDefaults, ...customDepartments]
+}
+
+const transliterateSlug = (value) => {
+  const map = { а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'i', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya', қ: 'q', ғ: 'g', ң: 'n', ө: 'o', ұ: 'u', ү: 'u', һ: 'h', і: 'i' }
+  return String(value || '').toLocaleLowerCase('ru').split('').map((char) => map[char] ?? char).join('')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70)
+}
+
+const emptyLocalizedContent = (title) => ({
+  title,
+  short: '',
+  summary: '',
+  services: [],
+  conditions: [],
+  technology: [],
+  journey: [],
+  benefits: [],
+  programs: [],
 })
 
 export default function AdminTreatmentDepartments() {
@@ -203,11 +235,15 @@ export default function AdminTreatmentDepartments() {
 
   useEffect(() => {
     let active = true
-    Promise.all([contentAPI.getGlobal(), doctorsAPI.getAll({ includeInactive: true })])
-      .then(([globalResponse, doctorsResponse]) => {
-        const { data } = normalizeResponse(globalResponse)
-        const { data: doctorData } = normalizeResponse(doctorsResponse)
+    Promise.allSettled([contentAPI.getGlobal(), doctorsAPI.getAll({ includeInactive: true })])
+      .then(([globalResult, doctorsResult]) => {
         if (!active) return
+        if (globalResult.status === 'rejected') throw globalResult.reason
+        const { data } = normalizeResponse(globalResult.value)
+        const { data: doctorData } = doctorsResult.status === 'fulfilled'
+          ? normalizeResponse(doctorsResult.value)
+          : { data: [] }
+        if (doctorsResult.status === 'rejected') console.warn('Could not load doctors for department counts:', doctorsResult.reason)
         const merged = mergeStoredWithDefaults(data?.treatmentDepartments, defaults)
         setDepartments(merged)
         setSavedDepartments(cloneDepartments(merged))
@@ -257,6 +293,35 @@ export default function AdminTreatmentDepartments() {
     programs: (activeContent.programs || []).filter((_, programIndex) => programIndex !== index),
   })
 
+  const addDepartment = () => {
+    const name = window.prompt(copy.newDepartmentName, '')?.trim()
+    if (!name) return
+    const baseSlug = transliterateSlug(name) || 'new-department'
+    const usedSlugs = new Set(departments.map((department) => department.slug))
+    let slug = baseSlug
+    let suffix = 2
+    while (usedSlugs.has(slug)) slug = `${baseSlug}-${suffix++}`
+    const nextOrder = Math.max(0, ...departments.map((department) => Number(department.sortOrder) || 0)) + 1
+    const department = {
+      slug,
+      icon: 'Activity',
+      accent: 'teal',
+      heroImage: defaultHeroImage,
+      sortOrder: nextOrder,
+      isActive: false,
+      specialtyMatches: [],
+      content: {
+        ru: emptyLocalizedContent(name),
+        en: emptyLocalizedContent(name),
+        kk: emptyLocalizedContent(name),
+      },
+    }
+    setDepartments((items) => [...items, department])
+    setActiveSlug(slug)
+    setActiveLocale('ru')
+    setIsDirty(true)
+  }
+
   const handleUpload = async (event) => {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -291,7 +356,9 @@ export default function AdminTreatmentDepartments() {
   const handleSave = async () => {
     const sortOrders = departments.map((department) => Number(department.sortOrder))
     const validSettings = departments.every((department) => (
-      validIcons.has(department.icon)
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(department.slug)
+      && department.slug.length <= 80
+      && validIcons.has(department.icon)
       && validAccents.has(department.accent)
       && isValidHeroMedia(department.heroImage)
       && Number.isInteger(Number(department.sortOrder))
@@ -368,6 +435,9 @@ export default function AdminTreatmentDepartments() {
 
       <div className='grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]'>
         <aside className='space-y-2 xl:sticky xl:top-24 xl:self-start'>
+          <Button type='button' variant='secondary' className='mb-3 w-full' onClick={addDepartment} leftIcon={<Plus className='h-4 w-4' />}>
+            {copy.addDepartment}
+          </Button>
           {departments.map((department) => (
             <button
               key={department.slug}
@@ -380,7 +450,9 @@ export default function AdminTreatmentDepartments() {
             >
               <div className='flex items-center justify-between gap-3'>
                 <span className='font-semibold text-slate-900'>{department.content?.[language]?.title || department.content?.ru?.title}</span>
-                {department.isActive !== false && <Check className='h-4 w-4 text-teal-600' />}
+                {department.isActive !== false
+                  ? <Check className='h-4 w-4 text-teal-600' />
+                  : <span className='text-[11px] font-medium text-amber-700'>{copy.draft}</span>}
               </div>
               <div className='mt-1 flex items-center justify-between gap-2 text-xs'>
                 <span className='text-slate-500'>{department.slug}</span>

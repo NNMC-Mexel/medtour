@@ -8,6 +8,7 @@ const Select = forwardRef(({
   error,
   options = [],
   placeholder,
+  allowEmptySelection = false,
   className,
   containerClassName,
   ...props
@@ -36,7 +37,7 @@ const Select = forwardRef(({
           )}
           {...props}
         >
-          <option value="" disabled>
+          <option value="" disabled={!allowEmptySelection}>
             {resolvedPlaceholder}
           </option>
           {options.map((option) => (

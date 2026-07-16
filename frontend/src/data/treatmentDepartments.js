@@ -216,6 +216,23 @@ export const TREATMENT_DEPARTMENTS = [
     technology: ['Аппараты искусственного кровообращения', 'Современная защита головного мозга', 'Малоинвазивные доступы MICS', 'Протоколы ускоренной реабилитации'],
     specialtyMatches: ['Кардиолог', 'Кардиохирург'], journey: commonJourney, benefits: commonBenefits,
   },
+  {
+    slug: 'heart-institute', icon: 'HeartPulse', accent: 'rose', heroImage,
+    title: { ru: 'Институт сердца', en: 'Heart Institute', kk: 'Жүрек институты' },
+    short: { ru: 'Полный цикл диагностики и лечения заболеваний сердца и сосудов', en: 'Complete diagnosis and treatment for heart and vascular disease', kk: 'Жүрек пен қан тамырлары ауруларын толық диагностикалау және емдеу' },
+    summary: 'Институт сердца ННМЦ объединяет кардиохирургию, интервенционную кардиологию и аритмологию. Пациент получает комплексную диагностику, индивидуальный план и полный цикл лечения — от дистанционной оценки документов до операции и послеоперационной реабилитации.',
+    services: ['Консультации кардиохирурга, интервенционного кардиолога и аритмолога', 'ЭКГ, Холтер, эхокардиография, КТ сердца и коронарография', 'Аортокоронарное шунтирование и операции на клапанах', 'Стентирование, IVUS, OCT, FFR/iFR и лечение CTO', 'Радиочастотная и криоаблация', 'Имплантация кардиостимуляторов, CRT и ICD', 'Кардиологическая реабилитация и Check-up программы'],
+    programs: [
+      { name: 'Малоинвазивное аортокоронарное шунтирование', text: 'Восстановление кровоснабжения миокарда, в том числе на работающем сердце и через минимальный доступ.', duration: '4–6 часов', stay: '7–10 дней' },
+      { name: 'Хирургия клапанов сердца', text: 'Пластика или замена клапана современным протезом, при возможности — малоинвазивным доступом.', duration: '3–5 часов', stay: '7–10 дней' },
+      { name: 'Стентирование коронарных артерий', text: 'Малоинвазивное восстановление кровотока с внутрисосудистой визуализацией IVUS или OCT.', duration: '30–90 минут', stay: '1–3 дня' },
+      { name: 'Катетерная аблация аритмий', text: 'Радиочастотное или криогенное лечение фибрилляции предсердий и других тахикардий.', duration: '2–4 часа', stay: '2–3 дня' },
+      { name: 'Cardio Check-up', text: 'Комплексная оценка сердечно-сосудистого риска с заключением специалистов и индивидуальным планом.', duration: '1–3 дня', stay: 'Не требуется' },
+    ],
+    conditions: ['Ишемическая болезнь сердца', 'Пороки клапанов сердца', 'Нарушения сердечного ритма', 'Аневризма и расслоение аорты', 'Хроническая сердечная недостаточность', 'Врождённые пороки сердца у взрослых'],
+    technology: ['Экспертная эхокардиография и КТ сердца', 'Ангиография, IVUS, OCT и FFR/iFR', 'Системы 3D-навигации и криоаблации', 'Аппараты искусственного кровообращения', 'Современные кардиостимуляторы, CRT и ICD'],
+    specialtyMatches: ['Кардиолог', 'Кардиохирург', 'Интервенционный кардиолог', 'Аритмолог'], journey: commonJourney, benefits: commonBenefits,
+  },
 ]
 
 const EN_CONTENT = {
@@ -313,6 +330,19 @@ const EN_CONTENT = {
     ],
     conditions: ['Coronary artery disease', 'Heart valve disease', 'Aortic aneurysm and dissection', 'Atrial fibrillation', 'Adult congenital heart disease', 'Reduced left ventricular ejection fraction'],
     technology: ['Cardiopulmonary bypass systems', 'Modern cerebral protection techniques', 'Minimally invasive MICS access', 'Enhanced recovery protocols'],
+  },
+  'heart-institute': {
+    summary: 'The NNMC Heart Institute brings cardiac surgery, interventional cardiology and arrhythmology together in one center. International patients receive coordinated diagnostics, an individual plan and complete care from remote record review through treatment and rehabilitation.',
+    services: ['Cardiac surgeon, interventional cardiologist and arrhythmologist consultations', 'ECG, Holter monitoring, echocardiography, cardiac CT and coronary angiography', 'Coronary bypass and heart valve surgery', 'PCI, IVUS, OCT, FFR/iFR and CTO treatment', 'Radiofrequency and cryoablation', 'Pacemaker, CRT and ICD implantation', 'Cardiac rehabilitation and check-up programs'],
+    programs: [
+      { name: 'Minimally invasive coronary bypass', text: 'Restoration of myocardial blood flow, including off-pump and minimally invasive approaches.', duration: '4–6 hours', stay: '7–10 days' },
+      { name: 'Heart valve surgery', text: 'Valve repair or replacement with a modern prosthesis, using minimally invasive access when suitable.', duration: '3–5 hours', stay: '7–10 days' },
+      { name: 'Coronary artery stenting', text: 'Minimally invasive blood-flow restoration supported by IVUS or OCT imaging.', duration: '30–90 minutes', stay: '1–3 days' },
+      { name: 'Catheter ablation for arrhythmia', text: 'Radiofrequency or cryoablation for atrial fibrillation and other tachyarrhythmias.', duration: '2–4 hours', stay: '2–3 days' },
+      { name: 'Cardio check-up', text: 'Comprehensive cardiovascular risk assessment with specialist conclusions and a personal plan.', duration: '1–3 days', stay: 'Outpatient' },
+    ],
+    conditions: ['Coronary artery disease', 'Heart valve disease', 'Heart rhythm disorders', 'Aortic aneurysm and dissection', 'Chronic heart failure', 'Adult congenital heart disease'],
+    technology: ['Expert echocardiography and cardiac CT', 'Angiography, IVUS, OCT and FFR/iFR', '3D mapping and cryoablation systems', 'Cardiopulmonary bypass systems', 'Modern pacemakers, CRT and ICD devices'],
   },
 }
 
@@ -412,6 +442,19 @@ const KK_CONTENT = {
     conditions: ['Жүректің ишемиялық ауруы', 'Жүрек қақпақшаларының ақаулары', 'Аорта аневризмасы және қатпарлануы', 'Жүрекшелер фибрилляциясы', 'Ересектердегі туа біткен жүрек ақаулары', 'Сол жақ қарыншаның шығару фракциясының төмендеуі'],
     technology: ['Жасанды қан айналымы аппараттары', 'Миды қорғаудың заманауи әдістері', 'MICS аз инвазивті қолжетімділігі', 'Жедел оңалту хаттамалары'],
   },
+  'heart-institute': {
+    summary: 'ҰҒМО Жүрек институты кардиохирургияны, интервенциялық кардиологияны және аритмологияны бір орталықта біріктіреді. Шетелдік пациенттер құжаттарды қашықтан бағалаудан бастап емдеу мен оңалтуға дейін үйлестірілген толық медициналық көмек алады.',
+    services: ['Кардиохирург, интервенциялық кардиолог және аритмолог консультациясы', 'ЭКГ, Холтер, эхокардиография, жүрек КТ және коронарография', 'Коронарлық шунттау және жүрек қақпақшаларына операциялар', 'Стенттеу, IVUS, OCT, FFR/iFR және CTO емдеу', 'Радиожиілікті және криоабляция', 'Кардиостимулятор, CRT және ICD имплантациясы', 'Кардиологиялық оңалту және Check-up бағдарламалары'],
+    programs: [
+      { name: 'Аз инвазивті коронарлық шунттау', text: 'Жұмыс істеп тұрған жүректе және шағын қолжетімділікпен миокардтың қанмен қамтылуын қалпына келтіру.', duration: '4–6 сағат', stay: '7–10 күн' },
+      { name: 'Жүрек қақпақшаларының хирургиясы', text: 'Қақпақшаны пластикалау немесе заманауи протезбен алмастыру, мүмкіндік болса аз инвазивті әдіспен.', duration: '3–5 сағат', stay: '7–10 күн' },
+      { name: 'Коронарлық артерияларды стенттеу', text: 'IVUS немесе OCT бақылауымен қан ағымын аз инвазивті қалпына келтіру.', duration: '30–90 минут', stay: '1–3 күн' },
+      { name: 'Аритмияның катетерлік абляциясы', text: 'Жүрекшелер фибрилляциясы мен басқа тахикардияларды радиожиілік немесе криоәдіспен емдеу.', duration: '2–4 сағат', stay: '2–3 күн' },
+      { name: 'Cardio Check-up', text: 'Мамандар қорытындысы және жеке жоспары бар жүрек-қан тамырлары қаупін кешенді бағалау.', duration: '1–3 күн', stay: 'Қажет емес' },
+    ],
+    conditions: ['Жүректің ишемиялық ауруы', 'Жүрек қақпақшаларының ақаулары', 'Жүрек ырғағының бұзылыстары', 'Аорта аневризмасы және қатпарлануы', 'Созылмалы жүрек жеткіліксіздігі', 'Ересектердегі туа біткен жүрек ақаулары'],
+    technology: ['Сараптамалық эхокардиография және жүрек КТ', 'Ангиография, IVUS, OCT және FFR/iFR', '3D-навигация және криоабляция жүйелері', 'Жасанды қан айналымы аппараттары', 'Заманауи кардиостимуляторлар, CRT және ICD құрылғылары'],
+  },
 }
 
 const contentFields = ['summary', 'services', 'programs', 'conditions', 'technology', 'journey', 'benefits']
@@ -445,20 +488,46 @@ export function createDefaultTreatmentDepartmentsForCms() {
 export function mergeTreatmentDepartments(cmsDepartments) {
   if (!Array.isArray(cmsDepartments) || cmsDepartments.length === 0) return TREATMENT_DEPARTMENTS
 
-  return TREATMENT_DEPARTMENTS.map((fallback, index) => {
-    const stored = cmsDepartments.find((item) => item?.slug === fallback.slug)
-    return stored
-      ? {
-          ...fallback,
-          ...stored,
-          sortOrder: Number(stored.sortOrder) || index + 1,
-          specialtyMatches: Array.isArray(stored.specialtyMatches) && stored.specialtyMatches.length > 0
-            ? stored.specialtyMatches
-            : fallback.specialtyMatches,
-          content: stored.content || {},
-        }
-      : fallback
+  const fallbackBySlug = new Map(TREATMENT_DEPARTMENTS.map((department) => [department.slug, department]))
+  const storedBySlug = new Map(cmsDepartments.filter((item) => item?.slug).map((item) => [item.slug, item]))
+  const merged = TREATMENT_DEPARTMENTS.map((fallback, index) => {
+    const stored = storedBySlug.get(fallback.slug)
+    return stored ? {
+      ...fallback,
+      ...stored,
+      sortOrder: Number(stored.sortOrder) || index + 1,
+      specialtyMatches: Array.isArray(stored.specialtyMatches) && stored.specialtyMatches.length > 0
+        ? stored.specialtyMatches
+        : fallback.specialtyMatches,
+      content: stored.content || {},
+    } : fallback
   })
+  for (const stored of cmsDepartments) {
+    if (stored?.slug && !fallbackBySlug.has(stored.slug)) {
+      const baseContent = stored.content?.ru || {}
+      merged.push({
+        ...stored,
+        title: stored.title || {
+          ru: stored.content?.ru?.title || stored.slug,
+          en: stored.content?.en?.title || stored.content?.ru?.title || stored.slug,
+          kk: stored.content?.kk?.title || stored.content?.ru?.title || stored.slug,
+        },
+        short: stored.short || {
+          ru: stored.content?.ru?.short || '',
+          en: stored.content?.en?.short || stored.content?.ru?.short || '',
+          kk: stored.content?.kk?.short || stored.content?.ru?.short || '',
+        },
+        summary: stored.summary || baseContent.summary || '',
+        services: Array.isArray(stored.services) ? stored.services : (baseContent.services || []),
+        programs: Array.isArray(stored.programs) ? stored.programs : (baseContent.programs || []),
+        conditions: Array.isArray(stored.conditions) ? stored.conditions : (baseContent.conditions || []),
+        technology: Array.isArray(stored.technology) ? stored.technology : (baseContent.technology || []),
+        journey: Array.isArray(stored.journey) ? stored.journey : (baseContent.journey || []),
+        benefits: Array.isArray(stored.benefits) ? stored.benefits : (baseContent.benefits || []),
+      })
+    }
+  }
+  return merged
     .filter((department) => department.isActive !== false)
     .sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0))
 }
@@ -476,6 +545,7 @@ const specialtyAliases = {
   arrhythmology: ['cardiologist', 'arrhythmologist', 'electrophysiologist', 'кардиолог', 'аритмолог'],
   gynecology: ['gynecologist', 'obstetrician-gynecologist', 'гинеколог', 'акушер-гинеколог'],
   'cardiac-surgery': ['cardiologist', 'cardiac surgeon', 'cardiothoracic surgeon', 'кардиолог', 'кардиохирург'],
+  'heart-institute': ['cardiologist', 'cardiac surgeon', 'interventional cardiologist', 'arrhythmologist', 'кардиолог', 'кардиохирург', 'интервенционный кардиолог', 'аритмолог'],
 }
 
 const normalizeMatchValue = (value) => String(value || '')
@@ -520,7 +590,7 @@ export function localizeDepartment(department, language = 'ru') {
     ...(localizedContent || {}),
     journey: localizedContent?.journey || (language === 'en' ? commonJourneyEn : language === 'kk' ? commonJourneyKk : department.journey),
     benefits: localizedContent?.benefits || (language === 'en' ? commonBenefitsEn : language === 'kk' ? commonBenefitsKk : department.benefits),
-    displayTitle: localizedContent?.title || department.title[language] || department.title.ru,
-    displayShort: localizedContent?.short || department.short[language] || department.short.ru,
+    displayTitle: localizedContent?.title || department.title?.[language] || department.title?.ru || department.slug,
+    displayShort: localizedContent?.short || department.short?.[language] || department.short?.ru || '',
   }
 }

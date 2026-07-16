@@ -4,30 +4,28 @@
 
 import { factories } from '@strapi/strapi';
 
-const DEPARTMENT_SLUGS = new Set([
-  'neurosurgery',
-  'therapy',
-  'urology',
-  'general-thoracic-surgery',
-  'interventional-cardiology',
-  'arrhythmology',
-  'gynecology',
-  'cardiac-surgery',
-]);
 const ICONS = new Set(['Activity', 'Brain', 'Heart', 'HeartPulse', 'ScanLine', 'Stethoscope', 'Syringe', 'Venus']);
 const ACCENTS = new Set(['teal', 'sky', 'violet', 'amber', 'rose', 'indigo', 'pink', 'red']);
 const LOCALES = ['ru', 'en', 'kk'];
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function validateTreatmentDepartments(value: unknown): string | null {
-  if (!Array.isArray(value) || value.length !== DEPARTMENT_SLUGS.size) {
-    return 'Treatment departments must contain all configured departments';
+  if (!Array.isArray(value) || value.length === 0 || value.length > 50) {
+    return 'Treatment departments must contain between 1 and 50 departments';
   }
   if (JSON.stringify(value).length > 1_000_000) return 'Treatment department content is too large';
 
   const slugs = new Set<string>();
   const orders = new Set<number>();
   for (const department of value as any[]) {
-    if (!department || typeof department !== 'object' || !DEPARTMENT_SLUGS.has(department.slug) || slugs.has(department.slug)) {
+    if (
+      !department
+      || typeof department !== 'object'
+      || typeof department.slug !== 'string'
+      || department.slug.length > 80
+      || !SLUG_PATTERN.test(department.slug)
+      || slugs.has(department.slug)
+    ) {
       return 'Treatment department slug is invalid or duplicated';
     }
     slugs.add(department.slug);
@@ -50,6 +48,10 @@ function validateTreatmentDepartments(value: unknown): string | null {
     )) {
       return 'Treatment department hero image is invalid';
     }
+
+    // Inactive departments are drafts and may be saved before all translations
+    // are ready. Public pages already filter them out.
+    if (department.isActive === false) continue;
 
     for (const locale of LOCALES) {
       const content = department.content?.[locale];

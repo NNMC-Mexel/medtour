@@ -57,7 +57,10 @@ export default function TreatmentDepartmentPage() {
         const { data } = normalizeResponse(response)
         if (active) setCmsDepartments(data?.treatmentDepartments || [])
       })
-      .catch((error) => console.error('Error loading treatment department content:', error))
+      .catch((error) => {
+        console.error('Error loading treatment department content:', error)
+        if (active) setCmsDepartments([])
+      })
     return () => { active = false }
   }, [slug])
 
@@ -82,6 +85,12 @@ export default function TreatmentDepartmentPage() {
     { value: '24/7', label: language === 'en' ? 'patient support' : language === 'kk' ? 'сүйемелдеу' : 'сопровождение' },
   ] : [], [department, language, localized, ui.specialists])
 
+  // Custom departments exist only in CMS. Wait for the global-content request
+  // before deciding that a slug is unknown; otherwise they are redirected on
+  // the first render while the request is still in flight.
+  if (!department && cmsDepartments === null) {
+    return <div className='flex min-h-[60vh] items-center justify-center'><Loader2 className='h-8 w-8 animate-spin text-teal-600' /></div>
+  }
   if (!department) return <Navigate to='/#specializations' replace />
 
   return (

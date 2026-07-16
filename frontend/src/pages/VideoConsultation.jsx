@@ -216,16 +216,22 @@ function VideoConsultation({
 
   const attachMediaStreams = useCallback(() => {
     if (localVideoRef.current && localStreamRef.current) {
-      localVideoRef.current.srcObject = localStreamRef.current
+      if (localVideoRef.current.srcObject !== localStreamRef.current) {
+        localVideoRef.current.srcObject = localStreamRef.current
+      }
+      localVideoRef.current.play()?.catch(() => {})
     }
     if (remoteVideoRef.current && remoteStreamRef.current) {
-      remoteVideoRef.current.srcObject = remoteStreamRef.current
+      if (remoteVideoRef.current.srcObject !== remoteStreamRef.current) {
+        remoteVideoRef.current.srcObject = remoteStreamRef.current
+      }
+      remoteVideoRef.current.play()?.catch(() => {})
     }
   }, [])
 
   useEffect(() => {
     attachMediaStreams()
-  }, [attachMediaStreams])
+  }, [attachMediaStreams, isMinimized])
 
   useEffect(() => {
     if (!isMinimized) return
