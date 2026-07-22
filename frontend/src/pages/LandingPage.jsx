@@ -21,6 +21,7 @@ import {
     Mail,
     MapPin,
     Play,
+    Pause,
     HeartPulse,
     UserCheck,
     Headphones,
@@ -371,7 +372,14 @@ function LandingPage() {
     const [doctors, setDoctors] = useState([]);
     const [treatmentDepartments, setTreatmentDepartments] = useState(TREATMENT_DEPARTMENTS);
     const [storedLandingConfig, setStoredLandingConfig] = useState(null);
+    const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+    const [isVideoReady, setIsVideoReady] = useState(false);
+    const [prefersReducedMotion, setPrefersReducedMotion] = useState(() =>
+        typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    );
 
+    const heroRef = useRef(null);
+    const videoRef = useRef(null);
     const cardRef = useRef(null);
     const [cardTransform, setCardTransform] = useState({
         rotateX: 0,
@@ -493,7 +501,7 @@ function LandingPage() {
     }, [t, i18n.language]);
 
     const handleCardMouseMove = (e) => {
-        if (!cardRef.current) return;
+        if (!cardRef.current || prefersReducedMotion) return;
         const card = cardRef.current;
         const rect = card.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
@@ -508,6 +516,51 @@ function LandingPage() {
     const handleCardMouseLeave = () => {
         setCardTransform({ rotateX: 0, rotateY: 0, scale: 1 });
     };
+
+    const handleHeroPointerMove = (event) => {
+        if (!heroRef.current || prefersReducedMotion) return;
+        const rect = heroRef.current.getBoundingClientRect();
+        const x = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
+        const y = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
+
+        heroRef.current.style.setProperty("--hero-shift-x", `${x * -8}px`);
+        heroRef.current.style.setProperty("--hero-shift-y", `${y * -6}px`);
+        heroRef.current.style.setProperty("--hero-glow-x", `${50 + x * 12}%`);
+        heroRef.current.style.setProperty("--hero-glow-y", `${45 + y * 10}%`);
+    };
+
+    const handleHeroPointerLeave = () => {
+        if (!heroRef.current) return;
+        heroRef.current.style.setProperty("--hero-shift-x", "0px");
+        heroRef.current.style.setProperty("--hero-shift-y", "0px");
+        heroRef.current.style.setProperty("--hero-glow-x", "50%");
+        heroRef.current.style.setProperty("--hero-glow-y", "45%");
+    };
+
+    const toggleHeroVideo = async () => {
+        if (!videoRef.current) return;
+
+        if (videoRef.current.paused) {
+            try {
+                await videoRef.current.play();
+            } catch {
+                setIsVideoPlaying(false);
+            }
+        } else {
+            videoRef.current.pause();
+        }
+    };
+
+    useEffect(() => {
+        const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+        const handleMotionPreference = () => {
+            setPrefersReducedMotion(motionPreference.matches);
+            if (motionPreference.matches) videoRef.current?.pause();
+        };
+
+        motionPreference.addEventListener?.("change", handleMotionPreference);
+        return () => motionPreference.removeEventListener?.("change", handleMotionPreference);
+    }, []);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -552,70 +605,113 @@ function LandingPage() {
     return (
         <div className='overflow-hidden'>
             {/* Hero Section */}
-            <section className='relative min-h-screen flex items-center'>
-                <div className='absolute inset-0'>
-                    <img src='/background.png' alt='' className='w-full h-full object-cover' />
-                    <div className='absolute inset-0 bg-gradient-to-r from-teal-800/85 via-teal-700/75 to-sky-800/65' />
-                </div>
-                <div className='absolute inset-0 overflow-hidden pointer-events-none'>
-                    <div className='absolute top-20 left-20 w-72 h-72 bg-white/10 rounded-full blur-3xl' />
-                    <div className='absolute bottom-20 right-20 w-96 h-96 bg-sky-300/10 rounded-full blur-3xl' />
+            <section
+                ref={heroRef}
+                className='hero-stage relative min-h-screen min-h-[100svh] flex items-center'
+                onPointerMove={handleHeroPointerMove}
+                onPointerLeave={handleHeroPointerLeave}>
+                <div className='absolute inset-0 overflow-hidden bg-slate-950'>
+                    <div
+                        className='hero-poster absolute inset-0 bg-cover bg-center'
+                        style={{ backgroundImage: "url('/medtour-clinic-poster.jpg')" }}
+                    />
+                    <video
+                        ref={videoRef}
+                        className={cn("hero-video absolute inset-0 w-full h-full object-cover", isVideoReady && "is-ready")}
+                        autoPlay={!prefersReducedMotion}
+                        muted
+                        loop
+                        playsInline
+                        preload='metadata'
+                        poster='/medtour-clinic-poster.jpg'
+                        onCanPlay={() => setIsVideoReady(true)}
+                        onPlay={() => setIsVideoPlaying(true)}
+                        onPause={() => setIsVideoPlaying(false)}
+                        aria-hidden='true'>
+                        <source src='/medtour-clinic-hero.mp4' type='video/mp4' />
+                    </video>
+                    <div className='hero-color-wash absolute inset-0' />
+                    <div className='absolute inset-0 bg-gradient-to-r from-slate-950/95 via-teal-950/72 to-slate-950/15' />
+                    <div className='absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/20' />
+                    <div className='hero-grid absolute inset-0 opacity-30' />
                 </div>
 
-                <div className='relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32'>
+                <div className='absolute inset-0 overflow-hidden pointer-events-none'>
+                    <div className='hero-ambient-orb absolute top-20 left-[38%] w-72 h-72 bg-teal-300/10 rounded-full blur-3xl' />
+                    <div className='hero-ambient-orb hero-ambient-orb-delayed absolute bottom-16 right-16 w-96 h-96 bg-sky-300/10 rounded-full blur-3xl' />
+                </div>
+
+                <div className='hero-reveal hero-delay-5 hidden lg:flex absolute top-28 right-8 xl:right-14 z-10 items-center gap-3 rounded-full border border-white/15 bg-slate-950/35 px-4 py-2.5 text-white shadow-xl backdrop-blur-md'>
+                    <span className='relative flex h-2.5 w-2.5'>
+                        <span className='absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-70' />
+                        <span className='relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400' />
+                    </span>
+                    <div>
+                        <p className='text-[10px] font-semibold uppercase tracking-[0.2em] text-white/55'>
+                            {t('landing.hero.video_kicker')}
+                        </p>
+                        <p className='flex items-center gap-1.5 text-sm font-medium'>
+                            <MapPin className='h-3.5 w-3.5 text-teal-300' />
+                            {t('landing.hero.video_location')}
+                        </p>
+                    </div>
+                </div>
+
+                <div className='relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32 lg:py-36'>
                     <div className='grid lg:grid-cols-2 gap-12 items-center'>
                         <div className='text-white'>
-                            <span className='inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full text-sm font-medium mb-6 backdrop-blur-sm border border-white/20'>
+                            <span className='hero-reveal hero-delay-1 inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full text-sm font-medium mb-6 backdrop-blur-sm border border-white/20 shadow-lg shadow-slate-950/10'>
                                 <Zap className='w-4 h-4 text-amber-400' />
                                 {config.hero.badge}
                             </span>
-                            <h1 className='text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6'>
+                            <h1 className='hero-reveal hero-delay-2 text-4xl sm:text-5xl lg:text-6xl xl:text-[4.25rem] font-bold leading-[1.08] mb-6 max-w-3xl text-balance'>
                                 {config.hero.titlePrefix}{" "}
-                                <span className='text-transparent bg-clip-text bg-gradient-to-r from-teal-200 to-cyan-200'>
+                                <span className='hero-gradient-text text-transparent bg-clip-text bg-gradient-to-r from-teal-200 via-white to-cyan-200'>
                                     {config.hero.titleHighlight}
                                 </span>
                             </h1>
-                            <p className='text-xl text-white/80 mb-8 max-w-lg leading-relaxed'>
+                            <p className='hero-reveal hero-delay-3 text-lg sm:text-xl text-white/78 mb-8 max-w-xl leading-relaxed text-balance'>
                                 {config.hero.description}
                             </p>
-                            <div className='flex flex-col sm:flex-row gap-4'>
+                            <div className='hero-reveal hero-delay-4 flex flex-col sm:flex-row gap-4'>
                                 <Link to='/register'>
-                                    <Button size='lg' className='text-teal-700 hover:bg-teal-50 shadow-lg shadow-black/10 font-semibold'>
+                                    <Button variant='inverse' size='lg' className='w-full sm:w-auto group font-semibold shadow-xl shadow-slate-950/20'>
                                         {config.hero.primaryButtonLabel}
-                                        <ArrowRight className='w-5 h-5 ml-2' />
+                                        <ArrowRight className='w-5 h-5 ml-2 transition-transform group-hover:translate-x-1' />
                                     </Button>
                                 </Link>
                                 <Link to='/register'>
-                                    <Button size='lg' className='bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg font-semibold'>
+                                    <Button variant='ghost' size='lg' className='w-full sm:w-auto border border-white/20 bg-white/10 text-white hover:bg-white/18 hover:text-white shadow-lg backdrop-blur-sm font-semibold'>
                                         {config.hero.secondaryButtonLabel}
                                     </Button>
                                 </Link>
                             </div>
 
-                            <div className='grid grid-cols-2 sm:grid-cols-4 gap-6 mt-12 pt-12 border-t border-white/20'>
+                            <div className='hero-reveal hero-delay-5 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-5 mt-10 pt-8 border-t border-white/18'>
                                 {(config.stats || []).slice(0, 4).map((item, idx) => (
                                     <div key={idx}>
                                         <div className='text-3xl font-bold text-white'>{item.value}</div>
-                                        <div className='text-sm text-white/60'>{item.label}</div>
+                                        <div className='text-sm text-white/58'>{item.label}</div>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
                         {/* 3D Floating Card */}
-                        <div className='hidden lg:block relative' style={{ perspective: "1000px" }}>
-                            <div className='absolute -top-10 -right-10 w-72 h-72 bg-teal-500/30 rounded-full blur-3xl' />
-                            <div
-                                ref={cardRef}
-                                onMouseMove={handleCardMouseMove}
-                                onMouseLeave={handleCardMouseLeave}
-                                className='relative'
-                                style={{
-                                    transform: `rotateX(${cardTransform.rotateX}deg) rotateY(${cardTransform.rotateY}deg) scale(${cardTransform.scale})`,
-                                    transition: "transform 0.15s ease-out",
-                                    transformStyle: "preserve-3d",
-                                }}>
-                                <Card className='relative bg-white/70 backdrop-blur-md shadow-2xl border-0 overflow-hidden'>
+                        <div className='hero-reveal hero-delay-4 hidden lg:block relative ml-auto w-full max-w-md' style={{ perspective: "1200px" }}>
+                            <div className='absolute -inset-10 bg-teal-400/12 rounded-full blur-3xl' />
+                            <div className='hero-card-float'>
+                                <div
+                                    ref={cardRef}
+                                    onMouseMove={handleCardMouseMove}
+                                    onMouseLeave={handleCardMouseLeave}
+                                    className='relative'
+                                    style={{
+                                        transform: `rotateX(${cardTransform.rotateX}deg) rotateY(${cardTransform.rotateY}deg) scale(${cardTransform.scale})`,
+                                        transition: "transform 0.18s ease-out",
+                                        transformStyle: "preserve-3d",
+                                    }}>
+                                    <Card className='relative bg-white/86 backdrop-blur-xl shadow-2xl shadow-slate-950/30 border border-white/55 overflow-hidden ring-1 ring-slate-900/5'>
                                     <div
                                         className='absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-none'
                                         style={{
@@ -654,22 +750,32 @@ function LandingPage() {
                                             <Button className='w-full'>{config.heroCard.buttonLabel}</Button>
                                         </Link>
                                     </CardContent>
-                                </Card>
+                                    </Card>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className='absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center animate-bounce'>
+                <a href='#features' className='hero-scroll-cue absolute bottom-7 left-1/2 -translate-x-1/2 hidden sm:flex flex-col items-center text-center'>
                     <span className='text-white/60 text-sm mb-2'>{t('landing.hero.scroll_more')}</span>
                     <div className='w-6 h-10 border-2 border-white/30 rounded-full flex items-start justify-center p-1'>
-                        <div className='w-1.5 h-3 bg-white/60 rounded-full' />
+                        <div className='hero-scroll-dot w-1.5 h-3 bg-white/70 rounded-full' />
                     </div>
-                </div>
+                </a>
+
+                <button
+                    type='button'
+                    onClick={toggleHeroVideo}
+                    className='absolute top-20 right-4 lg:top-auto lg:bottom-6 lg:right-20 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-slate-950/35 text-white shadow-lg backdrop-blur-md transition hover:scale-105 hover:bg-slate-950/55 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white'
+                    aria-label={isVideoPlaying ? t('landing.hero.pause_video') : t('landing.hero.play_video')}
+                    title={isVideoPlaying ? t('landing.hero.pause_video') : t('landing.hero.play_video')}>
+                    {isVideoPlaying ? <Pause className='h-4 w-4 fill-current' /> : <Play className='h-4 w-4 fill-current translate-x-px' />}
+                </button>
             </section>
 
             {/* Features Section */}
-            <section className='py-24 bg-white'>
+            <section id='features' className='py-24 bg-white'>
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
                     <div className='text-center mb-16'>
                         <span className='inline-block px-4 py-1 bg-teal-100 text-teal-700 rounded-full text-sm font-medium mb-4'>

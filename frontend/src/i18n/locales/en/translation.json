@@ -259,7 +259,11 @@
       "description": "MedTour helps international patients access partner clinics in Kazakhstan with a personal manager handling documents, doctor matching, travel and treatment logistics.",
       "find_doctor": "Start Medical Case",
       "register": "Create Account",
-      "scroll_more": "Learn More"
+      "scroll_more": "Learn More",
+      "video_kicker": "Inside the clinic",
+      "video_location": "Astana, Kazakhstan",
+      "pause_video": "Pause background video",
+      "play_video": "Play background video"
     },
     "hero_card": {
       "title": "Personal Medical Case",
