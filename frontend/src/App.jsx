@@ -25,6 +25,7 @@ const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
 const VerifyEmailSentPage = lazy(() => import('./pages/VerifyEmailSentPage'))
 const EmailConfirmedPage = lazy(() => import('./pages/EmailConfirmedPage'))
 const TourismPage = lazy(() => import('./pages/TourismPage'))
+const BlogPage = lazy(() => import('./pages/BlogPage'))
 const PriceListPage = lazy(() => import('./pages/PriceListPage'))
 const PatientDashboard = lazy(() => import('./pages/patient/PatientDashboard'))
 const PatientAppointments = lazy(() => import('./pages/patient/PatientAppointments'))
@@ -175,6 +176,7 @@ function App() {
           <Route path="/doctors/:id" element={<DoctorProfilePage />} />
           <Route path="/specializations" element={<DoctorsPage />} />
           <Route path="/tourism" element={<TourismPage />} />
+          <Route path="/blog" element={<BlogPage />} />
           <Route path="/prices" element={<PriceListPage />} />
           <Route path="/treatments/:slug" element={<TreatmentDepartmentPage />} />
           <Route path="/about" element={<LandingPage />} />

@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Eye, EyeOff, Mail, Lock, Activity, ArrowLeft, Stethoscope, UserCircle } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, ArrowLeft, Stethoscope, UserCircle } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 import LanguageSwitcher from '../components/ui/LanguageSwitcher'
 import { Card, CardContent } from '../components/ui/Card'
 import useAuthStore from '../stores/authStore'
+import BrandLogo from '../components/ui/BrandLogo'
 
 function LoginPage() {
   const { t } = useTranslation()
@@ -188,13 +189,7 @@ function LoginPage() {
         </div>
 
         <div className="relative text-center text-white max-w-md">
-          <div className="w-20 h-20 mx-auto mb-8 bg-white/20 rounded-3xl flex items-center justify-center backdrop-blur">
-            {userType === 'doctor' ? (
-              <Stethoscope className="w-10 h-10 text-white" />
-            ) : (
-              <Activity className="w-10 h-10 text-white" />
-            )}
-          </div>
+          <BrandLogo className="mx-auto mb-8 h-28 w-28 drop-shadow-[0_18px_32px_rgba(0,0,0,.22)]" />
           <h2 className="text-3xl font-bold mb-4">
             {userType === 'doctor' ? t('auth.login.doctor_title') : 'MedTour'}
           </h2>

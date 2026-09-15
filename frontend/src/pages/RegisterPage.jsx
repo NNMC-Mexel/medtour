@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-  Eye, EyeOff, Mail, Lock, User, Phone, CreditCard, Activity,
+  Eye, EyeOff, Mail, Lock, User, Phone, CreditCard,
   ArrowLeft, CheckCircle, Stethoscope, UserCircle, GraduationCap,
   Building2, FileText, Globe2
 } from 'lucide-react'
@@ -18,6 +18,7 @@ import { specializationsAPI, normalizeResponse } from '../services/api'
 import { normalizeCountryValue } from '../utils/countries'
 import { getDefaultTimezoneForCountry } from '../utils/timezones'
 import { formatPhoneForCountry, getPhoneRule, isValidPhoneForCountry } from '../utils/phone'
+import BrandLogo from '../components/ui/BrandLogo'
 
 const defaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Almaty'
 const languageOptions = [
@@ -587,13 +588,7 @@ function RegisterPage() {
         </div>
 
         <div className="relative text-white max-w-md">
-          <div className="w-20 h-20 mb-8 bg-white/20 rounded-3xl flex items-center justify-center backdrop-blur">
-            {userType === 'doctor' ? (
-              <Stethoscope className="w-10 h-10 text-white" />
-            ) : (
-              <Activity className="w-10 h-10 text-white" />
-            )}
-          </div>
+          <BrandLogo className="mb-8 h-28 w-28 drop-shadow-[0_18px_32px_rgba(0,0,0,.22)]" />
           <h2 className="text-3xl font-bold mb-4">
             {userType === 'doctor' ? t('auth.register.doctor_join_title') : t('auth.register.patient_join_title')}
           </h2>

@@ -298,7 +298,7 @@ export const tourismRegions = [
     id: 'pavlodar',
     name: 'Павлодарская область',
     center: 'Павлодар',
-    image: '/tourism/burabay.jpg',
+    image: '/tourism/bayanaul.webp',
     types: ['nature', 'wellness', 'history'],
     summary: 'Баянаул, озера, скальные массивы и спокойный санаторно-природный отдых на северо-востоке.',
     highlights: ['Баянаульский национальный парк', 'Озеро Жасыбай', 'Павлодарская набережная'],

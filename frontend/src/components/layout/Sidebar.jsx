@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { cn } from '../../utils/helpers'
 import useAuthStore from '../../stores/authStore'
+import BrandLogo from '../ui/BrandLogo'
 import Avatar from '../ui/Avatar'
 import LanguageSwitcher from '../ui/LanguageSwitcher'
 
@@ -50,32 +51,18 @@ function Sidebar({ navItems, onNavClick }) {
     navigate('/login')
   }
 
-  const getHomePath = () => {
-    switch (user?.userRole) {
-      case 'patient':
-        return '/patient'
-      case 'doctor':
-        return '/doctor'
-      case 'admin':
-        return '/admin'
-      default:
-        return '/'
-    }
-  }
-
   return (
     <aside className="h-(--app-height) w-64 bg-white border-r border-slate-100 flex flex-col">
-      {/* Logo */}
+      {/* Logo — always returns to the public landing page, like the public header.
+          The dashboard itself stays reachable through the first nav item. */}
       <div className="p-6 border-b border-slate-100">
         <div className="flex items-center justify-between">
           <Link
-            to={getHomePath()}
+            to="/"
             onClick={onNavClick}
             className="flex items-center gap-3 hover:opacity-80 transition-opacity"
           >
-            <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-sky-500 rounded-xl flex items-center justify-center shrink-0">
-              <Activity className="w-6 h-6 text-white" />
-            </div>
+            <BrandLogo className="h-12 w-12" />
             <div>
               <h1 className="font-bold text-slate-900">MedTour</h1>
               <p className="text-xs text-slate-500">{t('common.medical_tourism')}</p>

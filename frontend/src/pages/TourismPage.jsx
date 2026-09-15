@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Building2,
+  Check,
   ChevronRight,
   Compass,
   Globe2,
@@ -39,6 +40,25 @@ const typeIcons = {
   gastronomy: Utensils,
   space: Rocket,
 }
+
+const signatureTours = [
+  {
+    id: 'burabay-day',
+    name: { ru: 'Бурабай: лес, озёра и легенды', en: 'Burabay: forests, lakes and legends', kk: 'Бурабай: орман, көлдер және аңыздар' },
+    label: { ru: 'Однодневный маршрут из Астаны', en: 'Day route from Astana', kk: 'Астанадан бір күндік бағыт' },
+    text: { ru: 'Болектау, Окжетпес, Жумбактас, поляна Абылай хана и прогулка вдоль озера в окружении соснового леса.', en: 'Bolektau, Okzhetpes, Zhumbaktas, Abylai Khan meadow and a lakeside walk through pine forest.', kk: 'Бөлектау, Оқжетпес, Жұмбақтас, Абылай хан алаңы және қарағайлы ормандағы көл жағалауы.' },
+    image: '/tourism/burabay.jpg',
+    highlights: { ru: ['Трансфер из Астаны', 'Гид и национальный парк', 'Маршрут можно адаптировать'], en: ['Transfer from Astana', 'Guide and national park', 'Adaptable itinerary'], kk: ['Астанадан трансфер', 'Гид және ұлттық парк', 'Бағытты бейімдеуге болады'] },
+  },
+  {
+    id: 'bayanaul-day',
+    name: { ru: 'Баянаул: природная перезагрузка', en: 'Bayanaul: a natural reset', kk: 'Баянауыл: табиғаттағы тынығу' },
+    label: { ru: 'Насыщенный однодневный маршрут', en: 'Immersive day route', kk: 'Мазмұнды бір күндік бағыт' },
+    text: { ru: 'Озеро Жасыбай, Коныр-Аулие, скалы Саймантас и Кемпиртас, Аулие-Булак и панорамные тропы национального парка.', en: 'Lake Jasybay, Konyr-Aulie, Saimantas and Kempirtas rocks, Aulie-Bulak spring and panoramic park trails.', kk: 'Жасыбай көлі, Қоңыр Әулие, Саймантас пен Кемпіртас жартастары, Әулие бұлақ және ұлттық парк соқпақтары.' },
+    image: '/tourism/bayanaul.webp',
+    highlights: { ru: ['Трансфер из Астаны', 'Сопровождение гида', 'Природа и сакральные места'], en: ['Transfer from Astana', 'Guide support', 'Nature and sacred sites'], kk: ['Астанадан трансфер', 'Гид сүйемелдеуі', 'Табиғат және киелі орындар'] },
+  },
+]
 
 function localize(value, lang) {
   if (!value || typeof value === 'string') return value || ''
@@ -161,6 +181,22 @@ function TourismPage() {
                 </div>
               )
             })}
+          </div>
+        </div>
+      </section>
+
+      <section className='bg-[#f4f7fb] py-20'>
+        <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
+          <div className='max-w-3xl'>
+            <span className='text-xs font-bold uppercase tracking-[.18em] text-[#ff6b55]'>{lang === 'en' ? 'Routes from the tour package' : lang === 'kk' ? 'Турпакет бағыттары' : 'Маршруты из турпакета'}</span>
+            <h2 className='mt-4 text-3xl font-semibold tracking-[-.03em] text-[#101b3f] sm:text-4xl'>{lang === 'en' ? 'Two ways to discover nature from Astana' : lang === 'kk' ? 'Астанадан табиғатқа екі бағыт' : 'Два способа открыть природу из Астаны'}</h2>
+            <p className='mt-4 text-lg leading-8 text-[#626b82]'>{lang === 'en' ? 'The program includes the core logistics and can be adjusted to the patient’s condition and doctor’s guidance.' : lang === 'kk' ? 'Бағдарлама негізгі логистиканы қамтиды және дәрігер ұсынысына қарай бейімделеді.' : 'В программу входит основная логистика; темп и состав маршрута можно адаптировать под состояние пациента и рекомендации врача.'}</p>
+          </div>
+          <div className='mt-10 grid gap-6 lg:grid-cols-2'>
+            {signatureTours.map((tour) => <article key={tour.id} className='group overflow-hidden rounded-[2rem] border border-[#dfe3ec] bg-white shadow-sm'>
+              <div className='h-72 overflow-hidden'><img src={tour.image} alt={localize(tour.name, lang)} loading='lazy' className='h-full w-full object-cover transition duration-700 group-hover:scale-105' /></div>
+              <div className='p-7 sm:p-8'><div className='text-xs font-bold uppercase tracking-[.14em] text-[#3157d5]'>{localize(tour.label, lang)}</div><h3 className='mt-3 text-2xl font-semibold text-[#101b3f]'>{localize(tour.name, lang)}</h3><p className='mt-4 leading-7 text-[#626b82]'>{localize(tour.text, lang)}</p><div className='mt-6 flex flex-wrap gap-2'>{localize(tour.highlights, lang).map((item) => <span key={item} className='inline-flex items-center gap-2 rounded-full bg-[#edf2f9] px-3 py-2 text-xs font-medium text-[#39435f]'><Check className='h-3.5 w-3.5 text-[#ff6b55]' />{item}</span>)}</div></div>
+            </article>)}
           </div>
         </div>
       </section>

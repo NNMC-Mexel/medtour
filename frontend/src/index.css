@@ -260,6 +260,135 @@
   animation: hero-gradient-shift 7s ease-in-out infinite;
 }
 
+/* MedTour 2026 visual system */
+.medtour-kicker {
+  color: #ff6b55;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.medtour-title {
+  max-width: 760px;
+  color: #101b3f;
+  font-size: clamp(2.35rem, 5vw, 4rem);
+  font-weight: 650;
+  line-height: 1.06;
+  letter-spacing: -0.045em;
+}
+
+.medtour-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.28'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
+.hero-astana {
+  animation: astana-enter 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.route-glass {
+  box-shadow: 0 28px 90px rgba(2, 8, 30, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.medical-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 1rem 1rem 1rem 0.35rem;
+  transform: rotate(-3deg);
+  transition: transform 280ms ease, border-radius 280ms ease;
+}
+
+.medical-glyph > svg { transform: rotate(3deg); }
+.medical-tile:hover .medical-glyph { border-radius: 1rem; transform: rotate(0deg) scale(1.05); }
+.medical-tile:hover .medical-glyph > svg { transform: rotate(0deg); }
+.medical-glyph.tone-0 { background: #ffecef; color: #e64b61; }
+.medical-glyph.tone-1 { background: #eaf0ff; color: #3157d5; }
+.medical-glyph.tone-2 { background: #f0edff; color: #6941c6; }
+.medical-glyph.tone-3 { background: #e7f6f1; color: #147b68; }
+
+.travel-card::after {
+  position: absolute;
+  inset: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 1.35rem;
+  content: '';
+  pointer-events: none;
+}
+
+@keyframes astana-enter {
+  from { transform: scale(1.045); }
+  to { transform: scale(1); }
+}
+
+.hero-enter,
+.hero-card-enter {
+  opacity: 0;
+  animation: premium-enter 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.hero-enter-1 { animation-delay: 90ms; }
+.hero-enter-2 { animation-delay: 180ms; }
+.hero-enter-3 { animation-delay: 290ms; }
+.hero-enter-4 { animation-delay: 400ms; }
+.hero-enter-5 { animation-delay: 510ms; }
+.hero-card-enter { animation-delay: 420ms; }
+
+@keyframes premium-enter {
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 720ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 720ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+.landing-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.landing-primary-cta {
+  transition: transform 220ms ease, background-color 220ms ease, box-shadow 220ms ease;
+}
+
+.landing-primary-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 58px rgba(10, 163, 143, 0.34);
+}
+
+.landing-float-card {
+  transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), border-color 320ms ease;
+}
+
+.landing-float-card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(82, 209, 187, 0.5);
+}
+
+.landing-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior-inline: contain;
+}
+
+.landing-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .medtour-title { font-size: clamp(2.15rem, 11vw, 3.2rem); }
+}
+
 .hero-card-float {
   animation: hero-card-float 7s ease-in-out infinite;
 }
@@ -287,6 +416,19 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .hero-astana,
+  .hero-enter,
+  .hero-card-enter {
+    opacity: 1;
+    animation: none;
+  }
+  .landing-reveal,
+  .landing-reveal.is-visible {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
   .hero-poster,
   .hero-video {
     transform: scale(1.02);

@@ -83,6 +83,7 @@
     "home": "Home",
     "doctors": "Doctors",
     "tourism": "Tourism",
+    "blog": "Blog / Articles",
     "treatments": "Treatments",
     "process": "Process",
     "prices": "Price list",
@@ -565,7 +566,6 @@
     "book_halyk_qr": "Get QR · {{price}}",
     "book_pay": "Pay · {{price}}",
     "book_free": "Book free consultation",
-    "free": "Free",
     "pm_kaspi_desc": "Payment via Kaspi.kz",
     "pm_kaspi_badge": "Coming soon",
     "pm_halyk_badge": "Recommended",
@@ -1179,7 +1179,8 @@
     "rating_5": "Excellent",
     "review_placeholder": "Write a review (optional)...",
     "submit": "Submit",
-    "media_error": "Could not access camera and microphone"
+    "media_error": "Could not access camera and microphone",
+    "complete_error": "Could not complete the consultation on the server. The call was closed — please check its status in your schedule."
   },
   "appointment_detail": {
     "back": "Back",

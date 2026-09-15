@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import {
     Menu,
     X,
-    Activity,
     Phone,
     Mail,
     MapPin,
@@ -17,9 +16,10 @@ import Button from "../ui/Button";
 import LanguageSwitcher from "../ui/LanguageSwitcher";
 import useAuthStore from "../../stores/authStore";
 import PatientChatWidget from "../chat/PatientChatWidget";
+import BrandLogo from "../ui/BrandLogo";
 
 function PublicLayout() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const location = useLocation();
     const navigate = useNavigate();
     const { isAuthenticated, user } = useAuthStore();
@@ -27,6 +27,12 @@ function PublicLayout() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [showLoginDropdown, setShowLoginDropdown] = useState(false);
     const loginDropdownRef = useRef(null);
+    const lang = i18n.language?.split('-')?.[0] || 'ru';
+    const footerTreatments = {
+        ru: ['Институт сердца', 'Нейрохирургия', 'Check-up', 'Все направления'],
+        en: ['Heart Institute', 'Neurosurgery', 'Check-up', 'All specialties'],
+        kk: ['Жүрек институты', 'Нейрохирургия', 'Check-up', 'Барлық бағыттар'],
+    }[lang] || ['Институт сердца', 'Нейрохирургия', 'Check-up', 'Все направления'];
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -42,7 +48,7 @@ function PublicLayout() {
             document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const isDarkHeaderPage = location.pathname === "/" || location.pathname === "/tourism";
+    const isDarkHeaderPage = ["/", "/tourism", "/blog"].includes(location.pathname);
     const showDarkHeader = isDarkHeaderPage && !isScrolled;
 
     useEffect(() => {
@@ -54,8 +60,9 @@ function PublicLayout() {
     }, []);
 
     useEffect(() => {
-        setIsMobileMenuOpen(false);
-    }, [location]);
+        const frame = window.requestAnimationFrame(() => setIsMobileMenuOpen(false));
+        return () => window.cancelAnimationFrame(frame);
+    }, [location.pathname, location.hash]);
 
     const getDashboardLink = () => {
         const role = user?.role?.type || user?.role || user?.userRole;
@@ -70,11 +77,11 @@ function PublicLayout() {
 
     const navLinks = [
         { href: "/", label: t("nav.home") },
-        { href: "/tourism", label: t("nav.tourism") },
         { href: "#specializations", label: t("nav.treatments"), isAnchor: true },
+        { href: "/tourism", label: t("nav.tourism") },
+        { href: "/blog", label: t("nav.blog") },
         { href: "#process", label: t("nav.process"), isAnchor: true },
         { href: "/prices", label: t("nav.prices") },
-        { href: "#about", label: t("nav.about"), isAnchor: true },
         { href: "#contact", label: t("nav.contacts"), isAnchor: true },
     ];
 
@@ -112,9 +119,7 @@ function PublicLayout() {
             >
                 <div className='p-6 border-b border-slate-100 flex items-center justify-between shrink-0'>
                     <Link to='/' onClick={() => setIsMobileMenuOpen(false)} className='flex items-center gap-3'>
-                        <div className='w-10 h-10 bg-linear-to-br from-teal-500 to-sky-500 rounded-xl flex items-center justify-center'>
-                            <Activity className='w-6 h-6 text-white' />
-                        </div>
+                        <BrandLogo className='h-12 w-12' />
                         <div>
                             <h1 className='font-bold text-slate-900'>MedTour</h1>
                             <p className='text-xs text-slate-500'>{t("common.medical_tourism")}</p>
@@ -136,7 +141,7 @@ function PublicLayout() {
                     {navLinks.map((link) => (
                         <Link
                             key={link.href}
-                            to={link.isAnchor ? '#' : link.href}
+                            to={link.isAnchor ? `/${link.href}` : link.href}
                             onClick={(e) => {
                                 handleNavClick(e, link)
                                 setIsMobileMenuOpen(false)
@@ -201,9 +206,7 @@ function PublicLayout() {
                     <div className='flex items-center justify-between h-20'>
                         {/* Logo */}
                         <Link to='/' className='flex items-center gap-3'>
-                            <div className='w-10 h-10 bg-gradient-to-br from-teal-500 to-sky-500 rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/30'>
-                                <Activity className='w-6 h-6 text-white' />
-                            </div>
+                            <BrandLogo className='h-12 w-12 drop-shadow-[0_8px_18px_rgba(0,0,0,.2)]' />
                             <div>
                                 <h1
                                     className={cn(
@@ -227,20 +230,20 @@ function PublicLayout() {
                         </Link>
 
                         {/* Desktop Navigation */}
-                        <nav className='hidden lg:flex items-center gap-6'>
+                        <nav className='hidden lg:flex items-center gap-5'>
                             {navLinks.map((link) => (
                                 <Link
                                     key={link.href}
-                                    to={link.isAnchor ? "#" : link.href}
+                                    to={link.isAnchor ? `/${link.href}` : link.href}
                                     onClick={(e) => handleNavClick(e, link)}
                                     className={cn(
-                                        "text-sm font-medium transition-colors hover:text-teal-500",
+                                        "relative py-2 text-sm font-medium transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-px after:origin-left after:scale-x-0 after:bg-[#52d1bb] after:transition-transform hover:text-[#52d1bb] hover:after:scale-x-100",
                                         showDarkHeader
                                             ? "text-white/90"
                                             : "text-slate-700",
                                         location.pathname === link.href &&
                                             !link.isAnchor &&
-                                            "text-teal-500",
+                                            "text-[#0a9a87] after:scale-x-100",
                                     )}>
                                     {link.label}
                                 </Link>
@@ -357,15 +360,13 @@ function PublicLayout() {
             </main>
 
             {/* Footer */}
-            <footer id='contact' className='bg-slate-900 text-white'>
+            <footer className='bg-[#081229] text-white'>
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16'>
-                    <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12'>
+                    <div className='grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-[1.25fr_.8fr_.8fr_1fr]'>
                         {/* Brand */}
                         <div>
                             <div className='flex items-center gap-3 mb-6'>
-                                <div className='w-10 h-10 bg-gradient-to-br from-teal-500 to-sky-500 rounded-xl flex items-center justify-center'>
-                                    <Activity className='w-6 h-6 text-white' />
-                                </div>
+                                <BrandLogo className='h-14 w-14' />
                                 <div>
                                     <h3 className='font-bold text-lg'>MedTour</h3>
                                     <p className='text-xs text-slate-400'>{t("common.medical_tourism")}</p>
@@ -376,14 +377,39 @@ function PublicLayout() {
                             </p>
                         </div>
 
-                        {/* Quick Links */}
+                        <div>
+                            <h4 className='font-semibold mb-6'>{t("nav.treatments")}</h4>
+                            <ul className='space-y-3'>
+                                <li>
+                                    <Link to='/treatments/heart-institute' className='text-slate-400 hover:text-white transition-colors text-sm'>
+                                        {footerTreatments[0]}
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to='/treatments/neurosurgery' className='text-slate-400 hover:text-white transition-colors text-sm'>
+                                        {footerTreatments[1]}
+                                    </Link>
+                                </li>
+                                <li>
+                                    <Link to='/treatments/therapy' className='text-slate-400 hover:text-white transition-colors text-sm'>
+                                        {footerTreatments[2]}
+                                    </Link>
+                                </li>
+                                <li>
+                                    <a href='/#specializations' className='text-slate-400 hover:text-white transition-colors text-sm'>
+                                        {footerTreatments[3]}
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
+
                         <div>
                             <h4 className='font-semibold mb-6'>{t("footer.navigation")}</h4>
                             <ul className='space-y-3'>
                                 <li>
-                                    <Link to='/' className='text-slate-400 hover:text-white transition-colors text-sm'>
-                                        {t("nav.home")}
-                                    </Link>
+                                    <a href='/#process' className='text-slate-400 hover:text-white transition-colors text-sm'>
+                                        {t("nav.process")}
+                                    </a>
                                 </li>
                                 <li>
                                     <Link to='/tourism' className='text-slate-400 hover:text-white transition-colors text-sm'>
@@ -391,28 +417,13 @@ function PublicLayout() {
                                     </Link>
                                 </li>
                                 <li>
-                                    <a href='/#specializations' className='text-slate-400 hover:text-white transition-colors text-sm'>
-                                        {t("nav.treatments")}
-                                    </a>
-                                </li>
-                                <li>
-                                    <a href='/#process' className='text-slate-400 hover:text-white transition-colors text-sm'>
-                                        {t("nav.process")}
-                                    </a>
-                                </li>
-                                <li>
-                                    <Link to='/prices' className='text-slate-400 hover:text-white transition-colors text-sm'>
-                                        {t("nav.prices")}
+                                    <Link to='/blog' className='text-slate-400 hover:text-white transition-colors text-sm'>
+                                        {t("nav.blog")}
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link to='/register' className='text-slate-400 hover:text-white transition-colors text-sm'>
-                                        {t("nav.register")}
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link to='/login' className='text-slate-400 hover:text-white transition-colors text-sm'>
-                                        {t("nav.login")}
+                                    <Link to='/privacy' className='text-slate-400 hover:text-white transition-colors text-sm'>
+                                        {t("footer.privacy")}
                                     </Link>
                                 </li>
                             </ul>
@@ -424,11 +435,11 @@ function PublicLayout() {
                             <ul className='space-y-4'>
                                 <li className='flex items-center gap-3 text-slate-400'>
                                     <Phone className='w-5 h-5 text-teal-500' />
-                                    <span className='text-sm'>+7 (7172) 123-456</span>
+                                    <a href='https://www.nnmc.kz/' target='_blank' rel='noreferrer' className='text-sm hover:text-white'>www.nnmc.kz</a>
                                 </li>
                                 <li className='flex items-center gap-3 text-slate-400'>
                                     <Mail className='w-5 h-5 text-teal-500' />
-                                    <span className='text-sm'>info@medtour.kz</span>
+                                    <a href='mailto:support@nnmc.kz' className='text-sm hover:text-white'>support@nnmc.kz</a>
                                 </li>
                                 <li className='flex items-start gap-3 text-slate-400'>
                                     <MapPin className='w-5 h-5 text-teal-500 flex-shrink-0' />
@@ -439,7 +450,7 @@ function PublicLayout() {
                     </div>
 
                     <div className='mt-12 pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4'>
-                        <p className='text-slate-500 text-sm'>{t("footer.copyright")}</p>
+                        <p className='text-slate-500 text-sm'>© {new Date().getFullYear()} MedTour.</p>
                         <div className='flex items-center gap-6'>
                             <Link to='/privacy' className='text-slate-500 hover:text-white text-sm transition-colors'>
                                 {t("footer.privacy")}
