@@ -11,6 +11,8 @@
     "develop": "strapi develop",
     "seed:example": "node ./scripts/seed.js",
     "seed:medical": "node ./scripts/seed-medical.js",
+    "import:prices": "node ./scripts/import-price-catalog.js",
+    "import:prices:dry": "node ./scripts/import-price-catalog.js --dry-run",
     "migrate:case-statuses": "node ./scripts/migrate-medical-case-statuses.js",
     "migrate:case-statuses:dry": "node ./scripts/migrate-medical-case-statuses.js --dry-run",
     "migrate:case-chats": "node ./scripts/backfill-case-chats.js",

@@ -1,0 +1,14 @@
+{
+  "kind": "collectionType",
+  "collectionName": "price_requests",
+  "info": { "singularName": "price-request", "pluralName": "price-requests", "displayName": "Price Request" },
+  "options": { "draftAndPublish": false },
+  "attributes": {
+    "patient": { "type": "relation", "relation": "manyToOne", "target": "plugin::users-permissions.user" },
+    "items": { "type": "json", "required": true },
+    "totalUSD": { "type": "decimal", "min": 0, "required": true },
+    "note": { "type": "text" },
+    "managerNote": { "type": "text" },
+    "status": { "type": "enumeration", "enum": ["new", "reviewing", "contacted", "closed"], "default": "new" }
+  }
+}

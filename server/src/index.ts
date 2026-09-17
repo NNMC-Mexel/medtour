@@ -66,6 +66,9 @@ const medTourReadPermissions = [
 
 const medTourPatientPermissions = [
   ...medTourReadPermissions,
+  'api::price-request.price-request.find',
+  'api::price-request.price-request.findOne',
+  'api::price-request.price-request.create',
   'api::device-token.device-token.register',
   'api::device-token.device-token.unregister',
   'api::medical-case.medical-case.create',
@@ -108,6 +111,14 @@ const medTourDoctorPermissions = [
 
 const medTourStaffPermissions = [
   ...medTourReadPermissions,
+  'api::price-request.price-request.find',
+  'api::price-request.price-request.findOne',
+  'api::price-request.price-request.update',
+  'api::price-item.price-item.create',
+  'api::price-item.price-item.update',
+  'api::price-item.price-item.delete',
+  'api::price-item.price-item.exchangeRate',
+  'api::price-item.price-item.catalog',
   'api::device-token.device-token.register',
   'api::device-token.device-token.unregister',
   'api::medical-case.medical-case.create',

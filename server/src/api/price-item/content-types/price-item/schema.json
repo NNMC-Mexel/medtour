@@ -67,6 +67,29 @@
     "priceUSD": {
       "type": "decimal",
       "min": 0
+    },
+    "priceKZT": {
+      "type": "decimal",
+      "min": 0
+    },
+    "exchangeRate": {
+      "type": "decimal",
+      "min": 0
+    },
+    "exchangeRateDate": {
+      "type": "date"
+    },
+    "sourceKey": {
+      "type": "string",
+      "unique": true
+    },
+    "tariffCode": {
+      "type": "string"
+    },
+    "section": {
+      "type": "enumeration",
+      "enum": ["checkup", "analysis", "service"],
+      "default": "service"
     }
   }
 }
