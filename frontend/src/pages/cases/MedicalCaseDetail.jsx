@@ -26,6 +26,7 @@ import Textarea from '../../components/ui/Textarea'
 import Input from '../../components/ui/Input'
 import { useToast } from '../../components/ui/Toast'
 import useAuthStore from '../../stores/authStore'
+import { formatKztAsUsd, useUsdRate } from '../../hooks/useUsdRate'
 import CaseSlotPicker from '../../components/cases/CaseSlotPicker'
 import CaseConsultationsPanel from '../../components/cases/CaseConsultationsPanel'
 import { cn } from '../../utils/helpers'
@@ -673,6 +674,7 @@ function CaseDocumentsPanel({ medicalCase, onUploaded }) {
 function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged }) {
   const { t } = useTranslation()
   const toast = useToast()
+  const usdRate = useUsdRate()
   const currentPlan = plans[0] || null
   const [isSaving, setIsSaving] = useState(false)
   const [saveState, setSaveState] = useState('idle')
@@ -829,7 +831,7 @@ function TreatmentPlanPanel({ medicalCase, plans, canEdit, canApprove, onChanged
         ) : (
           <div className="space-y-4">
             <DetailRow label={t('case_detail.label_plan_status')} value={t(`case_detail.plan_status_${currentPlan.status?.toLowerCase()}`, { defaultValue: currentPlan.status })} />
-            <DetailRow label={t('case_detail.label_plan_cost')} value={currentPlan.totalCost ? `${currentPlan.totalCost} ${currentPlan.currency || ''}` : '—'} />
+            <DetailRow label={t('case_detail.label_plan_cost')} value={currentPlan.totalCost ? currentPlan.currency === 'KZT' ? formatKztAsUsd(currentPlan.totalCost, usdRate) : `${currentPlan.totalCost} ${currentPlan.currency || 'USD'}` : '—'} />
             <DetailRow label={t('case_detail.label_plan_duration')} value={currentPlan.estimatedDurationDays ? t('case_detail.label_plan_days', { days: currentPlan.estimatedDurationDays }) : '—'} />
             <div>
               <p className="text-sm font-medium text-slate-900 mb-1">{t('case_detail.plan_diagnosis_summary')}</p>
