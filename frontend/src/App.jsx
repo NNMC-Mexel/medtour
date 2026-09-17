@@ -59,6 +59,7 @@ const AdminGuideVideos = lazy(() => import('./pages/admin/AdminGuideVideos'))
 const AdminContent = lazy(() => import('./pages/admin/AdminContent'))
 const AdminTreatmentDepartments = lazy(() => import('./pages/admin/AdminTreatmentDepartments'))
 const StaffDashboard = lazy(() => import('./pages/staff/StaffDashboard'))
+const StaffPriceRequests = lazy(() => import('./pages/staff/StaffPriceRequests'))
 const TreatmentDepartmentPage = lazy(() => import('./pages/TreatmentDepartmentPage'))
 
 // Loading component
@@ -220,6 +221,7 @@ function App() {
           <Route path="cases" element={<MedicalCasesPage />} />
           <Route path="cases/:id" element={<MedicalCaseDetail />} />
           <Route path="appointments" element={<PatientAppointments />} />
+          <Route path="prices" element={<PriceListPage />} />
           <Route path="appointments/:id" element={<AppointmentDetail />} />
           <Route path="doctors" element={<Navigate to="/patient/appointments" replace />} />
           <Route path="doctors/:id" element={<Navigate to="/patient/appointments" replace />} />
@@ -267,6 +269,7 @@ function App() {
           <Route path="specializations" element={<AdminSpecializations />} />
           <Route path="treatment-departments" element={<AdminTreatmentDepartments />} />
           <Route path="prices" element={<AdminPriceList />} />
+          <Route path="price-requests" element={<StaffPriceRequests />} />
           <Route path="guide-videos" element={<AdminGuideVideos />} />
           <Route path="settings" element={<AdminContent />} />
           <Route path="cases" element={<MedicalCasesPage />} />
@@ -285,6 +288,8 @@ function App() {
         >
           <Route index element={<StaffDashboard />} />
           <Route path="cases" element={<MedicalCasesPage />} />
+          <Route path="prices" element={<AdminPriceList />} />
+          <Route path="price-requests" element={<StaffPriceRequests />} />
           <Route path="cases/:id" element={<MedicalCaseDetail />} />
           <Route path="chat" element={<PatientChat />} />
           <Route path="documents" element={<PatientDocuments />} />
@@ -301,6 +306,8 @@ function App() {
         >
           <Route index element={<StaffDashboard />} />
           <Route path="cases" element={<MedicalCasesPage />} />
+          <Route path="prices" element={<AdminPriceList />} />
+          <Route path="price-requests" element={<StaffPriceRequests />} />
           <Route path="cases/:id" element={<MedicalCaseDetail />} />
           <Route path="chat" element={<PatientChat />} />
           <Route path="doctors" element={<AdminDoctors readonly />} />

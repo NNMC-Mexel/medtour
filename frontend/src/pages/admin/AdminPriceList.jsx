@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2, Pencil, Plus, ReceiptText, Search, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
@@ -8,27 +8,23 @@ import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
 import Textarea from '../../components/ui/Textarea'
 import { useToast } from '../../components/ui/Toast'
-import { normalizeResponse, priceItemsAPI } from '../../services/api'
+import { priceItemsAPI } from '../../services/api'
 import { formatPrice } from '../../utils/pricing'
 import { DEFAULT_CONTENT_LOCALE, SUPPORTED_LOCALES } from '../../utils/locales'
 
 const defaultForm = {
   translations: {},
   price: '',
-  currency: 'KZT',
+  priceKZT: '',
+  currency: 'USD',
+  section: 'service',
+  recalculate: false,
   sortOrder: '',
   isActive: true,
   isFeatured: false,
 }
 
 const priceTextFields = ['title', 'category', 'description', 'unit', 'badge', 'note']
-
-const currencyOptions = [
-  { value: 'KZT', label: 'KZT' },
-  { value: 'USD', label: 'USD' },
-  { value: 'EUR', label: 'EUR' },
-  { value: 'RUB', label: 'RUB' },
-]
 
 function sortItems(list) {
   return [...(list || [])].sort((a, b) => {
@@ -63,7 +59,7 @@ function normalizeItemTranslations(item) {
   return translations
 }
 
-function toPayload(form, fallbackOrder) {
+function toPayload(form, fallbackOrder, editingItem) {
   const translations = {
     ...getEmptyTranslations(),
     ...(form.translations || {}),
@@ -73,12 +69,17 @@ function toPayload(form, fallbackOrder) {
     translations[SUPPORTED_LOCALES[0]?.code] ||
     {}
 
+  const convertFromKzt = form.priceKZT !== '' && (!editingItem || Number(form.priceKZT) !== Number(editingItem.priceKZT) || form.recalculate)
+  const useDirectUsd = form.priceKZT === '' && (!editingItem || Number(form.price) !== Number(editingItem.price) || editingItem.priceKZT !== null && editingItem.priceKZT !== undefined)
+
   return {
     title: baseTranslation.title.trim(),
     category: baseTranslation.category.trim(),
     description: baseTranslation.description?.trim() || '',
-    price: Number(form.price) || 0,
-    currency: form.currency || 'KZT',
+    ...(convertFromKzt ? { priceKZT: Number(form.priceKZT) } : {}),
+    ...(useDirectUsd ? { price: Number(form.price) || 0 } : {}),
+    currency: 'USD',
+    section: form.section,
     unit: baseTranslation.unit?.trim() || '',
     badge: baseTranslation.badge?.trim() || '',
     note: baseTranslation.note?.trim() || '',
@@ -106,34 +107,40 @@ function AdminPriceList() {
   const [editingItem, setEditingItem] = useState(null)
   const [activeLocale, setActiveLocale] = useState(DEFAULT_CONTENT_LOCALE)
   const [search, setSearch] = useState('')
+  const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
+  const [pagination, setPagination] = useState({ total: 0, pageCount: 0 })
+  const [rate, setRate] = useState(null)
+  const [rateError, setRateError] = useState(false)
   const [form, setForm] = useState({ ...defaultForm, translations: getEmptyTranslations() })
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
-      const res = await priceItemsAPI.getAll({ includeInactive: true })
-      const { data } = normalizeResponse(res)
-      setItems(sortItems(data || []))
+      const res = await priceItemsAPI.staffCatalog({ includeInactive: true, page, pageSize: 50, search: query })
+      setItems(sortItems(res.data?.data || []))
+      setPagination(res.data?.meta?.pagination || { total: 0, pageCount: 0 })
     } catch (error) {
       console.error('Error loading price list:', error)
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [page, query])
 
+  useEffect(() => { const timer = setTimeout(() => setQuery(search.trim()), 300); return () => clearTimeout(timer) }, [search])
+  useEffect(() => { loadData() }, [loadData])
   useEffect(() => {
-    loadData()
-  }, [])
+    if (!isModalOpen) return
+    let alive = true
+    setRateError(false)
+    priceItemsAPI.exchangeRate().then((response) => { if (alive) setRate(response.data?.data) })
+      .catch(() => { if (alive) { setRate(null); setRateError(true) } })
+    return () => { alive = false }
+  }, [isModalOpen])
 
   const filteredItems = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    if (!query) return items
-    return items.filter((item) =>
-      getLocalizedField(item, 'title', activeLocale)?.toLowerCase().includes(query) ||
-      getLocalizedField(item, 'category', activeLocale)?.toLowerCase().includes(query) ||
-      getLocalizedField(item, 'description', activeLocale)?.toLowerCase().includes(query),
-    )
-  }, [items, search, activeLocale])
+    return items
+  }, [items])
 
   const openCreateModal = () => {
     setEditingItem(null)
@@ -150,7 +157,10 @@ function AdminPriceList() {
     setForm({
       translations: normalizeItemTranslations(item),
       price: item.price !== undefined ? String(item.price) : '',
-      currency: item.currency || 'KZT',
+      priceKZT: item.priceKZT !== null && item.priceKZT !== undefined ? String(item.priceKZT) : '',
+      currency: 'USD',
+      section: item.section || 'service',
+      recalculate: false,
       sortOrder: item.sortOrder !== undefined ? String(item.sortOrder) : '',
       isActive: item.isActive !== false,
       isFeatured: Boolean(item.isFeatured),
@@ -167,14 +177,19 @@ function AdminPriceList() {
       return
     }
 
-    if (Number(form.price) < 0 || Number.isNaN(Number(form.price))) {
+    if (form.priceKZT === '' && (Number(form.price) < 0 || Number.isNaN(Number(form.price)))) {
       toast.warning(t('admin_price.err_price'))
+      return
+    }
+    const conversionRequested = form.priceKZT !== '' && (!editingItem || Number(form.priceKZT) !== Number(editingItem.priceKZT) || form.recalculate)
+    if (conversionRequested && (!rate || Number(form.priceKZT) < 0 || !Number.isFinite(Number(form.priceKZT)))) {
+      toast.warning(rateError ? 'Курс НБРК недоступен' : t('admin_price.err_price'))
       return
     }
 
     setIsSaving(true)
     try {
-      const payload = toPayload(form, (items?.length || 0) + 1)
+      const payload = toPayload(form, (items?.length || 0) + 1, editingItem)
 
       if (editingItem?.documentId) {
         await priceItemsAPI.update(editingItem.documentId, payload)
@@ -229,6 +244,7 @@ function AdminPriceList() {
   }
 
   const activeTranslation = form.translations?.[activeLocale] || {}
+  const conversionPreview = form.priceKZT !== '' && (!editingItem || Number(form.priceKZT) !== Number(editingItem.priceKZT) || form.recalculate)
 
   if (isLoading) {
     return (
@@ -269,14 +285,14 @@ function AdminPriceList() {
 
       <Input
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={(e) => { setSearch(e.target.value); setPage(1) }}
         placeholder={t('admin_price.search_placeholder')}
         leftIcon={<Search className='h-4 w-4' />}
       />
 
       <Card>
         <CardHeader>
-          <CardTitle>{t('admin_price.list_title', { count: filteredItems.length })}</CardTitle>
+          <CardTitle>{t('admin_price.list_title', { count: pagination.total })}</CardTitle>
         </CardHeader>
         <CardContent className='p-0'>
           <div className='overflow-x-auto'>
@@ -359,6 +375,12 @@ function AdminPriceList() {
         </CardContent>
       </Card>
 
+      {pagination.pageCount > 1 && <div className='flex items-center justify-center gap-4'>
+        <Button variant='secondary' disabled={page <= 1} onClick={() => setPage(page - 1)}>←</Button>
+        <span className='text-sm text-slate-600'>{page} / {pagination.pageCount}</span>
+        <Button variant='secondary' disabled={page >= pagination.pageCount} onClick={() => setPage(page + 1)}>→</Button>
+      </div>}
+
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -420,20 +442,14 @@ function AdminPriceList() {
 
           <div className='grid gap-4 md:grid-cols-4'>
             <Input
-              label={t('admin_price.label_price')}
-              required
+              label='Цена от экономиста (KZT)'
               type='number'
               min='0'
               step='0.01'
-              value={form.price}
-              onChange={(e) => setFormValue('price', e.target.value)}
+              value={form.priceKZT}
+              onChange={(e) => setFormValue('priceKZT', e.target.value)}
             />
-            <Select
-              label={t('admin_price.label_currency')}
-              value={form.currency}
-              onChange={(e) => setFormValue('currency', e.target.value)}
-              options={currencyOptions}
-            />
+            <Input label='Цена для пациента (USD)' type='number' min='0' step='0.01' value={conversionPreview && rate ? (Number(form.priceKZT) / rate.kztPerUsd).toFixed(2) : form.price} onChange={(e) => setFormValue('price', e.target.value)} disabled={form.priceKZT !== ''} />
             <Input
               label={t('admin_price.label_unit')}
               value={activeTranslation.unit || ''}
@@ -448,6 +464,11 @@ function AdminPriceList() {
               onChange={(e) => setFormValue('sortOrder', e.target.value)}
             />
           </div>
+          <div className='rounded-xl bg-teal-50 px-4 py-3 text-sm text-teal-900'>
+            {rate ? `Курс НБРК на ${rate.date}: $1 = ${rate.kztPerUsd} KZT. Сумма USD показана до сохранения.` : rateError ? 'Курс НБРК недоступен. Сохранение цены в KZT временно невозможно.' : 'Загрузка официального курса НБРК…'}
+            {editingItem && form.priceKZT !== '' && !conversionPreview && rate && <button type='button' className='ml-2 font-semibold underline' onClick={() => setFormValue('recalculate', true)}>Пересчитать по текущему курсу: {formatPrice(Number(form.priceKZT) / rate.kztPerUsd, 'USD')}</button>}
+          </div>
+          <Select label='Раздел прайса' value={form.section} onChange={(e) => setFormValue('section', e.target.value)} options={[{ value: 'checkup', label: 'Check-up и пакеты' }, { value: 'analysis', label: 'Анализы' }, { value: 'service', label: 'Другие услуги' }]} />
 
           <div className='grid gap-4 md:grid-cols-2'>
             <Input

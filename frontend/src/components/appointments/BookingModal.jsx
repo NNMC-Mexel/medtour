@@ -24,7 +24,8 @@ import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import Avatar from "../ui/Avatar";
 import Badge from "../ui/Badge";
-import { cn, formatPrice, getSpecName, getDoctorField } from "../../utils/helpers";
+import { cn, getSpecName, getDoctorField } from "../../utils/helpers";
+import { useUsdRate, formatKztAsUsd } from '../../hooks/useUsdRate';
 import { getMediaUrl, getBookedSlots, getSignalingUrl, medicalCasesAPI, normalizeResponse } from "../../services/api";
 import useAppointmentStore from "../../stores/appointmentStore";
 import useAuthStore from "../../stores/authStore";
@@ -162,6 +163,7 @@ const loadHalykScript = (serverWidgetUrl) =>
     });
 
 function BookingModal({ isOpen, onClose, doctor }) {
+    const usdRate = useUsdRate();
     const { t, i18n } = useTranslation();
     const dateLocale = i18n.language === 'kk' ? kk : i18n.language === 'en' ? enUS : ru;
     const { user, token } = useAuthStore();
@@ -271,6 +273,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
     const doctorSpecialization = getSpecName(doctor?.specialization, i18n.language)
         || t('booking.specialist_fallback');
     const doctorPrice = doctor?.price || 0;
+    const displayPrice = formatKztAsUsd(doctorPrice, usdRate);
     const isSlotTakenMessage = (message = "") => {
         const lower = message.toLowerCase();
         return lower.includes("забронировано") || lower.includes("занято") || lower.includes("booked") || lower.includes("taken");
@@ -933,12 +936,12 @@ function BookingModal({ isOpen, onClose, doctor }) {
                         : !SHOW_DOCTOR_PRICES
                         ? t('common.book_appt')
                         : paymentMethod === "kaspi"
-                        ? t('booking.book_kaspi', { price: formatPrice(doctorPrice) })
+                        ? t('booking.book_kaspi', { price: displayPrice })
                         : paymentMethod === "halyk"
                         ? isMobileDevice()
-                            ? t('booking.book_halyk_mobile', { price: formatPrice(doctorPrice) })
-                            : t('booking.book_halyk_qr', { price: formatPrice(doctorPrice) })
-                        : t('booking.book_pay', { price: formatPrice(doctorPrice) })}
+                            ? t('booking.book_halyk_mobile', { price: displayPrice })
+                            : t('booking.book_halyk_qr', { price: displayPrice })
+                        : t('booking.book_pay', { price: displayPrice })}
                 </Button>
             )}
         </div>
@@ -1060,7 +1063,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
                             <div className="bg-teal-50 rounded-xl px-4 py-3 text-sm text-teal-800 max-w-xs w-full">
                                 {SHOW_DOCTOR_PRICES && (
                                     <p className="font-semibold mb-1">
-                                        {t('booking.halyk_amount', { price: formatPrice(doctorPrice) })}
+                                        {t('booking.halyk_amount', { price: displayPrice })}
                                     </p>
                                 )}
                                 <div className="flex items-center justify-center gap-2 text-teal-600 mt-1">
@@ -1114,7 +1117,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
                             </p>
                             {SHOW_DOCTOR_PRICES && (
                                 <p className='text-sm text-amber-800 mb-1'>
-                                    {t('booking.kaspi_amount', { price: formatPrice(doctorPrice) })}
+                                    {t('booking.kaspi_amount', { price: displayPrice })}
                                 </p>
                             )}
                             <p className='text-xs text-amber-700'>
@@ -1215,7 +1218,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
                         {SHOW_DOCTOR_PRICES && (
                             <div className='sm:ml-auto sm:text-right w-full sm:w-auto'>
                                 <p className='font-bold text-slate-900'>
-                                    {FREE_CONSULTATIONS ? t('booking.free') : formatPrice(doctorPrice)}
+                                    {FREE_CONSULTATIONS ? t('booking.free') : displayPrice}
                                 </p>
                                 <p className='text-xs text-slate-500'>
                                     {t('booking.per_consultation')}
@@ -1637,7 +1640,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
                                             {t('booking.field_total')}
                                         </span>
                                         <span className='font-bold text-teal-700'>
-                                            {FREE_CONSULTATIONS ? t('booking.free') : formatPrice(doctorPrice)}
+                                            {FREE_CONSULTATIONS ? t('booking.free') : displayPrice}
                                         </span>
                                     </div>
                                 )}

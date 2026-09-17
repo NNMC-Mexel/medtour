@@ -531,6 +531,22 @@ export const contentAPI = {
 // ===========================================
 
 export const priceItemsAPI = {
+    catalog: (params = {}) => {
+        const query = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') query.append(key, String(value));
+        });
+        return api.get(`/api/price-items/catalog?${query}`);
+    },
+    staffCatalog: (params = {}) => {
+        const query = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') query.append(key, String(value));
+        });
+        return api.get(`/api/price-items/staff-catalog?${query}`);
+    },
+    exchangeRate: () => api.get('/api/price-items/exchange-rate'),
+    publicExchangeRate: () => api.get('/api/price-items/public-exchange-rate'),
     getAll: (params = {}) => {
         const query = new URLSearchParams();
         query.append("populate", "image");
@@ -571,6 +587,12 @@ export const priceItemsAPI = {
     update: (id, data) => updatePublishedDocument(`/api/price-items/${id}`, data),
 
     delete: (id) => api.delete(`/api/price-items/${id}`),
+};
+
+export const priceRequestsAPI = {
+    create: (itemIds, note = '') => api.post('/api/price-requests', { data: { itemIds, note } }),
+    list: (page = 1) => api.get(`/api/price-requests?page=${page}&pageSize=25`),
+    update: (id, data) => api.put(`/api/price-requests/${id}`, { data }),
 };
 
 export const guideVideosAPI = {

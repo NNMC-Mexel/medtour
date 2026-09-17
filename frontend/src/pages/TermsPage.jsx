@@ -30,7 +30,7 @@ const termsCopy = {
       {
         title: '3. Service cost and payment',
         paragraphs: [
-          'The consultation cost is shown in the doctor profile and booking modal before payment. The price is shown in tenge (₸) and includes applicable taxes.',
+          'Consultation estimates are shown in USD before payment. The payment provider shows the final charge and settlement currency before confirmation.',
           'Accepted payment methods:',
         ],
         bullets: ['Bank card (Visa, Mastercard) with 3-D Secure support.', 'QR payment through the Halyk Home Bank app.'],
@@ -113,7 +113,7 @@ const termsCopy = {
       {
         title: '3. Стоимость услуг и оплата',
         paragraphs: [
-          'Стоимость консультации указывается в профиле врача и в модальном окне бронирования до момента оплаты. Цена указана в тенге (₸) и включает все применимые налоги.',
+          'Ориентировочная стоимость консультации показывается в долларах США до оплаты. Платёжный провайдер показывает итоговую сумму и валюту списания перед подтверждением.',
           'Принимаемые способы оплаты:',
         ],
         bullets: ['Банковская карта (Visa, Mastercard) с поддержкой 3-D Secure.', 'QR-оплата через приложение Halyk Home Bank.'],

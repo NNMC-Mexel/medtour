@@ -76,6 +76,7 @@ export const PATIENT_NAV_ITEMS = [
   { path: '/patient', label: 'nav.home', icon: 'home' },
   { path: '/patient/cases', label: 'nav.medical_cases', icon: 'activity' },
   { path: '/patient/appointments', label: 'nav.consultations', icon: 'calendar' },
+  { path: '/patient/prices', label: 'nav.admin_prices', icon: 'receipt-text' },
   { path: '/patient/chat', label: 'nav.chat', icon: 'message-circle' },
   { path: '/patient/documents', label: 'nav.documents', icon: 'file-text' },
   { path: '/patient/plan-trip', label: 'nav.plan_trip', icon: 'clipboard-list' },
@@ -110,6 +111,7 @@ export const ADMIN_NAV_ITEMS = [
   { path: '/admin/specializations', label: 'nav.admin_specializations', icon: 'tags' },
   { path: '/admin/treatment-departments', label: 'nav.admin_treatments', icon: 'activity' },
   { path: '/admin/prices', label: 'nav.admin_prices', icon: 'receipt-text' },
+  { path: '/admin/price-requests', label: 'nav.price_requests', icon: 'shopping-cart' },
   { path: '/admin/guide-videos', label: 'nav.admin_guide_videos', icon: 'circle-help' },
   { path: '/admin/settings', label: 'nav.admin_settings', icon: 'settings' },
 ]
@@ -117,6 +119,8 @@ export const ADMIN_NAV_ITEMS = [
 export const MANAGER_NAV_ITEMS = [
   { path: '/manager', label: 'nav.home', icon: 'home' },
   { path: '/manager/cases', label: 'nav.medical_cases', icon: 'activity' },
+  { path: '/manager/prices', label: 'nav.admin_prices', icon: 'receipt-text' },
+  { path: '/manager/price-requests', label: 'nav.price_requests', icon: 'shopping-cart' },
   { path: '/manager/chat', label: 'nav.chat', icon: 'message-circle' },
   { path: '/manager/documents', label: 'nav.documents', icon: 'file-text' },
 ]
@@ -124,6 +128,8 @@ export const MANAGER_NAV_ITEMS = [
 export const COORDINATOR_NAV_ITEMS = [
   { path: '/coordinator', label: 'nav.home', icon: 'home' },
   { path: '/coordinator/cases', label: 'nav.medical_cases', icon: 'activity' },
+  { path: '/coordinator/prices', label: 'nav.admin_prices', icon: 'receipt-text' },
+  { path: '/coordinator/price-requests', label: 'nav.price_requests', icon: 'shopping-cart' },
   { path: '/coordinator/chat', label: 'nav.chat', icon: 'message-circle' },
   { path: '/coordinator/doctors', label: 'nav.doctors', icon: 'stethoscope' },
   { path: '/coordinator/documents', label: 'nav.documents', icon: 'file-text' },

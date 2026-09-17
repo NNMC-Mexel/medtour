@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware'
 export const useCurrencyStore = create(
   persist(
     (set) => ({
-      currency: 'KZT',
+      currency: 'USD',
       setCurrency: (currency) => set({ currency }),
     }),
     {

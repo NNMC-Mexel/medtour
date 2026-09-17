@@ -15,8 +15,10 @@ import DoctorCard from '../components/doctors/DoctorCard'
 import useAppointmentStore from '../stores/appointmentStore'
 import { getSpecName } from '../utils/helpers'
 import { SHOW_DOCTOR_PRICES } from '../utils/constants'
+import { useUsdRate } from '../hooks/useUsdRate'
 
 function DoctorsPage() {
+  const usdRate = useUsdRate()
   const { t, i18n } = useTranslation()
 
   const sortOptions = [
@@ -63,8 +65,8 @@ function DoctorsPage() {
       const matchesSpec = !selectedSpec || 
         doc.specialization?.name === selectedSpec ||
         doc.specialization?.id?.toString() === selectedSpec
-      const matchesMinPrice = !SHOW_DOCTOR_PRICES || !priceRange.min || doc.price >= parseInt(priceRange.min)
-      const matchesMaxPrice = !SHOW_DOCTOR_PRICES || !priceRange.max || doc.price <= parseInt(priceRange.max)
+      const matchesMinPrice = !SHOW_DOCTOR_PRICES || !priceRange.min || !usdRate || doc.price / usdRate >= Number(priceRange.min)
+      const matchesMaxPrice = !SHOW_DOCTOR_PRICES || !priceRange.max || !usdRate || doc.price / usdRate <= Number(priceRange.max)
       return matchesSearch && matchesSpec && matchesMinPrice && matchesMaxPrice
     })
     .sort((a, b) => {

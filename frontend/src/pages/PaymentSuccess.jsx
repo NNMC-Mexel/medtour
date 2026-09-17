@@ -7,10 +7,11 @@ import { ru, kk, enUS } from "date-fns/locale";
 import { io } from "socket.io-client";
 import Button from "../components/ui/Button";
 import useAuthStore from "../stores/authStore";
-import { formatPrice } from "../utils/helpers";
+import { useUsdRate, formatKztAsUsd } from '../hooks/useUsdRate';
 import { getSignalingUrl } from "../services/api";
 
 function PaymentSuccess() {
+    const usdRate = useUsdRate();
     const navigate = useNavigate();
     const { t, i18n } = useTranslation();
     const dateLocale = i18n.language === 'kk' ? kk : i18n.language === 'en' ? enUS : ru;
@@ -205,7 +206,7 @@ function PaymentSuccess() {
                                 {t('payment.paid_label')}
                             </span>
                             <span className="font-bold text-teal-700">
-                                {formatPrice(appointmentInfo.price)}
+                                {formatKztAsUsd(appointmentInfo.price, usdRate)}
                             </span>
                         </div>
                     </div>

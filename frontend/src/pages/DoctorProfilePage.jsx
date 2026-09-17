@@ -26,10 +26,12 @@ import Avatar from "../components/ui/Avatar";
 import Badge from "../components/ui/Badge";
 import { useTranslation } from "react-i18next";
 import api, { normalizeResponse, getMediaUrl } from "../services/api";
-import { formatPrice, formatDate, isDoctorOnline, getSpecName, getDoctorField } from "../utils/helpers";
+import { formatDate, isDoctorOnline, getSpecName, getDoctorField } from "../utils/helpers";
+import { useUsdRate, formatKztAsUsd } from '../hooks/useUsdRate';
 import { SHOW_DOCTOR_PRICES } from "../utils/constants";
 
 function DoctorProfilePage() {
+    const usdRate = useUsdRate();
     const { id } = useParams();
     const { t, i18n } = useTranslation();
     const [doctor, setDoctor] = useState(null);
@@ -205,7 +207,7 @@ function DoctorProfilePage() {
                                                 {t('doctor_public.price_label')}
                                             </p>
                                             <p className='text-2xl md:text-3xl font-bold leading-tight'>
-                                                {formatPrice(doctor.price || 0)}
+                                                {formatKztAsUsd(doctor.price || 0, usdRate)}
                                             </p>
                                             <p className='text-sm text-slate-600 mt-1 flex items-center justify-center gap-1'>
                                                 <Clock className='w-4 h-4 text-teal-500' />
@@ -382,9 +384,7 @@ function DoctorProfilePage() {
                                                 </p>
                                                 {SHOW_DOCTOR_PRICES && (
                                                     <p className='text-lg font-bold text-teal-600'>
-                                                        {formatPrice(
-                                                            doctor.price || 0,
-                                                        )}
+                                                        {formatKztAsUsd(doctor.price || 0, usdRate)}
                                                     </p>
                                                 )}
                                             </div>

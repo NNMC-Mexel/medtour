@@ -21,7 +21,8 @@ import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
 import useAuthStore from '../../stores/authStore'
 import useAppointmentStore from '../../stores/appointmentStore'
-import { formatPrice, getSpecName } from '../../utils/helpers'
+import { getSpecName } from '../../utils/helpers'
+import { useUsdRate, formatKztAsUsd } from '../../hooks/useUsdRate'
 import { SHOW_DOCTOR_PRICES } from '../../utils/constants'
 import { getMediaUrl, getServerNow } from '../../services/api'
 import { formatDateInTimeZone, formatTimeInTimeZone, getDeviceTimeZone } from '../../utils/kazakhstanTime'
@@ -37,7 +38,7 @@ const statusVariants = {
   no_show: 'warning',
 }
 
-const CancelResultNotification = ({ show, refundable, amount, onClose, t }) => {
+const CancelResultNotification = ({ show, refundable, amount, onClose, t, usdRate }) => {
   if (!show) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fadeIn">
@@ -57,7 +58,7 @@ const CancelResultNotification = ({ show, refundable, amount, onClose, t }) => {
           <h3 className="text-lg font-semibold text-slate-900 mb-2">{t('appointments.cancelled_title')}</h3>
           <p className={`text-sm ${refundable ? 'text-green-600' : 'text-rose-600'}`}>
             {refundable
-              ? t('appointments.refund_amount_msg', { amount: amount?.toLocaleString() + ' ₸' })
+              ? t('appointments.refund_amount_msg', { amount: formatKztAsUsd(amount, usdRate) })
               : t('appointments.no_refund_msg')}
           </p>
           <button
@@ -73,6 +74,7 @@ const CancelResultNotification = ({ show, refundable, amount, onClose, t }) => {
 }
 
 function PatientAppointments() {
+  const usdRate = useUsdRate()
   const { t, i18n } = useTranslation()
   const viewerTimeZone = getDeviceTimeZone()
   const { user } = useAuthStore()
@@ -398,7 +400,7 @@ function PatientAppointments() {
                         <div className="flex items-center gap-2">
                           {SHOW_DOCTOR_PRICES && (
                             <span className="font-semibold text-slate-900">
-                              {formatPrice(appointment.price || appointment.doctor?.price || 0)}
+                              {formatKztAsUsd(appointment.price || appointment.doctor?.price || 0, usdRate)}
                             </span>
                           )}
 
@@ -519,7 +521,7 @@ function PatientAppointments() {
                 </p>
                 {refund.refundable && (
                   <p className="text-green-600 text-sm mt-1">
-                    {t('appointments.refund_amount_label')}: {formatPrice(refund.amount)}
+                    {t('appointments.refund_amount_label')}: {formatKztAsUsd(refund.amount, usdRate)}
                   </p>
                 )}
                 <p className="text-slate-500 text-xs mt-2">
@@ -538,6 +540,7 @@ function PatientAppointments() {
         show={cancelResult.show}
         refundable={cancelResult.refundable}
         amount={cancelResult.amount}
+        usdRate={usdRate}
         onClose={() => setCancelResult({ show: false, refundable: false, amount: 0 })}
         t={t}
       />
