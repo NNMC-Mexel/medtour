@@ -183,6 +183,7 @@ npm start
 
 ## Post-deploy smoke
 
+- After the first deployment with the bundled international catalog, check Strapi logs for `Price catalog import complete` and confirm the public price list contains the 1,882 imported services. Later deployments must log that the catalog was already imported and must preserve edited or deleted prices.
 - `https://medtour.nnmc.kz` loads without console CORS/mixed-content errors.
 - `https://medtourserver.nnmc.kz/admin` opens.
 - `https://medtourserver.nnmc.kz/api/clinics` returns data.

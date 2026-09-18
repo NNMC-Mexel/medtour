@@ -1,5 +1,6 @@
 import type { Core } from '@strapi/strapi';
 import { decryptUserPII, encryptUserPII, isPiiEncryptionEnabled } from './utils/pii-crypto';
+import { importPriceCatalog } from './utils/price-catalog-import';
 
 const defaultSpecializations = [
   { name: 'Терапевт', description: 'Врач общей практики', icon: 'stethoscope', sortOrder: 1 },
@@ -910,6 +911,20 @@ export default {
         '⚠️  ALLOW_TEST_PAYMENTS_IN_PRODUCTION=true with PAYMENTS_LIVE!=true: ' +
         'appointments can be marked PAID without a real payment. Disable this before going live.'
       );
+    }
+
+    // Deploying code alone does not populate Postgres. Import in the background
+    // so startup health checks do not time out; the DB marker protects later
+    // staff edits and deletions from every subsequent deployment.
+    if (process.env.NODE_ENV === 'production' && process.env.PRICE_CATALOG_IMPORT_MANUAL_RUN !== '1') {
+      const run = () => {
+        void importPriceCatalog(strapi).catch((error) => {
+          strapi.log.error(`Automatic price catalog import failed: ${error instanceof Error ? error.message : String(error)}`);
+          const retry = setTimeout(run, 15 * 60 * 1000);
+          retry.unref();
+        });
+      };
+      setImmediate(run);
     }
   },
 };

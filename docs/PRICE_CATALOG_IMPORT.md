@@ -6,15 +6,18 @@ The committed [catalog](../server/data/price-catalog-2026-08-24.json) contains 1
 
 ## Deployment
 
-Back up the production database, deploy the server and frontend changes, then run once in the server environment:
+On the next production Strapi startup, the server imports the bundled catalog in the background. No extra Coolify command is needed. The process logs progress after every 100 rows, then stores the `paid-2026-08-24` completion marker in the production database. Later deployments see that marker and skip the import, preserving staff edits and deletions. A failed partial import retries after 15 minutes and only adds source rows still missing; it does not overwrite existing source rows. The import also converts existing published KZT price items to USD.
+
+Before the first production deployment, back up the database and resolve the tariff approval issues in [the QA report](PRICE_CATALOG_QA_2026-09-18.md). The conversion uses the official NBK rate at import time. If the rate is unavailable, no new prices are published until an automatic retry succeeds. The site can temporarily show the old catalog while the import runs. Do not run multiple server replicas during the first import; this job uses a completion marker but no cross-instance lock.
+
+The manual commands remain available for inspection or recovery from the `server` directory:
 
 ```sh
-npm run build
 npm run import:prices:dry
 npm run import:prices
 ```
 
-The import adds missing source rows, converts legacy KZT price items to USD, and records completion in Strapi's store. Once completed, reruns preserve staff edits and deletions. The import does **not** run automatically at application boot. In the local development database it imported all 1,882 rows and converted one legacy item, leaving 1,883 published entries.
+The dry run suppresses the automatic bootstrap import and never writes catalog rows. In the local development database, the original manual import added all 1,882 rows and converted one legacy item, leaving 1,883 published entries.
 
 ## Ongoing editing
 
