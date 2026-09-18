@@ -59,7 +59,7 @@ def main():
             title = re.sub(r'\s+', ' ', str(row[1])).strip()
             kzt = Decimal(str(row[6]))
             category = category_for_row(row_number) if sheet_index == 0 else (
-                'Консультации специалистов' if 'консультац' in title.lower() else 'Дополнительные услуги')
+                'Консультации специалистов' if row_number < 150 else 'Дополнительные услуги')
             usd = (kzt / rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             entries.append({
                 'sourceKey': f'nnmc-2026-08-paid-{sheet_index + 1}-{row_number}',
