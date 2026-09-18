@@ -77,6 +77,7 @@ export const PATIENT_NAV_ITEMS = [
   { path: '/patient/cases', label: 'nav.medical_cases', icon: 'activity' },
   { path: '/patient/appointments', label: 'nav.consultations', icon: 'calendar' },
   { path: '/patient/prices', label: 'nav.admin_prices', icon: 'receipt-text' },
+  { path: '/patient/price-requests', label: 'nav.sent_baskets', icon: 'shopping-cart' },
   { path: '/patient/chat', label: 'nav.chat', icon: 'message-circle' },
   { path: '/patient/documents', label: 'nav.documents', icon: 'file-text' },
   { path: '/patient/plan-trip', label: 'nav.plan_trip', icon: 'clipboard-list' },

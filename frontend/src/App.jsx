@@ -29,6 +29,7 @@ const BlogPage = lazy(() => import('./pages/BlogPage'))
 const PriceListPage = lazy(() => import('./pages/PriceListPage'))
 const PatientDashboard = lazy(() => import('./pages/patient/PatientDashboard'))
 const PatientAppointments = lazy(() => import('./pages/patient/PatientAppointments'))
+const PatientPriceRequests = lazy(() => import('./pages/patient/PatientPriceRequests'))
 const PatientProfile = lazy(() => import('./pages/patient/PatientProfile'))
 const PatientChat = lazy(() => import('./pages/patient/PatientChat'))
 const PatientDocuments = lazy(() => import('./pages/patient/PatientDocuments'))
@@ -222,6 +223,7 @@ function App() {
           <Route path="cases/:id" element={<MedicalCaseDetail />} />
           <Route path="appointments" element={<PatientAppointments />} />
           <Route path="prices" element={<PriceListPage />} />
+          <Route path="price-requests" element={<PatientPriceRequests />} />
           <Route path="appointments/:id" element={<AppointmentDetail />} />
           <Route path="doctors" element={<Navigate to="/patient/appointments" replace />} />
           <Route path="doctors/:id" element={<Navigate to="/patient/appointments" replace />} />
