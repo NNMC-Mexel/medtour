@@ -23,3 +23,5 @@ Admin, manager, and coordinator roles may add, edit, and delete catalog items. T
 The official rate is a daily accounting rate, not an intraday exchange quote. Patients submit selected services as a request, not a purchase. The server validates each selected service and stores a snapshot of its current USD amount; managers see the request and receive an in-app notification. The manager confirms the final services and treatment price.
 
 The source workbook contains Russian service names only. Category labels are translated in the interface; service titles remain in the source language until reviewed translations are supplied.
+
+The QA findings and source-tariff release gates are recorded in [the price catalog QA report](PRICE_CATALOG_QA_2026-09-18.md). Staff KZT saves include the previewed rate and date; if the official rate changes before saving, the server returns 409 and the form requests a fresh preview.
