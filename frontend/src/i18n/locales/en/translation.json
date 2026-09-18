@@ -1581,6 +1581,7 @@
     "err_required": "Service name and category are required",
     "err_price": "Enter a valid price",
     "err_save": "Failed to save price",
+    "rate_changed": "The exchange rate changed. Check the updated USD preview and save again.",
     "err_delete": "Failed to delete price",
     "saved": "Price saved",
     "created": "Price created",

@@ -5,6 +5,10 @@ const UID = 'api::price-request.price-request';
 const PRICE_UID = 'api::price-item.price-item';
 const staffRoles = ['admin', 'manager', 'coordinator'];
 const roleOf = (ctx: any) => ctx.state?.user?.role?.type || ctx.state?.user?.userRole;
+const patientView = (item: any) => {
+  const { managerNote, ...visible } = item;
+  return visible;
+};
 
 export default factories.createCoreController(UID as any, ({ strapi }) => ({
   async find(ctx) {
@@ -19,7 +23,7 @@ export default factories.createCoreController(UID as any, ({ strapi }) => ({
       strapi.documents(UID as any).findMany({ filters, populate: { patient: { fields: ['id', 'documentId', 'fullName', 'email', 'phone'] } }, sort: 'createdAt:desc', start: (page - 1) * pageSize, limit: pageSize } as any),
       strapi.documents(UID as any).count({ filters } as any),
     ]);
-    ctx.body = { data, meta: { pagination: { page, pageSize, pageCount: Math.ceil(total / pageSize), total } } };
+    ctx.body = { data: role === 'patient' ? data.map(patientView) : data, meta: { pagination: { page, pageSize, pageCount: Math.ceil(total / pageSize), total } } };
   },
   async findOne(ctx) {
     const user = ctx.state.user;
@@ -27,7 +31,7 @@ export default factories.createCoreController(UID as any, ({ strapi }) => ({
     const item: any = await strapi.documents(UID as any).findOne({ documentId: String(ctx.params.id), populate: { patient: { fields: ['id', 'documentId', 'fullName', 'email', 'phone'] } } } as any);
     if (!item) return ctx.notFound();
     if (!staffRoles.includes(roleOf(ctx)) && item.patient?.documentId !== user.documentId) return ctx.forbidden();
-    ctx.body = { data: item };
+    ctx.body = { data: roleOf(ctx) === 'patient' ? patientView(item) : item };
   },
   async create(ctx) {
     const user = ctx.state.user;
@@ -69,7 +73,7 @@ export default factories.createCoreController(UID as any, ({ strapi }) => ({
         } as any });
       } catch (error) { strapi.log.error('Price request notification failed', error); }
     }
-    ctx.body = { data: saved };
+    ctx.body = { data: patientView(saved) };
     ctx.status = 201;
   },
   async update(ctx) {

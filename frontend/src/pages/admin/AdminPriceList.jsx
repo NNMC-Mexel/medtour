@@ -59,7 +59,7 @@ function normalizeItemTranslations(item) {
   return translations
 }
 
-function toPayload(form, fallbackOrder, editingItem) {
+function toPayload(form, fallbackOrder, editingItem, rate) {
   const translations = {
     ...getEmptyTranslations(),
     ...(form.translations || {}),
@@ -77,6 +77,7 @@ function toPayload(form, fallbackOrder, editingItem) {
     category: baseTranslation.category.trim(),
     description: baseTranslation.description?.trim() || '',
     ...(convertFromKzt ? { priceKZT: Number(form.priceKZT) } : {}),
+    ...(convertFromKzt ? { expectedRate: rate.kztPerUsd, expectedRateDate: rate.date } : {}),
     ...(useDirectUsd ? { price: Number(form.price) || 0 } : {}),
     currency: 'USD',
     section: form.section,
@@ -189,7 +190,7 @@ function AdminPriceList() {
 
     setIsSaving(true)
     try {
-      const payload = toPayload(form, (items?.length || 0) + 1, editingItem)
+      const payload = toPayload(form, (items?.length || 0) + 1, editingItem, rate)
 
       if (editingItem?.documentId) {
         await priceItemsAPI.update(editingItem.documentId, payload)
@@ -203,6 +204,11 @@ function AdminPriceList() {
       await loadData()
       toast.success(editingItem ? t('admin_price.saved') : t('admin_price.created'))
     } catch (error) {
+      if (error?.response?.status === 409) {
+        priceItemsAPI.exchangeRate().then((response) => setRate(response.data?.data)).catch(() => setRate(null))
+        toast.warning(t('admin_price.rate_changed'))
+        return
+      }
       console.error('Error saving price item:', error)
       toast.error(t('admin_price.err_save'))
     } finally {
