@@ -4,5 +4,8 @@ cmds = ["npm ci"]
 [phases.build]
 cmds = ["npm run build"]
 
+# Caddy (Caddyfile) отдаёт настоящие 404, SEO-копии страниц и заголовки
+# безопасности. Если в образе его нет — прежний `vite preview`, чтобы деплой
+# не зависел от того, поставил ли Nixpacks Caddy.
 [start]
-cmd = "npx vite preview --host 0.0.0.0 --port ${PORT:-1342}"
+cmd = "if command -v caddy >/dev/null 2>&1; then exec caddy run --config Caddyfile --adapter caddyfile 2>&1; else exec npx vite preview --host 0.0.0.0 --port ${PORT:-1342}; fi"

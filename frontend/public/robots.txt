@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+# Cabinets and account pages are private and useless in search results.
+Disallow: /patient/
+Disallow: /doctor/
+Disallow: /admin/
+Disallow: /manager/
+Disallow: /coordinator/
+Disallow: /consultation/
+Disallow: /payment/
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email-sent
+Disallow: /email-confirmed
+
+Sitemap: https://medtour.nnmc.kz/sitemap.xml

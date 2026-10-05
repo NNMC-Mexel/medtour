@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { Shield, ChevronLeft } from 'lucide-react'
+import useSeo from '../components/seo/useSeo'
 
 const privacyCopy = {
   en: {
@@ -176,6 +177,7 @@ function Section({ title, paragraphs = [], bullets = [] }) {
 
 export default function PrivacyPage() {
   const { i18n } = useTranslation()
+  useSeo({ title: i18n.t('seo.privacy_title'), description: i18n.t('seo.privacy_description'), path: '/privacy' })
   const copy = privacyCopy[i18n.language] || privacyCopy.en
 
   useEffect(() => {

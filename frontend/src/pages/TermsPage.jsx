@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { FileText, ChevronLeft, RotateCcw, CreditCard, AlertCircle } from 'lucide-react'
+import useSeo from '../components/seo/useSeo'
 
 const termsCopy = {
   en: {
@@ -197,6 +198,7 @@ function Section({ title, paragraphs = [], bullets = [], after }) {
 
 export default function TermsPage() {
   const { i18n } = useTranslation()
+  useSeo({ title: i18n.t('seo.terms_title'), description: i18n.t('seo.terms_description'), path: '/terms' })
   const copy = termsCopy[i18n.language] || termsCopy.en
 
   useEffect(() => {

@@ -36,6 +36,7 @@ import {
     scheduleConfigToLegacyFields,
 } from "../utils/schedule";
 import { getKazakhstanCalendarToday } from "../utils/kazakhstanTime";
+import useSeo from '../components/seo/useSeo'
 
 // Сводка графика для карточки: часы приёма, перерывы между интервалами,
 // рабочие дни (ISO 1..7) и текущий отпуск.
@@ -61,6 +62,19 @@ function DoctorProfilePage() {
     const [doctor, setDoctor] = useState(null);
     const [reviews, setReviews] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const seoName = doctor ? (getDoctorField(doctor, 'fullName', i18n.language) || doctor.fullName) : '';
+    const seoSpecialization = doctor
+        ? (getSpecName(doctor.specialization, i18n.language) || t('doctor_public.specialist'))
+        : '';
+    // Несуществующий врач не должен попадать в индекс.
+    useSeo({
+        title: doctor ? t('seo.doctor_title', { name: seoName, specialization: seoSpecialization }) : t('seo.doctors_title'),
+        description: doctor
+            ? t('seo.doctor_description', { name: seoName, specialization: seoSpecialization })
+            : t('seo.doctors_description'),
+        path: `/doctors/${id}`,
+        noindex: !isLoading && !doctor,
+    });
 
     useEffect(() => {
         fetchDoctorData();

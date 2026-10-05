@@ -16,10 +16,13 @@ import useAppointmentStore from '../stores/appointmentStore'
 import { getSpecName } from '../utils/helpers'
 import { SHOW_DOCTOR_PRICES } from '../utils/constants'
 import { useUsdRate } from '../hooks/useUsdRate'
+import useSeo from '../components/seo/useSeo'
 
 function DoctorsPage() {
   const usdRate = useUsdRate()
   const { t, i18n } = useTranslation()
+  // /specializations показывает тот же каталог — canonical один.
+  useSeo({ title: t('seo.doctors_title'), description: t('seo.doctors_description'), path: '/doctors' })
 
   const sortOptions = [
     { value: 'rating', label: t('doctors_page.sort_rating') },

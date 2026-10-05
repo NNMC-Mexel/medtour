@@ -2501,5 +2501,28 @@
     "documents_uploaded_many": "{{count}} patient documents in the case",
     "documents_uploaded_other": "{{count}} patient documents in the case",
     "documents_missing": "No patient documents yet"
+  },
+  "seo": {
+    "home_title": "Medical treatment in Kazakhstan — MedTour by NNMC",
+    "home_description": "Treatment at the National Scientific Medical Center in Astana: online consultations with doctors, a personal case manager, prices in US dollars, visa and travel support.",
+    "doctors_title": "Doctors — MedTour",
+    "doctors_description": "Specialists of the National Scientific Medical Center in Astana: experience, specializations and online consultations.",
+    "doctor_title": "{{name}} — {{specialization}} | MedTour",
+    "doctor_description": "{{name}}, {{specialization}} at the National Scientific Medical Center in Astana. Get an online consultation through MedTour.",
+    "prices_title": "Prices for treatment in Kazakhstan — MedTour",
+    "prices_description": "Price list of the National Scientific Medical Center: consultations, diagnostics, surgery and inpatient care, in US dollars.",
+    "tourism_title": "Travelling to Kazakhstan for treatment — MedTour",
+    "tourism_description": "Astana and Kazakhstan for patients and their companions: what to see, where to stay and how we help with the trip.",
+    "blog_title": "Blog — MedTour",
+    "blog_description": "Articles about treatment in Kazakhstan, preparing for the trip and recovery.",
+    "treatment_title": "{{department}} in Kazakhstan — MedTour",
+    "treatment_description": "{{short}}. Treatment at the National Scientific Medical Center in Astana with MedTour support.",
+    "privacy_title": "Privacy policy — MedTour",
+    "privacy_description": "How MedTour processes and protects patients' personal and medical data.",
+    "terms_title": "Terms of use — MedTour",
+    "terms_description": "Terms of using the MedTour platform.",
+    "not_found_title": "Page not found — MedTour",
+    "not_found_text": "This page does not exist or has been moved.",
+    "not_found_home": "Go to the home page"
   }
 }

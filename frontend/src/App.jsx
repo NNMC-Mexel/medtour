@@ -43,6 +43,7 @@ const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'))
 const PaymentFailure = lazy(() => import('./pages/PaymentFailure'))
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'))
 const TermsPage = lazy(() => import('./pages/TermsPage'))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 const DoctorDashboard = lazy(() => import('./pages/doctor/DoctorDashboard'))
 const DoctorSchedule = lazy(() => import('./pages/doctor/DoctorSchedule'))
@@ -184,6 +185,7 @@ function App() {
           <Route path="/about" element={<LandingPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
 
         {/* Auth Routes */}
@@ -337,8 +339,6 @@ function App() {
         />
         <Route path="/payment/failure" element={<PaymentFailure />} />
 
-        {/* 404 */}
-        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </Suspense>
       <ActiveConsultation />

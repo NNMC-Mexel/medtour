@@ -4,6 +4,7 @@ import { ArrowRight, Clock3, FileHeart, Search, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import Button from '../components/ui/Button'
 import { cn } from '../utils/helpers'
+import useSeo from '../components/seo/useSeo'
 
 const articles = [
   { id: 1, category: 'Подготовка', title: 'Какие документы подготовить для онлайн-консультации', excerpt: 'Короткий список медицинских выписок, снимков и анализов, который поможет врачу дать более точную первичную рекомендацию.', read: '6 минут', image: '/treatments/medical-department-hero.png', featured: true },
@@ -25,6 +26,7 @@ const englishArticles = [
 
 function BlogPage() {
   const { i18n } = useTranslation()
+  useSeo({ title: i18n.t('seo.blog_title'), description: i18n.t('seo.blog_description'), path: '/blog' })
   const [category, setCategory] = useState('Все')
   const [query, setQuery] = useState('')
   const isEnglish = i18n.language?.startsWith('en')

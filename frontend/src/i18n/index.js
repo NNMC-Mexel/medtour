@@ -20,11 +20,21 @@ i18n
     load: 'languageOnly',
     interpolation: { escapeValue: false },
     detection: {
-      order: ['localStorage'],
+      // ?lang=ru|kk|en открывает нужный язык (ссылки hreflang и из поиска) и
+      // запоминается; без параметра — сохранённый выбор.
+      order: ['querystring', 'localStorage'],
+      lookupQuerystring: 'lang',
       caches: ['localStorage'],
       lookupLocalStorage: 'i18nextLng',
     },
   })
+
+// <html lang> следует за языком интерфейса: скринридеры и поисковики читают его.
+const syncHtmlLang = (lng) => {
+  if (typeof document !== 'undefined' && lng) document.documentElement.lang = lng.split('-')[0]
+}
+syncHtmlLang(i18n.language)
+i18n.on('languageChanged', syncHtmlLang)
 
 export const LANGUAGES = [
   { code: 'en', label: 'Eng', fullLabel: 'English' },
