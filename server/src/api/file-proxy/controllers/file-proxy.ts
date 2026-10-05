@@ -80,37 +80,85 @@ async function getAuthenticatedUser(ctx) {
   }
 }
 
-function getFileHashAndExt(key: string) {
-  const decodedKey = decodeURIComponent(key);
-  const filename = decodedKey.split('/').pop() || decodedKey;
-  const dotIndex = filename.lastIndexOf('.');
+const RESPONSIVE_FORMAT_PREFIXES = ['thumbnail_', 'small_', 'medium_', 'large_'];
 
-  if (dotIndex === -1) {
-    return { hash: filename, ext: undefined };
+/** Ключ объекта в хранилище, на который указывает URL файла (proxy, /uploads или абсолютный). */
+export function getStorageKeyFromUrl(url: unknown): string | null {
+  if (typeof url !== 'string' || !url.trim()) return null;
+  try {
+    const pathname = new URL(url, 'http://localhost').pathname;
+    const proxyPrefix = '/api/file-proxy/';
+    const rawKey = pathname.includes(proxyPrefix)
+      ? pathname.slice(pathname.indexOf(proxyPrefix) + proxyPrefix.length)
+      : pathname.startsWith('/uploads/')
+        ? pathname.slice('/uploads/'.length)
+        : pathname.replace(/^\/+/, '');
+    try {
+      return decodeURIComponent(rawKey);
+    } catch {
+      return rawKey;
+    }
+  } catch {
+    return null;
   }
-
-  return {
-    hash: filename.slice(0, dotIndex),
-    ext: filename.slice(dotIndex),
-  };
 }
 
-async function findUploadFileByKey(key: string) {
-  const { hash, ext } = getFileHashAndExt(key);
+const normalizeKey = (key: string) => {
+  const trimmed = String(key || '').replace(/^\/+/, '');
+  try {
+    return decodeURIComponent(trimmed);
+  } catch {
+    return trimmed;
+  }
+};
 
-  const exactMatches = await strapi.query('plugin::upload.file').findMany({
-    where: ext ? { hash, ext } : { hash },
-    limit: 1,
+async function findUploadFileByOriginalKey(key: string) {
+  const encodedKey = encodeURIComponent(key);
+  const candidateUrls = [
+    `/api/file-proxy/${key}`,
+    `/api/file-proxy/${encodedKey}`,
+    `/uploads/${key}`,
+    key,
+    `/${key}`,
+  ];
+
+  const exact = await strapi.db.query('plugin::upload.file').findOne({
+    where: { url: { $in: candidateUrls } },
   });
+  if (exact) return exact;
 
-  if (exactMatches[0]) return exactMatches[0];
-
-  const fallbackMatches = await strapi.query('plugin::upload.file').findMany({
+  // Абсолютные URL (https://server/api/file-proxy/<key>) и разные варианты
+  // кодирования ищем по подстроке, но принимаем только запись, чей ключ
+  // реально совпадает с запрошенным. Раньше бралась первая попавшаяся запись:
+  // доступ проверялся по одному файлу, а из хранилища отдавался другой.
+  const candidates = await strapi.db.query('plugin::upload.file').findMany({
     where: { url: { $contains: key } },
-    limit: 1,
+    limit: 10,
   });
+  return candidates.find((candidate: any) => getStorageKeyFromUrl(candidate?.url) === key) || null;
+}
 
-  return fallbackMatches[0] || null;
+/**
+ * Находит запись upload.file по ключу хранилища. Адаптивные варианты
+ * (small_/medium_/…) живут в JSON `formats` родителя, поэтому резолвим
+ * родителя и проверяем, что запрошенный вариант у него действительно объявлен.
+ */
+export async function findUploadFileByKey(rawKey: string) {
+  const key = normalizeKey(rawKey);
+  if (!key) return null;
+
+  const file = await findUploadFileByOriginalKey(key);
+  if (file) return file;
+
+  const slash = key.lastIndexOf('/');
+  const directory = slash >= 0 ? key.slice(0, slash + 1) : '';
+  const fileName = key.slice(slash + 1);
+  const prefix = RESPONSIVE_FORMAT_PREFIXES.find((candidate) => fileName.startsWith(candidate));
+  if (!prefix) return null;
+
+  const parent = await findUploadFileByOriginalKey(`${directory}${fileName.slice(prefix.length)}`);
+  const formats = parent?.formats && typeof parent.formats === 'object' ? Object.values(parent.formats) : [];
+  return formats.some((format: any) => getStorageKeyFromUrl(format?.url) === key) ? parent : null;
 }
 
 function doctorUserMatches(doctor: any, userId: number) {
@@ -176,13 +224,15 @@ export async function decideFileAccess(ctx, key: string): Promise<AccessDecision
 
   const relations: any[] = Array.isArray(fileWithRelations?.related) ? fileWithRelations.related : [];
 
-  // 1. Allow files attached to known public collection types.
-  for (const relation of relations) {
-    const uid = relation?.__type || relation?.__contentType || relation?.uid;
-    if (uid && PUBLIC_CONTENT_UIDS.has(uid)) {
-      return { allowed: true, isMedicalDocument: false };
-    }
+  // 1. Allow files whose EVERY relation is a known public collection type.
+  //    "Any public relation" was not enough: a doctor could set the id of a
+  //    patient's medical file as their own photo and make it world-readable.
+  const relationUids = relations.map((relation) => relation?.__type || relation?.__contentType || relation?.uid);
+  if (relationUids.length > 0 && relationUids.every((uid) => uid && PUBLIC_CONTENT_UIDS.has(uid))) {
+    return { allowed: true, isMedicalDocument: false };
   }
+  const hasPrivateRelation = relationUids.some((uid) =>
+    uid === 'api::medical-document.medical-document' || uid === 'api::message.message');
 
   // Treatment department hero images are stored as compact media descriptors
   // inside the global JSON field, so they do not create a Strapi morph relation.
@@ -193,7 +243,7 @@ export async function decideFileAccess(ctx, key: string): Promise<AccessDecision
   const treatmentDepartments = Array.isArray(globalContent?.treatmentDepartments)
     ? globalContent.treatmentDepartments
     : [];
-  if (treatmentDepartments.some((department: any) => Number(department?.heroImage?.id) === Number(uploadFile.id))) {
+  if (!hasPrivateRelation && treatmentDepartments.some((department: any) => Number(department?.heroImage?.id) === Number(uploadFile.id))) {
     return { allowed: true, isMedicalDocument: false };
   }
 
@@ -286,7 +336,8 @@ function safeFilename(name: string | undefined | null) {
 
 export default {
   async proxy(ctx) {
-    const { key } = ctx.params;
+    // Serve exactly the key the access decision was made for.
+    const key = normalizeKey(ctx.params?.key);
 
     if (!process.env.MINIO_ENDPOINT && !process.env.S3_ENDPOINT) {
       ctx.status = 404;

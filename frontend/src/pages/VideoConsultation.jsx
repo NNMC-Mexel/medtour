@@ -35,6 +35,7 @@ import {
   Paperclip,
   Download,
   Image,
+  RefreshCw,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { io } from 'socket.io-client'
@@ -45,6 +46,17 @@ import { cn, getSpecName } from '../utils/helpers'
 import useAuthStore from '../stores/authStore'
 import api, { appointmentsAPI, documentsAPI, uploadFile, getSignalingUrl, openMediaInNewTab } from '../services/api'
 import { formatDateTimeInTimeZone, getDeviceTimeZone, KAZAKHSTAN_TIME_ZONE } from '../utils/kazakhstanTime'
+import { MEDIA_KIND, MEDIA_REASON, acquireLocalMedia, describeMediaOutcome } from '../utils/mediaAccess'
+import { playChatChime } from '../utils/audioCues'
+import { isChatSurfaceVisible, isOwnChatMessage, resolveIncomingChatSignal } from '../utils/chatSignals'
+
+// Подсказку «браузер не умеет» или «нужен HTTPS» бессмысленно писать отдельно
+// про камеру и отдельно про микрофон — причина одна на оба устройства.
+const SHARED_MEDIA_REASONS = new Set([MEDIA_REASON.UNSUPPORTED, MEDIA_REASON.INSECURE])
+const mediaStringKey = (kind, reason) =>
+  SHARED_MEDIA_REASONS.has(reason)
+    ? `video.media.common.${reason}`
+    : `video.media.${kind}.${reason}`
 
 const _TURN_USER = import.meta.env.VITE_TURN_USERNAME || '';
 const _TURN_CRED = import.meta.env.VITE_TURN_CREDENTIAL || '';
@@ -90,6 +102,12 @@ function VideoConsultation({
   const toast = useToast()
 
   const [connectionState, setConnectionState] = useState('initializing')
+  // Результат запроса камеры/микрофона: каждое устройство отдельно, чтобы
+  // отсутствие одного не закрывало вход в комнату.
+  const [mediaOutcome, setMediaOutcome] = useState(null)
+  const [mediaNoticeDismissed, setMediaNoticeDismissed] = useState(false)
+  const [mediaAttempt, setMediaAttempt] = useState(0)
+  const allowNoDevicesRef = useRef(false)
   const [isMuted, setIsMuted] = useState(false)
   const [isVideoOn, setIsVideoOn] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -106,6 +124,39 @@ function VideoConsultation({
   const [remoteIsPortrait, setRemoteIsPortrait] = useState(false)
   const [containerHeight, setContainerHeight] = useState(0)
   const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+
+  // Непрочитанные сообщения чата: счётчик растёт, пока чат не на экране
+  // (панель закрыта, открыта другая вкладка, звонок свёрнут или страница в фоне).
+  const [unreadChatCount, setUnreadChatCount] = useState(0)
+  // Обработчик 'chat-message' навешивается один раз, поэтому видимость чата
+  // читаем через ref — иначе в замыкании навсегда останется начальное значение.
+  const chatVisibilityRef = useRef({ sidebarOpen: true, sidebarTab: 'chat', isMinimized: false })
+  const lastChimeAtRef = useRef(null)
+  const isChatVisible = isChatSurfaceVisible({
+    sidebarOpen,
+    sidebarTab,
+    isMinimized,
+    documentVisibility: typeof document === 'undefined' ? 'visible' : document.visibilityState,
+  })
+
+  useEffect(() => {
+    chatVisibilityRef.current = { sidebarOpen, sidebarTab, isMinimized }
+  }, [sidebarOpen, sidebarTab, isMinimized])
+
+  useEffect(() => {
+    if (isChatVisible) setUnreadChatCount(0)
+  }, [isChatVisible, messages.length])
+
+  // Возврат на вкладку при открытом чате тоже снимает отметку.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (isChatSurfaceVisible({ ...chatVisibilityRef.current, documentVisibility: document.visibilityState })) {
+        setUnreadChatCount(0)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
 
   // Серверная проверка временного окна подключения.
   // 'checking' | 'allowed' | 'denied'. Девайсные часы здесь не используются —
@@ -465,20 +516,39 @@ function VideoConsultation({
     const init = async () => {
       try {
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: isMobile ? { facingMode: 'user' } : { width: 1280, height: 720 },
-          audio: true,
+        const media = await acquireLocalMedia({
+          getUserMedia: (request) => navigator.mediaDevices.getUserMedia(request),
+          videoConstraints: isMobile ? { facingMode: { ideal: 'user' } } : { width: { ideal: 1280 }, height: { ideal: 720 } },
+          audioConstraints: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          isSupported: Boolean(navigator.mediaDevices?.getUserMedia),
+          isSecureContext: window.isSecureContext !== false,
         })
 
         if (!mounted) {
-          stream.getTracks().forEach(track => track.stop())
+          media.stream?.getTracks().forEach(track => track.stop())
           return
         }
 
-        localStreamRef.current = stream
-        if (localVideoRef.current) {
+        const outcome = describeMediaOutcome(media)
+        setMediaOutcome(outcome)
+        setMediaNoticeDismissed(false)
+
+        // Ни камеры, ни микрофона: сначала объясняем, что случилось, и даём
+        // выбрать между повтором и входом «только смотреть и слушать».
+        if (outcome.needsConfirmation && !allowNoDevicesRef.current) {
+          media.stream?.getTracks().forEach(track => track.stop())
+          setConnectionState('media-blocked')
+          return
+        }
+
+        const stream = media.stream
+        localStreamRef.current = stream || null
+        if (stream && localVideoRef.current) {
           localVideoRef.current.srcObject = stream
         }
+        // Кнопки отражают реальное положение дел: без дорожки нечего включать.
+        setIsVideoOn(Boolean(stream?.getVideoTracks().length))
+        setIsMuted(!stream?.getAudioTracks().length)
 
         const socket = io(SIGNALING_SERVER, {
           transports: ['websocket', 'polling'],
@@ -594,15 +664,33 @@ function VideoConsultation({
         })
 
         socket.on('chat-message', (data) => {
-          const currentUserId = String(user?.id ?? '')
+          const isOwn = isOwnChatMessage(data, user?.id)
           setMessages(prev => [...prev, {
             id: data.id,
-            sender: (data.userId != null && String(data.userId) === currentUserId) ? 'me' : 'other',
+            sender: isOwn ? 'me' : 'other',
             text: data.message,
             attachment: data.attachment || null,
             senderName: data.senderName,
             time: new Date(data.timestamp),
           }])
+
+          // Глаза на видео, а не на чате: сообщение собеседника сопровождаем
+          // сигналом (не чаще раза в 1,2 с) и счётчиком, пока чат не виден.
+          const { playChime, countUnread, nextChimeAt } = resolveIncomingChatSignal({
+            isOwnMessage: isOwn,
+            chatVisible: isChatSurfaceVisible({
+              ...chatVisibilityRef.current,
+              documentVisibility: document.visibilityState,
+            }),
+            now: Date.now(),
+            lastChimeAt: lastChimeAtRef.current,
+          })
+          lastChimeAtRef.current = nextChimeAt
+          if (playChime) {
+            playChatChime()
+            navigator.vibrate?.([30, 60, 30])
+          }
+          if (countUnread) setUnreadChatCount((count) => count + 1)
         })
 
         socket.on('remote-orientation-update', ({ isPortrait }) => {
@@ -633,7 +721,7 @@ function VideoConsultation({
       socketRef.current?.emit('leave-room')
       socketRef.current?.disconnect()
     }
-  }, [roomId, user?.id, user?.userRole, token, accessStatus])
+  }, [roomId, user?.id, user?.userRole, token, accessStatus, mediaAttempt])
 
   const handleReconnect = () => {
     if (reconnectAttemptsRef.current >= 3) {
@@ -689,9 +777,20 @@ function VideoConsultation({
     const pc = new RTCPeerConnection(ICE_SERVERS)
     peerConnectionRef.current = pc
 
-    localStreamRef.current?.getTracks().forEach(track => {
+    const localTracks = localStreamRef.current?.getTracks() || []
+    localTracks.forEach(track => {
       pc.addTrack(track, localStreamRef.current)
     })
+
+    // Без своей дорожки соответствующей m-линии в offer не будет, и собеседник
+    // не сможет прислать звук или картинку. Участнику без камеры/микрофона
+    // добавляем приёмный трансивер: отдавать нечего, но видеть и слышать он должен.
+    if (!localTracks.some(track => track.kind === 'audio')) {
+      pc.addTransceiver('audio', { direction: 'recvonly' })
+    }
+    if (!localTracks.some(track => track.kind === 'video')) {
+      pc.addTransceiver('video', { direction: 'recvonly' })
+    }
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -798,6 +897,55 @@ function VideoConsultation({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
+  // Пока устройства не запрошены, считаем их исправными: панель управления не
+  // должна мигать блокировками на первой секунде звонка.
+  const hasMicrophone = mediaOutcome ? mediaOutcome.devices[MEDIA_KIND.MICROPHONE].ok : true
+  const hasCamera = mediaOutcome ? mediaOutcome.devices[MEDIA_KIND.CAMERA].ok : true
+  const missingDevices = mediaOutcome?.missing || []
+  const isMediaBlocked = connectionState === 'media-blocked'
+  const showMediaNotice = missingDevices.length > 0 && !mediaNoticeDismissed && !isMediaBlocked
+
+  const retryMediaDevices = () => {
+    setMediaNoticeDismissed(false)
+    setConnectionState('initializing')
+    setMediaAttempt((attempt) => attempt + 1)
+  }
+
+  const joinWithoutDevices = () => {
+    allowNoDevicesRef.current = true
+    retryMediaDevices()
+  }
+
+  // Плашка в комнате говорит о последствиях («врач вас не увидит»), подсказка
+  // под ней — о причине и способе починить.
+  const mediaNotice = (() => {
+    if (!showMediaNotice) return null
+    if (missingDevices.length === 2) {
+      return { Icon: MicOff, title: t('video.media.notice_none.title'), hint: t('video.media.notice_none.hint') }
+    }
+    const kind = missingDevices[0]
+    const reason = mediaOutcome.devices[kind].reason
+    return {
+      Icon: kind === MEDIA_KIND.CAMERA ? VideoOff : MicOff,
+      title: t(kind === MEDIA_KIND.CAMERA ? 'video.media.notice_no_camera.title' : 'video.media.notice_no_microphone.title'),
+      hint: t(`${mediaStringKey(kind, reason)}.hint`),
+    }
+  })()
+
+  const renderMediaDeviceRow = (kind) => {
+    const reason = mediaOutcome?.devices?.[kind]?.reason || MEDIA_REASON.OTHER
+    const Icon = kind === MEDIA_KIND.CAMERA ? VideoOff : MicOff
+    return (
+      <li key={kind} className="flex gap-3 rounded-xl bg-slate-900/60 p-3 text-left">
+        <Icon className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-white">{t(`${mediaStringKey(kind, reason)}.title`)}</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-400">{t(`${mediaStringKey(kind, reason)}.hint`)}</p>
+        </div>
+      </li>
+    )
+  }
+
   const toggleMute = () => {
     const audioTrack = localStreamRef.current?.getAudioTracks()[0]
     if (audioTrack) {
@@ -844,9 +992,14 @@ function VideoConsultation({
 
   const cleanupCall = () => {
     localStreamRef.current?.getTracks().forEach(track => track.stop())
+    localStreamRef.current = null
     peerConnectionRef.current?.close()
+    peerConnectionRef.current = null
     socketRef.current?.emit('leave-room')
     socketRef.current?.disconnect()
+    socketRef.current = null
+    activeSocketRef.current = null
+    clearTimeout(reconnectTimerRef.current)
     remoteStreamRef.current = null
   }
 
@@ -896,8 +1049,9 @@ function VideoConsultation({
 
   const confirmEndCall = async () => {
     if (isEndingCallRef.current || !pendingEndAction) return
-    const action = pendingEndAction
-    if (action === 'complete' && !appointment?.documentId) return
+    // Without a loaded appointment we cannot complete it server-side, but the
+    // participant must still be able to get out of the call, so degrade to leave.
+    const action = pendingEndAction === 'complete' && appointment?.documentId ? 'complete' : 'leave'
 
     isEndingCallRef.current = true
     setIsCompletingCall(true)
@@ -907,14 +1061,23 @@ function VideoConsultation({
         await appointmentsAPI.update(appointment.documentId, { status: 'completed' })
         socketRef.current?.emit('force-end-call')
       }
-      cleanupCall()
-      setPendingEndAction(null)
-
-      closeConsultation(isDoctor ? '/doctor' : '/patient/appointments')
     } catch (err) {
+      // Completing the appointment is best-effort. Leaving the call must never
+      // depend on it, otherwise the button looks dead and gets clicked again.
       console.error('Error completing appointment:', err)
-      isEndingCallRef.current = false
+      const message = err?.response?.data?.error?.message
+      toast.error(message || t('video.complete_error'))
+    }
+
+    // Always tear the call down and release the participant — a failed status
+    // update must not trap them behind an unresponsive confirmation dialog.
+    try {
+      cleanupCall()
+      setConnectionState('waiting')
+      setPendingEndAction(null)
+      closeConsultation(isDoctor ? '/doctor' : '/patient/appointments')
     } finally {
+      isEndingCallRef.current = false
       setIsCompletingCall(false)
     }
   }
@@ -1116,7 +1279,7 @@ function VideoConsultation({
                 : 'bg-rose-500 hover:bg-rose-600'
             )}
             onClick={confirmEndCall}
-            disabled={isCompletingCall || (pendingEndAction === 'complete' && !appointment?.documentId)}
+            disabled={isCompletingCall}
           >
             {isCompletingCall ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -1193,6 +1356,7 @@ function VideoConsultation({
       connected: t('video.connected'),
       reconnecting: t('video.reconnecting'),
       failed: t('video.failed_title'),
+      'media-blocked': t('video.media.gate_title'),
     }[connectionState] || connectionState
 
     return (
@@ -1271,10 +1435,11 @@ function VideoConsultation({
               <button
                 type="button"
                 onClick={toggleMute}
-                title={isMuted ? t('common.mic_on') : t('common.mic_off')}
-                aria-label={isMuted ? t('common.mic_on') : t('common.mic_off')}
+                disabled={!hasMicrophone}
+                title={hasMicrophone ? (isMuted ? t('common.mic_on') : t('common.mic_off')) : t('video.media.microphone_unavailable')}
+                aria-label={hasMicrophone ? (isMuted ? t('common.mic_on') : t('common.mic_off')) : t('video.media.microphone_unavailable')}
                 className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-xl transition-colors sm:h-10 sm:w-10',
+                  'flex h-9 w-9 items-center justify-center rounded-xl transition-colors sm:h-10 sm:w-10 disabled:cursor-not-allowed disabled:opacity-50',
                   isMuted ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-slate-800 text-white hover:bg-slate-700'
                 )}
               >
@@ -1283,10 +1448,11 @@ function VideoConsultation({
               <button
                 type="button"
                 onClick={toggleVideo}
-                title={isVideoOn ? t('common.cam_off') : t('common.cam_on')}
-                aria-label={isVideoOn ? t('common.cam_off') : t('common.cam_on')}
+                disabled={!hasCamera}
+                title={hasCamera ? (isVideoOn ? t('common.cam_off') : t('common.cam_on')) : t('video.media.camera_unavailable')}
+                aria-label={hasCamera ? (isVideoOn ? t('common.cam_off') : t('common.cam_on')) : t('video.media.camera_unavailable')}
                 className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-xl transition-colors sm:h-10 sm:w-10',
+                  'flex h-9 w-9 items-center justify-center rounded-xl transition-colors sm:h-10 sm:w-10 disabled:cursor-not-allowed disabled:opacity-50',
                   !isVideoOn ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-slate-800 text-white hover:bg-slate-700'
                 )}
               >
@@ -1295,11 +1461,16 @@ function VideoConsultation({
               <button
                 type="button"
                 onClick={onRestore}
-                title={t('video.restore')}
-                aria-label={t('video.restore')}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-600 text-white transition-colors hover:bg-teal-500 sm:h-10 sm:w-10"
+                title={unreadChatCount > 0 ? t('video.unread_messages', { n: unreadChatCount }) : t('video.restore')}
+                aria-label={unreadChatCount > 0 ? t('video.unread_messages', { n: unreadChatCount }) : t('video.restore')}
+                className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-teal-600 text-white transition-colors hover:bg-teal-500 sm:h-10 sm:w-10"
               >
                 <Maximize className="h-4 w-4" />
+                {unreadChatCount > 0 && (
+                  <span aria-hidden="true" className="absolute -top-1 -right-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-slate-950">
+                    {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                  </span>
+                )}
               </button>
               <button
                 type="button"
@@ -1384,16 +1555,56 @@ function VideoConsultation({
             </button>
             {!sidebarOpen && (
               <button
-                onClick={() => setSidebarOpen(true)}
-                title={t('video.open_chat')}
-                aria-label={t('video.open_chat')}
-                className="p-2 rounded-lg bg-teal-600 text-white hover:bg-teal-500 transition-colors"
+                onClick={() => {
+                  setSidebarTab('chat')
+                  setSidebarOpen(true)
+                }}
+                title={unreadChatCount > 0 ? t('video.unread_messages', { n: unreadChatCount }) : t('video.open_chat')}
+                aria-label={unreadChatCount > 0 ? t('video.unread_messages', { n: unreadChatCount }) : t('video.open_chat')}
+                className={cn(
+                  'relative p-2 rounded-lg text-white transition-colors',
+                  unreadChatCount > 0 ? 'bg-amber-500 hover:bg-amber-400 animate-pulse' : 'bg-teal-600 hover:bg-teal-500'
+                )}
               >
                 <MessageCircle className="w-4 h-4" />
+                {unreadChatCount > 0 && (
+                  <span aria-hidden="true" className="absolute -top-1 -right-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-slate-800">
+                    {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                  </span>
+                )}
               </button>
             )}
           </div>
         </div>
+
+        {/* Ограничения по устройствам: не ошибка, а предупреждение о том,
+            чего собеседник не получит */}
+        {mediaNotice && (
+          <div className="flex items-start gap-3 border-b border-amber-400/20 bg-amber-400/10 px-3 py-2.5 sm:px-4">
+            <mediaNotice.Icon className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-amber-100">{mediaNotice.title}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-amber-200/70">{mediaNotice.hint}</p>
+            </div>
+            <button
+              type="button"
+              onClick={retryMediaDevices}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-400/15 px-2.5 py-1.5 text-xs font-medium text-amber-100 transition-colors hover:bg-amber-400/25"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{t('video.media.retry_devices')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMediaNoticeDismissed(true)}
+              aria-label={t('common.close')}
+              title={t('common.close')}
+              className="shrink-0 rounded-lg p-1.5 text-amber-200/70 transition-colors hover:bg-amber-400/15 hover:text-amber-100"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         {/* Video Container */}
         <div ref={videoContainerRef} className="flex-1 relative bg-slate-900">
@@ -1495,6 +1706,43 @@ function VideoConsultation({
             </div>
           )}
 
+          {isMediaBlocked && (
+            <div className="absolute inset-0 z-[25] flex items-start justify-center overflow-y-auto bg-slate-900 px-4 py-6 sm:items-center">
+              <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-800/70 p-5 sm:p-6">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-400/15">
+                  <Settings className="h-7 w-7 text-amber-300" />
+                </div>
+                <h3 className="text-center text-xl font-semibold text-white">{t('video.media.gate_title')}</h3>
+                <p className="mt-2 text-center text-sm text-slate-300">{t('video.media.gate_desc')}</p>
+                <ul className="mt-5 space-y-2">
+                  {[MEDIA_KIND.MICROPHONE, MEDIA_KIND.CAMERA].map(renderMediaDeviceRow)}
+                </ul>
+                <div className="mt-6 space-y-2">
+                  <Button className="w-full" onClick={retryMediaDevices} leftIcon={<RefreshCw className="h-4 w-4" />}>
+                    {t('video.media.retry_devices')}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={joinWithoutDevices}
+                    className="w-full rounded-xl border border-slate-600 px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-700/50"
+                  >
+                    {t('video.media.join_without')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate(isDoctor ? '/doctor/schedule' : '/patient/appointments')}
+                    className="w-full px-4 py-2 text-sm text-slate-400 transition-colors hover:text-slate-200"
+                  >
+                    {t('video.back_to_appointments')}
+                  </button>
+                </div>
+                <p className="mt-4 text-center text-xs leading-relaxed text-slate-500">
+                  {t('video.media.join_without_hint')}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-36 bg-gradient-to-t from-slate-950/85 via-slate-950/35 to-transparent" />
 
           {/* Remote Video — always preserve full frame; black side bars come from the container background */}
@@ -1577,10 +1825,11 @@ function VideoConsultation({
             <div className="pointer-events-auto flex items-center justify-center gap-2 rounded-3xl bg-slate-950/90 px-3 py-3 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl">
               <button
                 onClick={toggleMute}
-                title={isMuted ? t('common.mic_on') : t('common.mic_off')}
-                aria-label={isMuted ? t('common.mic_on') : t('common.mic_off')}
+                disabled={!hasMicrophone}
+                title={hasMicrophone ? (isMuted ? t('common.mic_on') : t('common.mic_off')) : t('video.media.microphone_unavailable')}
+                aria-label={hasMicrophone ? (isMuted ? t('common.mic_on') : t('common.mic_off')) : t('video.media.microphone_unavailable')}
                 className={cn(
-                  'h-12 w-12 rounded-2xl flex items-center justify-center transition-all',
+                  'h-12 w-12 rounded-2xl flex items-center justify-center transition-all disabled:cursor-not-allowed disabled:opacity-50',
                   isMuted
                     ? 'bg-rose-500 text-white hover:bg-rose-600'
                     : 'bg-slate-700 text-white hover:bg-slate-600'
@@ -1591,10 +1840,11 @@ function VideoConsultation({
 
               <button
                 onClick={toggleVideo}
-                title={isVideoOn ? t('common.cam_off') : t('common.cam_on')}
-                aria-label={isVideoOn ? t('common.cam_off') : t('common.cam_on')}
+                disabled={!hasCamera}
+                title={hasCamera ? (isVideoOn ? t('common.cam_off') : t('common.cam_on')) : t('video.media.camera_unavailable')}
+                aria-label={hasCamera ? (isVideoOn ? t('common.cam_off') : t('common.cam_on')) : t('video.media.camera_unavailable')}
                 className={cn(
-                  'h-12 w-12 rounded-2xl flex items-center justify-center transition-all',
+                  'h-12 w-12 rounded-2xl flex items-center justify-center transition-all disabled:cursor-not-allowed disabled:opacity-50',
                   !isVideoOn
                     ? 'bg-rose-500 text-white hover:bg-rose-600'
                     : 'bg-slate-700 text-white hover:bg-slate-600'
@@ -1648,6 +1898,11 @@ function VideoConsultation({
             >
               <MessageCircle className="w-4 h-4" />
               {t('video.tab_chat')}
+              {unreadChatCount > 0 && sidebarTab !== 'chat' && (
+                <span className="min-w-[1.25rem] rounded-full bg-rose-500 px-1.5 py-0.5 text-xs font-semibold leading-none text-white">
+                  {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                </span>
+              )}
             </button>
             {isDoctor && (
               <button

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "node --test src/utils/*.test.js",
     "lint": "eslint .",
     "i18n:check": "node scripts/check-i18n.mjs",
     "i18n:treatments": "node scripts/check-treatment-locales.mjs",

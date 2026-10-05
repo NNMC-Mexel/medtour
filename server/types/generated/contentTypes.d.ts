@@ -558,6 +558,10 @@ export interface ApiAppointmentAppointment extends Struct.CollectionTypeSchema {
       ['pending', 'paid', 'refunded', 'failed']
     > &
       Schema.Attribute.DefaultTo<'pending'>;
+    preparationReminder24hSentAt: Schema.Attribute.DateTime &
+      Schema.Attribute.Private;
+    preparationReminder2hSentAt: Schema.Attribute.DateTime &
+      Schema.Attribute.Private;
     price: Schema.Attribute.Integer & Schema.Attribute.Required;
     publishedAt: Schema.Attribute.DateTime;
     rating: Schema.Attribute.Integer &
@@ -983,6 +987,7 @@ export interface ApiDoctorDoctor extends Struct.CollectionTypeSchema {
       Schema.Attribute.DefaultTo<0>;
     reviews: Schema.Attribute.Relation<'oneToMany', 'api::review.review'>;
     reviewsCount: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    scheduleConfig: Schema.Attribute.JSON;
     slotDuration: Schema.Attribute.Integer;
     specialization: Schema.Attribute.Relation<
       'manyToOne',
@@ -1008,6 +1013,7 @@ export interface ApiDoctorDoctor extends Struct.CollectionTypeSchema {
     workEndTime: Schema.Attribute.String;
     workingDays: Schema.Attribute.String;
     workingHours: Schema.Attribute.JSON;
+    workingIntervals: Schema.Attribute.JSON;
     workplace: Schema.Attribute.String;
     workStartTime: Schema.Attribute.String;
   };
@@ -1486,6 +1492,14 @@ export interface ApiPriceItemPriceItem extends Struct.CollectionTypeSchema {
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'KZT'>;
     description: Schema.Attribute.Text;
+    exchangeRate: Schema.Attribute.Decimal &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
+    exchangeRateDate: Schema.Attribute.Date;
     i18n: Schema.Attribute.JSON;
     image: Schema.Attribute.Media<'images'>;
     isActive: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
@@ -1505,6 +1519,13 @@ export interface ApiPriceItemPriceItem extends Struct.CollectionTypeSchema {
         },
         number
       >;
+    priceKZT: Schema.Attribute.Decimal &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
     priceUSD: Schema.Attribute.Decimal &
       Schema.Attribute.SetMinMax<
         {
@@ -1513,10 +1534,61 @@ export interface ApiPriceItemPriceItem extends Struct.CollectionTypeSchema {
         number
       >;
     publishedAt: Schema.Attribute.DateTime;
+    section: Schema.Attribute.Enumeration<['checkup', 'analysis', 'service']> &
+      Schema.Attribute.DefaultTo<'service'>;
     sortOrder: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    sourceKey: Schema.Attribute.String & Schema.Attribute.Unique;
+    tariffCode: Schema.Attribute.String;
     title: Schema.Attribute.String & Schema.Attribute.Required;
     unit: Schema.Attribute.String &
       Schema.Attribute.DefaultTo<'\u0443\u0441\u043B\u0443\u0433\u0430'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiPriceRequestPriceRequest
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'price_requests';
+  info: {
+    displayName: 'Price Request';
+    pluralName: 'price-requests';
+    singularName: 'price-request';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    items: Schema.Attribute.JSON & Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::price-request.price-request'
+    > &
+      Schema.Attribute.Private;
+    managerNote: Schema.Attribute.Text;
+    note: Schema.Attribute.Text;
+    patient: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    status: Schema.Attribute.Enumeration<
+      ['new', 'reviewing', 'contacted', 'closed']
+    > &
+      Schema.Attribute.DefaultTo<'new'>;
+    totalUSD: Schema.Attribute.Decimal &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -2128,6 +2200,7 @@ export interface PluginUploadFile extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    uploadedByUserId: Schema.Attribute.Integer & Schema.Attribute.Private;
     url: Schema.Attribute.Text & Schema.Attribute.Required;
     width: Schema.Attribute.Integer;
   };
@@ -2365,6 +2438,7 @@ export interface PluginUsersPermissionsUser
       'plugin::users-permissions.role'
     >;
     timezone: Schema.Attribute.String;
+    tokenValidAfter: Schema.Attribute.DateTime & Schema.Attribute.Private;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -2411,6 +2485,7 @@ declare module '@strapi/strapi' {
       'api::message.message': ApiMessageMessage;
       'api::notification.notification': ApiNotificationNotification;
       'api::price-item.price-item': ApiPriceItemPriceItem;
+      'api::price-request.price-request': ApiPriceRequestPriceRequest;
       'api::review.review': ApiReviewReview;
       'api::specialization.specialization': ApiSpecializationSpecialization;
       'api::time-slot.time-slot': ApiTimeSlotTimeSlot;

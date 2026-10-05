@@ -1,21 +1,24 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Bell, Search, Menu, X, Loader2, CheckCheck } from 'lucide-react'
+import { Bell, Search, Menu, X, Loader2, CheckCheck, ChevronDown, LogOut, User } from 'lucide-react'
 import { cn } from '../../utils/helpers'
 import Avatar from '../ui/Avatar'
 import useAuthStore from '../../stores/authStore'
 import useNotificationStore from '../../stores/notificationStore'
+import useChatStore from '../../stores/chatStore'
 import { getMediaUrl } from '../../services/api'
 
 function Header({ title, subtitle, onMenuClick, isMobileMenuOpen }) {
   const { t } = useTranslation()
-  const { user } = useAuthStore()
+  const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const location = useLocation()
   const [showSearch, setShowSearch] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const notificationsRef = useRef(null)
+  const [showAccountMenu, setShowAccountMenu] = useState(false)
+  const accountMenuRef = useRef(null)
 
   const notifications = useNotificationStore((s) => s.notifications)
   const unreadCount = useNotificationStore((s) => s.unreadCount)
@@ -33,6 +36,38 @@ function Header({ title, subtitle, onMenuClick, isMobileMenuOpen }) {
     startPolling()
     return () => stopPolling()
   }, [user?.id, startPolling, stopPolling])
+
+  useEffect(() => {
+    if (!showAccountMenu) return undefined
+    const handlePointerDown = (event) => {
+      if (accountMenuRef.current?.contains(event.target)) return
+      setShowAccountMenu(false)
+    }
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') setShowAccountMenu(false)
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [showAccountMenu])
+
+  // Имя в шапке — самый очевидный вход в профиль. У сотрудников и админа
+  // такой страницы нет, поэтому их карточка остаётся некликабельной.
+  const profilePath = location.pathname.startsWith('/doctor')
+    ? '/doctor/profile'
+    : location.pathname.startsWith('/patient')
+      ? '/patient/profile'
+      : null
+
+  const handleLogout = () => {
+    setShowAccountMenu(false)
+    useChatStore.getState().reset()
+    logout()
+    navigate('/login')
+  }
 
   useEffect(() => {
     if (!showNotifications) return undefined
@@ -236,18 +271,84 @@ function Header({ title, subtitle, onMenuClick, isMobileMenuOpen }) {
             )}
           </div>
 
-          <div className="hidden sm:flex items-center gap-3 pl-3 border-l border-slate-200">
-            <Avatar
-              src={getMediaUrl(user?.avatar)}
-              name={user?.fullName || user?.username}
-              size="sm"
-              status="online"
-            />
-            <div className="hidden sm:block">
-              <p className="text-sm font-medium text-slate-900">
-                {user?.fullName || user?.username}
-              </p>
-            </div>
+          {/* Аккаунт: выход не только внизу боковой панели — на низких окнах
+              её низ мог быть не виден. Шапка липкая, до неё дотянуться можно всегда. */}
+          <div ref={accountMenuRef} className="relative hidden sm:flex items-center gap-1 pl-3 border-l border-slate-200">
+            {(() => {
+              const identity = (
+                <>
+                  <Avatar
+                    src={getMediaUrl(user?.avatar)}
+                    name={user?.fullName || user?.username}
+                    size="sm"
+                    status="online"
+                  />
+                  <p className="max-w-[12rem] truncate text-sm font-medium text-slate-900">
+                    {user?.fullName || user?.username}
+                  </p>
+                </>
+              )
+              if (!profilePath) return <div className="flex items-center gap-3">{identity}</div>
+              return (
+                <button
+                  type="button"
+                  onClick={() => navigate(profilePath)}
+                  aria-label={t('nav.open_profile')}
+                  title={t('nav.open_profile')}
+                  className="flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                >
+                  {identity}
+                </button>
+              )
+            })()}
+
+            <button
+              type="button"
+              onClick={() => setShowAccountMenu((open) => !open)}
+              aria-label={t('nav.account_menu')}
+              title={t('nav.account_menu')}
+              aria-haspopup="menu"
+              aria-expanded={showAccountMenu}
+              className="rounded-xl p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <ChevronDown className={cn('w-4 h-4 transition-transform', showAccountMenu && 'rotate-180')} />
+            </button>
+
+            {showAccountMenu && (
+              <div
+                role="menu"
+                aria-label={t('nav.account_menu')}
+                className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl z-50 animate-slideDown"
+              >
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <p className="truncate text-sm font-medium text-slate-900">{user?.fullName || user?.username}</p>
+                  <p className="truncate text-xs text-slate-500">{user?.email}</p>
+                </div>
+                {profilePath && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setShowAccountMenu(false)
+                      navigate(profilePath)
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    <User className="w-4 h-4 text-slate-400" />
+                    {t('nav.profile')}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-3 border-t border-slate-100 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                >
+                  <LogOut className="w-4 h-4 text-slate-400" />
+                  {t('nav.logout')}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

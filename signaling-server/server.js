@@ -536,6 +536,10 @@ app.post('/api/slot/verify', async (req, res) => {
 // The caller provides their JWT in Authorization; we resolve patientId from /users/me.
 // In live mode (PAYMENTS_LIVE=true) we verify the invoiceId with ePay before creating the appointment.
 app.post('/api/payment/epay-confirm', async (req, res) => {
+  const clientIp = req.ip || req.socket?.remoteAddress || 'unknown'
+  if (isRateLimited(clientIp, 'epay-confirm', 20, 60 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Too many payment requests. Please try again later.' })
+  }
   try {
     const authHeader = req.headers.authorization || ''
     const userToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
@@ -572,8 +576,9 @@ app.post('/api/payment/epay-confirm', async (req, res) => {
     }
 
     // --- Resolve the patient's numeric id from their JWT (needed for ePay accountId check) ---
-    const meRes = await fetch(`${STRAPI_API_URL}/api/users/me`, {
+    const meRes = await fetch(`${STRAPI_API_URL}/api/users/me?populate=role`, {
       headers: { Authorization: `Bearer ${userToken}` },
+      signal: AbortSignal.timeout(5000),
     })
     if (!meRes.ok) {
       return res.status(401).json({ error: 'Invalid or expired user token' })
@@ -582,6 +587,11 @@ app.post('/api/payment/epay-confirm', async (req, res) => {
     const patientId = meData?.id
     if (!patientId) {
       return res.status(401).json({ error: 'Could not resolve patient' })
+    }
+    // Only a patient pays for their own consultation. Staff book directly in
+    // Strapi; a doctor or admin token must not reach the API-token create below.
+    if ((meData.userRole || meData.role?.type) !== 'patient') {
+      return res.status(403).json({ error: 'Only patients can book through the payment gateway' })
     }
 
     // --- Live mode: verify payment status, amount, and owner with ePay ---
@@ -773,10 +783,6 @@ async function configureRedisAdapter() {
   console.log('[Socket.IO] Redis adapter enabled')
 }
 
-// Verified token cache: token → { userId, expiresAt }
-// Avoids hitting Strapi /api/users/me on every socket event.
-const tokenCache = new Map()
-const TOKEN_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 const STAFF_CHAT_ROLES = new Set(['manager', 'coordinator', 'admin'])
 const onlineStaffSockets = new Map()
 
@@ -794,25 +800,28 @@ async function strapiJson(path, token, options = {}) {
   return res.json().catch(() => null)
 }
 
-async function verifySocketToken(token) {
-  if (!token) return null
-  const now = Date.now()
-  const cached = tokenCache.get(token)
-  if (cached && now < cached.expiresAt) return cached.user
-
+// No positive token cache: a cached user kept a JWT working for minutes after
+// logout, password change or blocking. Sessions are re-checked on a timer instead.
+//
+// Returns { status: 'valid', user } | { status: 'revoked' } | { status: 'unknown' }.
+// 'unknown' (Strapi unreachable, 5xx) must not drop a live video call.
+async function checkSocketSession(token) {
+  if (!token) return { status: 'revoked' }
   const res = await fetch(`${STRAPI_API_URL}/api/users/me`, {
     headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(5000),
   }).catch(() => null)
 
-  if (!res?.ok) {
-    tokenCache.delete(token)
-    return null
-  }
+  if (!res) return { status: 'unknown' }
+  if (res.status === 401 || res.status === 403) return { status: 'revoked' }
+  if (!res.ok) return { status: 'unknown' }
   const user = await res.json().catch(() => null)
-  if (!user?.id) return null
+  return user?.id ? { status: 'valid', user } : { status: 'unknown' }
+}
 
-  tokenCache.set(token, { user, expiresAt: now + TOKEN_CACHE_TTL })
-  return user
+async function verifySocketToken(token) {
+  const session = await checkSocketSession(token)
+  return session.status === 'valid' ? session.user : null
 }
 
 // Room access cache: roomId -> { patientId, doctorUserId, expiresAt }
@@ -848,14 +857,6 @@ async function fetchAppointmentRoom(roomId, userToken) {
   roomAccessCache.set(roomId, entry)
   return entry
 }
-
-// Cleanup expired token cache entries every 10 minutes
-setInterval(() => {
-  const now = Date.now()
-  for (const [token, entry] of tokenCache) {
-    if (now >= entry.expiresAt) tokenCache.delete(token)
-  }
-}, 10 * 60 * 1000)
 
 /**
  * When the last participant leaves a room, revert the appointment status from
@@ -933,6 +934,73 @@ const MAX_CHAT_HISTORY = 200
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`)
   const connectedRole = socket.verifiedUser?.userRole || socket.verifiedUser?.role?.type
+
+  // Personal room: "you have a new message" signals reach the user wherever
+  // they are in the cabinet, not only on the open conversation.
+  socket.join(`user:${socket.verifiedUserId}`)
+
+  // ── Session and payload guards ─────────────────────────────────────
+  // A revoked session (logout, password change, blocked account, changed role)
+  // is disconnected within SESSION_RECHECK_MS; events from it are refused.
+  const SESSION_RECHECK_MS = 15000
+  let sessionCheckedAt = Date.now()
+  const validateSession = async () => {
+    const session = await checkSocketSession(socket.verifiedToken)
+    if (session.status === 'unknown') return true
+    const role = session.user?.userRole || session.user?.role?.type
+    if (session.status !== 'valid' || session.user.id !== socket.verifiedUserId || role !== connectedRole) {
+      socket.disconnect(true)
+      return false
+    }
+    sessionCheckedAt = Date.now()
+    return true
+  }
+  const sessionTimer = setInterval(() => { void validateSession() }, SESSION_RECHECK_MS)
+  sessionTimer.unref?.()
+  socket.on('disconnect', () => clearInterval(sessionTimer))
+
+  const OBJECT_PAYLOAD_EVENTS = new Set([
+    'join-room', 'offer', 'answer', 'ice-candidate', 'chat-message', 'media-toggle',
+    'orientation-update', 'join-slot-watch', 'leave-slot-watch', 'reserve-slot',
+    'release-slot', 'slot-confirmed', 'chat:join', 'chat:typing', 'chat:message-created',
+    'chat:read', 'chat:takeover',
+  ])
+  const MAX_EVENTS_PER_WINDOW = 200
+  const EVENT_WINDOW_MS = 10000
+  const MAX_PAYLOAD_CHARS = 64000
+  let eventWindowStart = Date.now()
+  let eventCount = 0
+  socket.use(async ([event, payload], next) => {
+    if (Date.now() - eventWindowStart > EVENT_WINDOW_MS) {
+      eventWindowStart = Date.now()
+      eventCount = 0
+    }
+    if (++eventCount > MAX_EVENTS_PER_WINDOW) return next(new Error('Too many events'))
+    if (OBJECT_PAYLOAD_EVENTS.has(event)) {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        return next(new Error('Invalid event payload'))
+      }
+      if (JSON.stringify(payload).length > MAX_PAYLOAD_CHARS) return next(new Error('Event too large'))
+    }
+    if (Date.now() - sessionCheckedAt > SESSION_RECHECK_MS && !(await validateSession())) {
+      return next(new Error('Unauthorized'))
+    }
+    next()
+  })
+  // Rejected events surface as an 'error' on the socket; without a listener
+  // socket.io would log them as unhandled.
+  socket.on('error', () => {})
+
+  // EventEmitter ignores rejected promises and lets synchronous throws (e.g.
+  // destructuring a malformed payload) escape. Contain them per event.
+  const onEvent = (event, handler) => socket.on(event, (...args) => {
+    Promise.resolve()
+      .then(() => handler(...args))
+      .catch((error) => {
+        console.error(`[socket] ${event} handler failed:`, error?.message || error)
+        socket.emit('request-error', { event, message: 'Request could not be processed' })
+      })
+  })
   if (STAFF_CHAT_ROLES.has(connectedRole)) {
     onlineStaffSockets.set(socket.id, {
       userId: socket.verifiedUserId,
@@ -960,21 +1028,21 @@ io.on('connection', (socket) => {
     return `case-chat:${conversation.documentId || conversation.id}`
   }
 
-  socket.on('chat:presence:get', () => {
+  onEvent('chat:presence:get', () => {
     socket.emit('chat:manager-presence', {
       managerOnline: onlineStaffSockets.size > 0,
       onlineManagers: onlineStaffSockets.size,
     })
   })
 
-  socket.on('chat:join-staff-queue', () => {
+  onEvent('chat:join-staff-queue', () => {
     const role = socket.verifiedUser?.userRole || socket.verifiedUser?.role?.type
     if (!STAFF_CHAT_ROLES.has(role)) return
     socket.join('case-chat:staff-queue')
     socket.emit('chat:staff-queue-joined', { ok: true })
   })
 
-  socket.on('chat:join', async ({ conversationId }) => {
+  onEvent('chat:join', async ({ conversationId }) => {
     const conversation = await fetchAuthorizedConversation(conversationId)
     if (!conversation) {
       socket.emit('chat:error', { reason: 'Conversation access denied' })
@@ -989,7 +1057,7 @@ io.on('connection', (socket) => {
     })
   })
 
-  socket.on('chat:typing', async ({ conversationId, isTyping }) => {
+  onEvent('chat:typing', async ({ conversationId, isTyping }) => {
     const conversation = await fetchAuthorizedConversation(conversationId)
     if (!conversation) return
     socket.to(chatRoom(conversation)).emit('chat:typing', {
@@ -1000,7 +1068,7 @@ io.on('connection', (socket) => {
     })
   })
 
-  socket.on('chat:message-created', async ({ conversationId, message }) => {
+  onEvent('chat:message-created', async ({ conversationId, message }) => {
     const conversation = await fetchAuthorizedConversation(conversationId)
     if (!conversation || !message?.id) return
     const payload = {
@@ -1009,9 +1077,21 @@ io.on('connection', (socket) => {
     }
     io.to(chatRoom(conversation)).emit('chat:message-created', payload)
     io.to('case-chat:staff-queue').emit('chat:message-created', payload)
+
+    // Unread marker for every other member, without the message text: the
+    // cabinet menu shows the count even when this chat is not open.
+    const members = Array.isArray(conversation.users_permissions_users) ? conversation.users_permissions_users : []
+    for (const member of members) {
+      if (!member?.id || String(member.id) === String(socket.verifiedUserId)) continue
+      io.to(`user:${member.id}`).emit('chat:unread', {
+        conversationId: payload.conversationId,
+        messageId: message.id,
+        senderId: socket.verifiedUserId,
+      })
+    }
   })
 
-  socket.on('chat:read', async ({ conversationId, readAt }) => {
+  onEvent('chat:read', async ({ conversationId, readAt }) => {
     const conversation = await fetchAuthorizedConversation(conversationId)
     if (!conversation) return
     const payload = {
@@ -1023,7 +1103,7 @@ io.on('connection', (socket) => {
     io.to('case-chat:staff-queue').emit('chat:read', payload)
   })
 
-  socket.on('chat:takeover', async ({ conversationId }) => {
+  onEvent('chat:takeover', async ({ conversationId }) => {
     const conversation = await fetchAuthorizedConversation(conversationId)
     if (!conversation) return
     const payload = {
@@ -1037,7 +1117,7 @@ io.on('connection', (socket) => {
   })
 
   // Присоединение к комнате
-  socket.on('join-room', async ({ roomId, isPortrait }) => {
+  onEvent('join-room', async ({ roomId, isPortrait }) => {
     if (!roomId || typeof roomId !== 'string') {
       socket.emit('join-room-error', { reason: 'Invalid roomId' })
       return
@@ -1159,7 +1239,7 @@ io.on('connection', (socket) => {
   }
 
   // WebRTC сигнализация - отправка offer
-  socket.on('offer', ({ targetSocketId, offer }) => {
+  onEvent('offer', ({ targetSocketId, offer }) => {
     if (!isPeerInSameRoom(targetSocketId)) return
     console.log(`Offer from ${socket.id} to ${targetSocketId}`)
     io.to(targetSocketId).emit('offer', {
@@ -1169,7 +1249,7 @@ io.on('connection', (socket) => {
   })
 
   // WebRTC сигнализация - отправка answer
-  socket.on('answer', ({ targetSocketId, answer }) => {
+  onEvent('answer', ({ targetSocketId, answer }) => {
     if (!isPeerInSameRoom(targetSocketId)) return
     console.log(`Answer from ${socket.id} to ${targetSocketId}`)
     io.to(targetSocketId).emit('answer', {
@@ -1179,7 +1259,7 @@ io.on('connection', (socket) => {
   })
 
   // WebRTC сигнализация - ICE candidate
-  socket.on('ice-candidate', ({ targetSocketId, candidate }) => {
+  onEvent('ice-candidate', ({ targetSocketId, candidate }) => {
     if (!isPeerInSameRoom(targetSocketId)) return
     io.to(targetSocketId).emit('ice-candidate', {
       senderSocketId: socket.id,
@@ -1190,11 +1270,11 @@ io.on('connection', (socket) => {
   // Чат в комнате — имя и id берём из серверного состояния, не с клиента.
   // Для вложений принимаем только URL нашего Strapi, чтобы чат нельзя было
   // превратить в прокси для произвольных внешних адресов.
-  socket.on('chat-message', (payload = {}) => {
+  onEvent('chat-message', (payload = {}) => {
     const ctx = getJoinedRoom()
     if (!ctx) return
     const { message } = payload || {}
-    if (typeof message !== 'string' || !message.trim()) return
+    if (typeof message !== 'string' || !message.trim() || message.length > 5000) return
     let attachment = null
     const candidate = payload?.attachment
     if (candidate && typeof candidate === 'object' && typeof candidate.url === 'string') {
@@ -1235,7 +1315,7 @@ io.on('connection', (socket) => {
   })
 
   // Переключение медиа (mute/unmute, video on/off)
-  socket.on('media-toggle', ({ type, enabled }) => {
+  onEvent('media-toggle', ({ type, enabled }) => {
     const ctx = getJoinedRoom()
     if (!ctx) return
     socket.to(ctx.roomId).emit('user-media-toggle', {
@@ -1246,7 +1326,7 @@ io.on('connection', (socket) => {
   })
 
   // Ориентация устройства (portrait/landscape)
-  socket.on('orientation-update', ({ isPortrait }) => {
+  onEvent('orientation-update', ({ isPortrait }) => {
     const ctx = getJoinedRoom()
     if (!ctx) return
     ctx.participant.isPortrait = isPortrait === true
@@ -1258,7 +1338,7 @@ io.on('connection', (socket) => {
 
   // ── Real-time slot watching ──────────────────────────────────────
 
-  socket.on('join-slot-watch', ({ doctorId, date }) => {
+  onEvent('join-slot-watch', ({ doctorId, date }) => {
     const room = `slots:${doctorId}:${date}`
     socket.join(room)
     // Send existing reservations for this doctor+date
@@ -1272,11 +1352,11 @@ io.on('connection', (socket) => {
     socket.emit('current-reservations', reservations)
   })
 
-  socket.on('leave-slot-watch', ({ doctorId, date }) => {
+  onEvent('leave-slot-watch', ({ doctorId, date }) => {
     socket.leave(`slots:${doctorId}:${date}`)
   })
 
-  socket.on('reserve-slot', ({ doctorId, date, time }) => {
+  onEvent('reserve-slot', ({ doctorId, date, time }) => {
     const userId = socket.verifiedUserId
     const key = `${doctorId}|${date}|${time}`
 
@@ -1318,7 +1398,7 @@ io.on('connection', (socket) => {
     console.log(`[Slots] Reserved ${key} by socket ${socket.id}`)
   })
 
-  socket.on('release-slot', ({ doctorId, date, time }) => {
+  onEvent('release-slot', ({ doctorId, date, time }) => {
     const key = `${doctorId}|${date}|${time}`
     const val = pendingSlotReservations.get(key)
     if (val && val.socketId === socket.id) {
@@ -1332,7 +1412,7 @@ io.on('connection', (socket) => {
   // Клиент вызывает после успешного создания записи — сервер рассылает
   // slot-booked всем наблюдателям, чтобы у них слот исчез, а не превратился
   // обратно в свободный после release.
-  socket.on('slot-confirmed', ({ doctorId, date, time }) => {
+  onEvent('slot-confirmed', ({ doctorId, date, time }) => {
     if (!doctorId || !date || !time) return
     const key = `${doctorId}|${date}|${time}`
     const val = pendingSlotReservations.get(key)
@@ -1357,7 +1437,7 @@ io.on('connection', (socket) => {
   })
 
   // Отключение
-  socket.on('disconnect', () => {
+  onEvent('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`)
     onlineStaffSockets.delete(socket.id)
     emitStaffPresence()
@@ -1389,7 +1469,7 @@ io.on('connection', (socket) => {
   })
 
   // Принудительное завершение звонка врачом
-  socket.on('force-end-call', () => {
+  onEvent('force-end-call', () => {
     const ctx = getJoinedRoom()
     if (!ctx) return
     if (ctx.participant.role !== 'doctor') {
@@ -1400,7 +1480,7 @@ io.on('connection', (socket) => {
   })
 
   // Покинуть комнату
-  socket.on('leave-room', () => {
+  onEvent('leave-room', () => {
     const roomId = socket.roomId
     if (roomId) {
       socket.leave(roomId)

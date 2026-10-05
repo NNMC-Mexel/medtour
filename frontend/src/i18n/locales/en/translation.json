@@ -64,7 +64,8 @@
     "cam_on": "Turn on camera",
     "cam_off": "Turn off camera",
     "leave_call": "Leave call",
-    "next": "Next"
+    "next": "Next",
+    "previous": "Previous"
   },
   "pricing": {
     "badge": "Price list",
@@ -122,7 +123,9 @@
     "login_as_patient": "Sign in as Patient",
     "login_as_doctor": "Sign in as Doctor",
     "patient_cabinet": "Patient Dashboard",
-    "doctor_cabinet": "Doctor Dashboard"
+    "doctor_cabinet": "Doctor Dashboard",
+    "open_profile": "Open profile",
+    "account_menu": "Account menu"
   },
   "auth": {
     "login": {
@@ -797,7 +800,7 @@
     "password_new": "New password",
     "password_confirm": "Repeat new password",
     "password_save": "Change password",
-    "password_hint": "Minimum 6 characters.",
+    "password_hint": "At least 8 characters with an uppercase letter, a lowercase letter, a digit and a special character.",
     "password_current_required": "Enter your current password",
     "password_min": "New password must be at least 6 characters",
     "password_same": "New password must be different from the current password",
@@ -1013,7 +1016,18 @@
     "min_60": "60 minutes",
     "save_error_no_profile": "Doctor profile not found",
     "save_success": "Settings saved!",
-    "save_error": "Error saving settings"
+    "save_error": "Error saving settings",
+    "conflicts_title": "The new schedule affects existing appointments: {{count}}",
+    "conflicts_more": "…and {{count}} more",
+    "conflicts_question": "These appointments will not be cancelled automatically — they will stay outside working hours. Save the schedule?",
+    "err_interval_empty": "Add at least one working interval",
+    "err_interval_invalid": "Check interval start and end times",
+    "err_interval_overlap": "Intervals must not overlap or be adjacent",
+    "err_interval_no_space": "Not enough time for a new interval",
+    "vacation_day": "Vacation",
+    "vacation_until": "On vacation until {{date}}",
+    "day_off": "Day off",
+    "interval_label": "Interval {{number}}"
   },
   "patients": {
     "title": "My Patients",
@@ -1186,7 +1200,74 @@
     "review_placeholder": "Write a review (optional)...",
     "submit": "Submit",
     "media_error": "Could not access camera and microphone",
-    "complete_error": "Could not complete the consultation on the server. The call was closed — please check its status in your schedule."
+    "complete_error": "Could not complete the consultation on the server. The call was closed — please check its status in your schedule.",
+    "media": {
+      "gate_title": "No camera or microphone found",
+      "gate_desc": "We couldn't reach either device yet. Here's what you can try:",
+      "retry_devices": "Check again",
+      "join_without": "Join without camera and microphone",
+      "join_without_hint": "You'll still see and hear the doctor, and you can reply in the consultation chat.",
+      "microphone_unavailable": "Microphone unavailable",
+      "camera_unavailable": "Camera unavailable",
+      "notice_no_camera": {
+        "title": "You're in the call without a camera"
+      },
+      "notice_no_microphone": {
+        "title": "You're in the call without a microphone"
+      },
+      "notice_none": {
+        "title": "You joined without a camera or microphone",
+        "hint": "You can see and hear the doctor — reply in the consultation chat."
+      },
+      "common": {
+        "unsupported": {
+          "title": "This browser can't start video calls",
+          "hint": "Open the consultation in an up-to-date Chrome, Safari or Firefox: in-app browsers inside messengers block the camera and microphone."
+        },
+        "insecure": {
+          "title": "The connection isn't secure",
+          "hint": "The camera and microphone only work over https. Please open the consultation link again."
+        }
+      },
+      "microphone": {
+        "denied": {
+          "title": "Microphone access is blocked",
+          "hint": "Click the lock icon to the left of the address bar, allow the microphone, then press “Check again”."
+        },
+        "not_found": {
+          "title": "No microphone found",
+          "hint": "Plug in a headset or microphone and press “Check again”. You can also continue without one and type in the chat."
+        },
+        "busy": {
+          "title": "Another app is using the microphone",
+          "hint": "Close Zoom, Teams, Skype or another tab with a call, then press “Check again”."
+        },
+        "other": {
+          "title": "Couldn't turn on the microphone",
+          "hint": "Check that the device is connected and press “Check again”. If that doesn't help, restart the browser."
+        }
+      },
+      "camera": {
+        "denied": {
+          "title": "Camera access is blocked",
+          "hint": "Click the lock icon to the left of the address bar, allow the camera, then press “Check again”."
+        },
+        "not_found": {
+          "title": "No camera found",
+          "hint": "Connect a camera and press “Check again”. The consultation also works by voice — the doctor will hear you."
+        },
+        "busy": {
+          "title": "Another app is using the camera",
+          "hint": "Close Zoom, Teams, Skype or another tab with a call, then press “Check again”."
+        },
+        "other": {
+          "title": "Couldn't turn on the camera",
+          "hint": "Check that the camera is connected and press “Check again”. If that doesn't help, restart the browser."
+        }
+      }
+    },
+    "unread_messages": "New chat messages: {{n}}",
+    "new_messages_short": "in chat"
   },
   "appointment_detail": {
     "back": "Back",
@@ -1283,7 +1364,7 @@
     "reset_done_desc": "You can now log in with your new password.",
     "reset_login": "Log in",
     "reset_new_password": "New password",
-    "reset_min_chars": "At least 6 characters",
+    "reset_min_chars": "8+ characters, A-z, digit, symbol",
     "reset_confirm": "Confirm password",
     "reset_repeat": "Repeat password",
     "reset_min_error": "Password must be at least 6 characters",
@@ -1448,7 +1529,7 @@
     "placeholder_login": "E.g.: doctor_ivanov",
     "label_password": "Password",
     "label_password_new": "New password (optional)",
-    "placeholder_password": "Minimum 6 characters",
+    "placeholder_password": "8+ characters, A-z, digit, symbol",
     "placeholder_password_new": "Leave blank to keep current",
     "hint_password": "Current password is not shown. Enter a new one to change it.",
     "label_confirm": "Confirm password",
@@ -1508,7 +1589,64 @@
     "label_active": "Profile is active",
     "upload_photo": "Upload photo",
     "remove_photo": "Remove photo",
-    "exp_years": "{{count}} years"
+    "exp_years": "{{count}} years",
+    "schedule_title": "Consultation schedule",
+    "schedule_subtitle": "Set up a repeating week or specific consultation dates",
+    "schedule_type_label": "Schedule type",
+    "schedule_type_recurring": "Recurring schedule",
+    "schedule_type_recurring_hint": "Repeats every week",
+    "schedule_type_one_time": "One-time dates",
+    "schedule_type_one_time_hint": "Only on selected calendar dates",
+    "schedule_time_mode_label": "Working hours",
+    "schedule_time_same": "Same for all days",
+    "schedule_time_individual": "Set each day separately",
+    "schedule_days_label": "Consultation days",
+    "schedule_hours_label": "Consultation intervals",
+    "schedule_table_day": "Weekday",
+    "schedule_table_hours": "Working hours",
+    "schedule_day_off": "Day off",
+    "schedule_dates_title": "Consultation dates",
+    "schedule_dates_hint": "Add one or more specific dates and set hours for each",
+    "schedule_add_date": "Add date",
+    "schedule_add_first_date": "Add the first consultation date",
+    "schedule_date_label": "Date",
+    "schedule_remove_date": "Remove date",
+    "schedule_copy_previous": "Copy hours from previous date",
+    "schedule_add_interval": "Add interval",
+    "schedule_remove_interval": "Remove interval",
+    "schedule_interval_start_aria": "Start of interval {{number}}",
+    "schedule_interval_end_aria": "End of interval {{number}}",
+    "schedule_day_1": "Monday",
+    "schedule_day_2": "Tuesday",
+    "schedule_day_3": "Wednesday",
+    "schedule_day_4": "Thursday",
+    "schedule_day_5": "Friday",
+    "schedule_day_6": "Saturday",
+    "schedule_day_7": "Sunday",
+    "schedule_day_1_short": "Mon",
+    "schedule_day_2_short": "Tue",
+    "schedule_day_3_short": "Wed",
+    "schedule_day_4_short": "Thu",
+    "schedule_day_5_short": "Fri",
+    "schedule_day_6_short": "Sat",
+    "schedule_day_7_short": "Sun",
+    "vacation_title": "Vacation and days off",
+    "vacation_hint": "Booking is closed on these days, even if they are in the schedule",
+    "vacation_add": "Add vacation",
+    "vacation_remove": "Remove period",
+    "vacation_save": "Save period",
+    "vacation_pick_start": "Choose the first day",
+    "vacation_pick_end": "Choose the last day",
+    "vacation_days_one": "{{count}} day",
+    "vacation_days_other": "{{count}} days",
+    "vacation_now": "in progress",
+    "err_schedule_invalid_vacation": "A vacation period has no dates",
+    "err_schedule_no_days": "Select at least one consultation day",
+    "err_schedule_no_dates": "Add at least one consultation date",
+    "err_schedule_invalid_date": "Enter a valid consultation date",
+    "err_schedule_duplicate_date": "The same date is listed more than once",
+    "vacation_days_few": "{{count}} days",
+    "vacation_days_many": "{{count}} days"
   },
   "admin_spec": {
     "title": "Specializations",
@@ -1779,7 +1917,14 @@
     "chat_history": "Message history",
     "no_chat_history": "No messages were sent during the consultation",
     "participant": "Consultation participant",
-    "consultation_documents": "Consultation documents"
+    "consultation_documents": "Consultation documents",
+    "saved_conclusions": "Saved conclusions",
+    "conclusion_saved_at": "Saved and sent to the patient · {{date}}",
+    "new_conclusion": "New conclusion",
+    "nothing_to_save": "Add the conclusion text or a file",
+    "delete_conclusion": "Delete conclusion",
+    "delete_conclusion_confirm": "Delete this conclusion? The patient will no longer see it.",
+    "conclusion_deleted": "Conclusion deleted"
   },
   "case_detail": {
     "toast_doc_choose": "Choose a file first",
@@ -2264,7 +2409,9 @@
     "no_doctor_conversations_hint": "Doctor consultations and medical chats will appear here",
     "start_manager_chat": "Message a manager",
     "today": "Today",
-    "yesterday": "Yesterday"
+    "yesterday": "Yesterday",
+    "unread_count": "Unread messages: {{count}}",
+    "attach_file": "Attach a file"
   },
   "onboarding": {
     "title": "Case successfully created!",
@@ -2328,5 +2475,23 @@
         "desc": "Where to talk to your manager and receive case updates."
       }
     }
+  },
+  "password_policy": {
+    "required": "Enter a password",
+    "too_short": "Password must be at least 8 characters long",
+    "too_long": "Password is too long (72 characters maximum)",
+    "whitespace_edges": "Password must not start or end with a space",
+    "needs_uppercase": "Add at least one uppercase letter",
+    "needs_lowercase": "Add at least one lowercase letter",
+    "needs_digit": "Add at least one digit",
+    "needs_special": "Add at least one special character (e.g. ! @ # $ %)",
+    "hint": "At least 8 characters with an uppercase letter, a lowercase letter, a digit and a special character."
+  },
+  "preparation": {
+    "documents_uploaded_one": "{{count}} patient document in the case",
+    "documents_uploaded_few": "{{count}} patient documents in the case",
+    "documents_uploaded_many": "{{count}} patient documents in the case",
+    "documents_uploaded_other": "{{count}} patient documents in the case",
+    "documents_missing": "No patient documents yet"
   }
 }

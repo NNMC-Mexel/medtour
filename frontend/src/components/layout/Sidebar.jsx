@@ -21,6 +21,8 @@ import {
 } from 'lucide-react'
 import { cn } from '../../utils/helpers'
 import useAuthStore from '../../stores/authStore'
+import useChatStore, { selectTotalUnread } from '../../stores/chatStore'
+import UnreadBadge from './UnreadBadge'
 import BrandLogo from '../ui/BrandLogo'
 import Avatar from '../ui/Avatar'
 import LanguageSwitcher from '../ui/LanguageSwitcher'
@@ -47,14 +49,16 @@ function Sidebar({ navItems, onNavClick }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
+  const chatUnread = useChatStore(selectTotalUnread)
 
   const handleLogout = () => {
+    useChatStore.getState().reset()
     logout()
     navigate('/login')
   }
 
   return (
-    <aside className="h-(--app-height) w-64 bg-white border-r border-slate-100 flex flex-col">
+    <aside className="h-full w-64 bg-white border-r border-slate-100 flex flex-col">
       {/* Logo — always returns to the public landing page, like the public header.
           The dashboard itself stays reachable through the first nav item. */}
       <div className="p-6 border-b border-slate-100">
@@ -98,7 +102,10 @@ function Sidebar({ navItems, onNavClick }) {
                 )
               }
             >
-              <Icon className="w-5 h-5" />
+              <span className="relative shrink-0">
+                <Icon className="w-5 h-5" />
+                {item.path.endsWith('/chat') && <UnreadBadge count={chatUnread} />}
+              </span>
               {t(item.label)}
             </NavLink>
           )

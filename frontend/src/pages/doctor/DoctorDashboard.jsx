@@ -19,6 +19,7 @@ import {
 import Button from "../../components/ui/Button";
 import Avatar from "../../components/ui/Avatar";
 import Badge from "../../components/ui/Badge";
+import PreparationBadge from '../../components/appointments/PreparationBadge'
 import useAuthStore from "../../stores/authStore";
 import api, { normalizeResponse, getMediaUrl, getServerNow } from "../../services/api";
 import {
@@ -319,6 +320,7 @@ function DoctorDashboard() {
                                                         <p className='text-xs text-slate-500 truncate'>
                                                             {appointment.patient?.phone || ""}
                                                         </p>
+                                                        {!isPastConsultation && <PreparationBadge preparation={appointment.preparation} />}
                                                     </div>
                                                     <div className='shrink-0'>
                                                         {isPastConsultation && (appointment.statuse || appointment.status) !== "cancelled" ? (
@@ -368,6 +370,7 @@ function DoctorDashboard() {
                                                         <p className='text-sm text-slate-500 truncate'>
                                                             {appointment.patient?.phone || appointment.patient?.email || ""}
                                                         </p>
+                                                        {!isPastConsultation && <PreparationBadge preparation={appointment.preparation} />}
                                                     </div>
                                                 </div>
                                                 <div className='flex items-center gap-2 shrink-0'>

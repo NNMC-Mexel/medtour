@@ -49,6 +49,9 @@
 @layer base {
   :root {
     --app-height: 100dvh;
+    /* Видимая область над клавиатурой; main.jsx обновляет их по visualViewport. */
+    --vv-height: var(--app-height);
+    --vv-top: 0px;
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-right: env(safe-area-inset-right, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -73,6 +76,30 @@
   #root {
     min-height: 100%;
     min-height: var(--app-height);
+  }
+
+  /* Кабинет: у элементов сетки по умолчанию min-width: auto, и длинная подпись
+     в селекте, имя файла или таблица растягивали колонку — на телефоне форма
+     или карточка уезжала за край экрана. Только внутри кабинета, чтобы не
+     затрагивать лендинг. Утилиты min-w-* по-прежнему перекрывают правило. */
+  .cabinet-shell .grid > * {
+    min-width: 0;
+  }
+
+  /* Поле ввода чата: над полоской «домой», пока клавиатура закрыта, и вплотную
+     к клавиатуре, когда открыта. */
+  .chat-composer {
+    padding-bottom: max(0.5rem, calc(var(--safe-bottom) + 0.25rem));
+  }
+
+  :root[data-keyboard-open] .chat-composer {
+    padding-bottom: 0.5rem;
+  }
+
+  @media (min-width: 640px) {
+    .chat-composer {
+      padding-bottom: 1rem;
+    }
   }
 
   h1, h2, h3, h4, h5, h6 {

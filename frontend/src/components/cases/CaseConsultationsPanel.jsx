@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Paperclip,
   Stethoscope,
+  Trash2,
   Upload,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
@@ -65,8 +66,14 @@ function CaseConsultationsPanel({ medicalCase, selectedAppointmentId, onSelectAp
     ))
   }, [medicalCase?.medical_documents, selectedAppointment])
 
-  const conclusionDocument = useMemo(() => (
-    appointmentDocuments.find(doc => doc.type === 'certificate') || null
+  // Each saved conclusion is its own record; newest first.
+  const conclusions = useMemo(() => (
+    appointmentDocuments
+      .filter(doc => doc.type === 'certificate')
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+  ), [appointmentDocuments])
+  const otherDocuments = useMemo(() => (
+    appointmentDocuments.filter(doc => doc.type !== 'certificate')
   ), [appointmentDocuments])
 
   const [conclusionText, setConclusionText] = useState('')
@@ -76,15 +83,17 @@ function CaseConsultationsPanel({ medicalCase, selectedAppointmentId, onSelectAp
   const [isUploading, setIsUploading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
 
+  // The form is always for a NEW conclusion; saved ones are listed above it.
   useEffect(() => {
     if (!selectedAppointment) return
-    setConclusionText(conclusionDocument?.description || '')
-    setConclusionFile(conclusionDocument?.file || null)
+    setConclusionText('')
+    setConclusionFile(null)
     setDoctorDecision(selectedAppointment.doctorDecision || '')
     setDoctorDecisionNotes(selectedAppointment.doctorDecisionNotes || '')
     setSaved(false)
-  }, [selectedAppointment, conclusionDocument])
+  }, [selectedAppointment])
 
   useEffect(() => {
     if (selectedAppointment && !selectedAppointmentId) {
@@ -121,28 +130,51 @@ function CaseConsultationsPanel({ medicalCase, selectedAppointmentId, onSelectAp
     }
   }
 
+  const decisionChanged = (doctorDecision || '') !== (selectedAppointment?.doctorDecision || '')
+    || (doctorDecisionNotes || '') !== (selectedAppointment?.doctorDecisionNotes || '')
+  const hasSomethingToSave = Boolean(conclusionText.trim() || conclusionFile || decisionChanged)
+
   const saveConsultationOutput = async () => {
     if (!selectedAppointment || !canEdit) return
+    if (!hasSomethingToSave) {
+      toast.warning(t('case_consultations.nothing_to_save'))
+      return
+    }
     setIsSaving(true)
     try {
       const appointmentId = getRef(selectedAppointment)
       await appointmentsAPI.saveOutput(appointmentId, {
         conclusionTitle: t('case_consultations.conclusion_document_title'),
         conclusionText,
-        ...(conclusionFile?.id && getRef(conclusionFile) !== getRef(conclusionDocument?.file)
-          ? { conclusionFileId: conclusionFile.id }
-          : {}),
+        ...(conclusionFile?.id ? { conclusionFileId: conclusionFile.id } : {}),
         doctorDecision: doctorDecision || null,
         doctorDecisionNotes,
       })
 
       setSaved(true)
+      setConclusionText('')
+      setConclusionFile(null)
       toast.success(t('case_consultations.saved'))
       await onChanged?.()
     } catch (error) {
       toast.error(error?.response?.data?.error?.message || t('case_consultations.save_error'))
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const deleteConclusion = async (conclusion) => {
+    if (!selectedAppointment || !canEdit) return
+    if (!window.confirm(t('case_consultations.delete_conclusion_confirm'))) return
+    setDeletingId(getRef(conclusion))
+    try {
+      await appointmentsAPI.deleteConclusion(getRef(selectedAppointment), getRef(conclusion))
+      toast.success(t('case_consultations.conclusion_deleted'))
+      await onChanged?.()
+    } catch (error) {
+      toast.error(error?.response?.data?.error?.message || t('case_consultations.save_error'))
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -241,9 +273,59 @@ function CaseConsultationsPanel({ medicalCase, selectedAppointmentId, onSelectAp
               </div>
             </div>
 
+            {conclusions.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-slate-700">{t('case_consultations.saved_conclusions')}</p>
+                {conclusions.map(conclusion => (
+                  <div key={getRef(conclusion)} className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                        <Check className="h-4 w-4" />
+                        {t('case_consultations.conclusion_saved_at', {
+                          date: new Date(conclusion.createdAt).toLocaleString(dateLocale, {
+                            day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                          }),
+                        })}
+                      </p>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={() => deleteConclusion(conclusion)}
+                          disabled={deletingId === getRef(conclusion)}
+                          title={t('case_consultations.delete_conclusion')}
+                          aria-label={t('case_consultations.delete_conclusion')}
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+                        >
+                          {deletingId === getRef(conclusion)
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <Trash2 className="h-4 w-4" />}
+                        </button>
+                      )}
+                    </div>
+                    {conclusion.description && (
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-800">{conclusion.description}</p>
+                    )}
+                    {conclusion.file && (
+                      <button
+                        type="button"
+                        onClick={() => openMediaInNewTab(conclusion.file)}
+                        className="mt-2 flex max-w-full items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                      >
+                        <Paperclip className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{conclusion.file.name || t('case_consultations.conclusion_file')}</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {(canEdit || conclusions.length === 0) && (
             <div>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <label className="text-sm font-medium text-slate-700">{t('case_consultations.conclusion')}</label>
+                <label className="text-sm font-medium text-slate-700">
+                  {conclusions.length > 0 ? t('case_consultations.new_conclusion') : t('case_consultations.conclusion')}
+                </label>
                 {canEdit && (
                   <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-teal-600 hover:text-teal-700">
                     {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -273,9 +355,15 @@ function CaseConsultationsPanel({ medicalCase, selectedAppointmentId, onSelectAp
                 >
                   <Paperclip className="h-4 w-4 shrink-0" />
                   <span className="truncate">{conclusionFile.name || t('case_consultations.conclusion_file')}</span>
+                  {conclusionFile.size ? (
+                    <span className="shrink-0 text-xs text-slate-400">
+                      {Math.max(1, Math.round(Number(conclusionFile.size)))} KB
+                    </span>
+                  ) : null}
                 </button>
               )}
             </div>
+            )}
 
             {canSeeInternalFeedback && (
               <div className="space-y-3 border-t border-slate-100 pt-5">
@@ -314,7 +402,7 @@ function CaseConsultationsPanel({ medicalCase, selectedAppointmentId, onSelectAp
               <div className="flex justify-end">
                 <Button
                   onClick={saveConsultationOutput}
-                  disabled={isSaving || isUploading}
+                  disabled={isSaving || isUploading || !hasSomethingToSave}
                   leftIcon={isSaving
                     ? <Loader2 className="h-4 w-4 animate-spin" />
                     : saved
@@ -362,7 +450,7 @@ function CaseConsultationsPanel({ medicalCase, selectedAppointmentId, onSelectAp
           </CardContent>
         </Card>
 
-        {appointmentDocuments.length > 0 && (
+        {otherDocuments.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -371,7 +459,7 @@ function CaseConsultationsPanel({ medicalCase, selectedAppointmentId, onSelectAp
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {appointmentDocuments.map(doc => (
+              {otherDocuments.map(doc => (
                 <button
                   type="button"
                   key={getRef(doc)}

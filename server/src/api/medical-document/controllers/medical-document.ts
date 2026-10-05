@@ -9,6 +9,7 @@
  */
 import { factories } from '@strapi/strapi';
 import { normalizeCaseStatus } from '../../../utils/medical-case-workflow';
+import { areFilesAttachable, getRowIdsForDocument } from '../../../utils/file-attach';
 import {
   getAuthenticatedUser,
   getMedicalCaseAccessFilter,
@@ -450,22 +451,13 @@ export default factories.createCoreController('api::medical-document.medical-doc
     }
 
     // SECURITY (file-IDOR): a media field is a polymorphic relation, so the
-    // same upload file can be linked from multiple medical-documents. Without
-    // this check a patient could enumerate upload ids and attach another
-    // patient's file to a document they own, then read it through the
-    // file-proxy (which authorises by doc.user === caller). Staff/doctor link
-    // files on behalf of patients and are already gated by case/appointment
-    // access checks above, so this only constrains the patient self-upload path.
-    if (body.file && !isAdmin && !isDoctor && !isStaff) {
-      const fileId = typeof body.file === 'object' ? (body.file.id ?? body.file.documentId ?? body.file) : body.file;
-      const existingForFile = await strapi.documents('api::medical-document.medical-document').findMany({
-        filters: { file: { id: fileId } } as any,
-        populate: { user: { fields: ['id'] } } as any,
-        limit: 50,
-      });
-      if (existingForFile.some((d: any) => d.user?.id && d.user.id !== user.id)) {
-        return ctx.forbidden('This file is not available');
-      }
+    // same upload file can be linked from several records. Linking someone
+    // else's upload (another patient's document, a chat attachment) to a
+    // document you can read would expose it through the file-proxy. Only a
+    // fresh upload by the caller may be attached — for every role, since
+    // staff and doctors also attach only what they have just uploaded.
+    if (body.file && !isAdmin && !(await areFilesAttachable(body.file, { userId: user.id }))) {
+      return ctx.forbidden('This file is not available');
     }
 
     // Resolve sharedWithDoctors documentIds
@@ -592,6 +584,15 @@ export default factories.createCoreController('api::medical-document.medical-doc
 
     if (Object.keys(data).length === 0) {
       return ctx.badRequest('No allowed fields to update');
+    }
+
+    if (data.file && !isAdminUser(user)) {
+      const attachable = await areFilesAttachable(data.file, {
+        userId: user.id,
+        ownRelatedType: 'api::medical-document.medical-document',
+        ownRelatedIds: await getRowIdsForDocument('api::medical-document.medical-document', ctx.params.id),
+      });
+      if (!attachable) return ctx.forbidden('This file is not available');
     }
 
     const inferredCaseFromAppointment = (existing as any).appointment?.medical_case?.documentId;

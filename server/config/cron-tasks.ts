@@ -1,12 +1,21 @@
 /**
  * Cron tasks:
- *  1. markNoShowAppointments   — every 5 min, marks missed appointments
+ *  1. markNoShowAppointments   — every 5 min, marks missed appointments and
+ *                                 completes consultations stuck "in progress"
  *  2. notifySlaOverdueCases    — every 30 min, in-app + email alerts for stalled cases
  *  3. notifyDueCaseReminders   — every 5 min, fires reminders created by staff
+ *  4. remindAppointmentPreparation — every 15 min, reminds patients 24 h and
+ *                                 2 h before a consultation (and asks for case
+ *                                 documents when there are none yet)
  */
 import { sendSlaOverdueEmail } from '../src/utils/case-email';
+import { countPatientDocumentsByCase } from '../src/utils/appointment-preparation';
 
 const CONSULTATION_JOIN_AFTER_BUFFER_MIN = 5;
+const STALE_IN_PROGRESS_GRACE_MIN = 60;
+const APPOINTMENT_CRON_LOOKBACK_DAYS = Number(process.env.APPOINTMENT_CRON_LOOKBACK_DAYS) > 0
+  ? Number(process.env.APPOINTMENT_CRON_LOOKBACK_DAYS)
+  : 7;
 const CASE_SLA_HOURS: Record<string, number> = {
   NEW_LEAD: 2,
   REGISTERED: 4,
@@ -37,6 +46,40 @@ function isCaseOverdue(item: any, now = Date.now()) {
   return now - startMs >= hours * 60 * 60 * 1000;
 }
 
+const PREPARATION_TEXT: Record<string, Record<'24h' | '2h' | 'today' | 'tomorrow' | 'title' | 'noDocuments', string>> = {
+  ru: {
+    title: 'Скоро консультация',
+    '24h': 'Консультация с врачом {doctor} {day} в {time} (Астана).',
+    today: 'сегодня',
+    tomorrow: 'завтра',
+    '2h': 'Консультация с врачом {doctor} скоро — в {time} (Астана). Проверьте камеру и микрофон.',
+    noDocuments: 'В кейсе пока нет ваших медицинских документов — загрузите их заранее, чтобы врач успел ознакомиться.',
+  },
+  en: {
+    title: 'Upcoming consultation',
+    '24h': 'Your consultation with {doctor} is {day} at {time} (Astana time).',
+    today: 'today',
+    tomorrow: 'tomorrow',
+    '2h': 'Your consultation with {doctor} starts soon, at {time} (Astana time). Please check your camera and microphone.',
+    noDocuments: 'Your case has no medical documents yet — upload them in advance so the doctor can review them.',
+  },
+  kk: {
+    title: 'Консультация жақында',
+    '24h': '{doctor} дәрігерімен консультация {day} {time} (Астана уақыты).',
+    today: 'бүгін',
+    tomorrow: 'ертең',
+    '2h': '{doctor} дәрігерімен консультация жақында — {time} (Астана уақыты). Камера мен микрофонды тексеріңіз.',
+    noDocuments: 'Кейсте әзірге медициналық құжаттарыңыз жоқ — дәрігер танысып үлгеруі үшін оларды алдын ала жүктеңіз.',
+  },
+};
+
+const astanaDateKey = (value: string | number) =>
+  new Date(new Date(value).getTime() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+const formatAstanaTime = (value: string) => new Date(value).toLocaleTimeString('ru-RU', {
+  timeZone: 'Asia/Almaty', hour: '2-digit', minute: '2-digit',
+});
+
 async function notifyUsers(strapi: any, users: any[], payload: any) {
   const svc = strapi.service('api::notification.notification');
   const seen = new Set();
@@ -50,76 +93,62 @@ async function notifyUsers(strapi: any, users: any[], payload: any) {
 export default {
   markNoShowAppointments: {
     task: async ({ strapi }: { strapi: any }) => {
+      const appointments = strapi.documents('api::appointment.appointment');
+      // Appointments use draft & publish and the API serves the published
+      // version. Reading/updating without `status: 'published'` changed only the
+      // draft, so users never saw the no_show and slots stayed "confirmed".
+      const setStatus = (documentId: string, statuse: string, tag: string) =>
+        appointments
+          .update({ documentId, data: { statuse }, status: 'published' })
+          .catch((err: any) => strapi.log.error(`[cron:${tag}] Failed ${documentId}: ${err.message}`));
+      const windowEnd = (appt: any) =>
+        new Date(appt.dateTime).getTime() +
+        ((Number(appt.doctor?.consultationDuration) || 30) + CONSULTATION_JOIN_AFTER_BUFFER_MIN) * 60 * 1000;
+
       try {
         const now = Date.now();
+        // Without a lower bound the first run after a deploy would rewrite the
+        // whole history at once. Older records are closed by staff by hand.
+        const lookbackFrom = new Date(now - APPOINTMENT_CRON_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
         // 1. Mark pending/confirmed appointments as no_show only after the same
         // server-side join window has closed. Otherwise cron can block users
         // while the video room still allows entry.
-        const candidates = await strapi.documents('api::appointment.appointment').findMany({
+        const candidates = await appointments.findMany({
+          status: 'published',
           filters: {
             statuse: { $in: ['pending', 'confirmed'] },
-            dateTime: { $lt: new Date(now).toISOString() },
+            dateTime: { $lt: new Date(now).toISOString(), $gte: lookbackFrom },
           },
           populate: { doctor: { fields: ['consultationDuration'] } },
           fields: ['documentId', 'dateTime'],
           limit: 500,
         });
 
-        const overdue = candidates.filter((appt: any) => {
-          if (!appt.dateTime) return false;
-          const duration = Number((appt.doctor as any)?.consultationDuration) || 30;
-          const windowEnd =
-            new Date(appt.dateTime).getTime() +
-            (duration + CONSULTATION_JOIN_AFTER_BUFFER_MIN) * 60 * 1000;
-          return now > windowEnd;
-        });
-
+        const overdue = candidates.filter((appt: any) => appt.dateTime && now > windowEnd(appt));
         if (overdue.length > 0) {
           strapi.log.info(`[cron:no_show] Marking ${overdue.length} appointment(s) as no_show`);
-          await Promise.all(
-            overdue.map((appt: any) =>
-              strapi
-                .documents('api::appointment.appointment')
-                .update({ documentId: appt.documentId, data: { statuse: 'no_show' } })
-                .catch((err: any) =>
-                  strapi.log.error(`[cron:no_show] Failed ${appt.documentId}: ${err.message}`)
-                )
-            )
-          );
+          await Promise.all(overdue.map((appt: any) => setStatus(appt.documentId, 'no_show', 'no_show')));
         }
 
-        // 2. Find in_progress appointments whose consultation window has closed
-        // (both parties left without completing). Revert to no_show so the slot
-        // is clearly closed and doesn't confuse staff dashboards.
-        const stuckInProgress = await strapi.documents('api::appointment.appointment').findMany({
-          filters: { statuse: 'in_progress' },
+        // 2. A consultation becomes in_progress when someone joins the room and
+        // completed only when the doctor presses "Complete". If the doctor just
+        // left the call it stayed "in progress" forever. The call did happen,
+        // so close it as completed — an hour after the join window, because
+        // participants already in the room may talk past the scheduled end.
+        const inProgress = await appointments.findMany({
+          status: 'published',
+          filters: { statuse: 'in_progress', dateTime: { $gte: lookbackFrom } },
           populate: { doctor: { fields: ['consultationDuration'] } },
           fields: ['documentId', 'dateTime'],
           limit: 500,
         });
 
-        const toClose: any[] = stuckInProgress.filter((appt: any) => {
-          if (!appt.dateTime) return false;
-          const duration = Number((appt.doctor as any)?.consultationDuration) || 30;
-          const windowEnd =
-            new Date(appt.dateTime).getTime() +
-            (duration + CONSULTATION_JOIN_AFTER_BUFFER_MIN) * 60 * 1000;
-          return now > windowEnd;
-        });
-
-        if (toClose.length > 0) {
-          strapi.log.info(`[cron:no_show] Closing ${toClose.length} stuck in_progress appointment(s)`);
-          await Promise.all(
-            toClose.map((appt: any) =>
-              strapi
-                .documents('api::appointment.appointment')
-                .update({ documentId: appt.documentId, data: { statuse: 'no_show' } })
-                .catch((err: any) =>
-                  strapi.log.error(`[cron:no_show] Failed closing in_progress ${appt.documentId}: ${err.message}`)
-                )
-            )
-          );
+        const stale = inProgress.filter((appt: any) =>
+          appt.dateTime && now > windowEnd(appt) + STALE_IN_PROGRESS_GRACE_MIN * 60 * 1000);
+        if (stale.length > 0) {
+          strapi.log.info(`[cron:stale_in_progress] Completing ${stale.length} appointment(s)`);
+          await Promise.all(stale.map((appt: any) => setStatus(appt.documentId, 'completed', 'stale_in_progress')));
         }
       } catch (err: any) {
         strapi.log.error('[cron:no_show] Unexpected error:', err.message);
@@ -127,6 +156,73 @@ export default {
     },
     options: {
       rule: '*/5 * * * *',
+    },
+  },
+  remindAppointmentPreparation: {
+    task: async ({ strapi }: { strapi: any }) => {
+      try {
+        const now = Date.now();
+        const inTwoHours = now + 2 * 60 * 60 * 1000;
+        const inTwentyFourHours = now + 24 * 60 * 60 * 1000;
+        const appointments = await strapi.documents('api::appointment.appointment').findMany({
+          status: 'published',
+          filters: {
+            statuse: { $in: ['pending', 'confirmed'] },
+            dateTime: { $gte: new Date(now).toISOString(), $lte: new Date(inTwentyFourHours).toISOString() },
+          },
+          fields: ['documentId', 'dateTime', 'preparationReminder24hSentAt', 'preparationReminder2hSentAt'],
+          populate: {
+            patient: { fields: ['id', 'language'] },
+            doctor: { fields: ['fullName'] },
+            medical_case: { fields: ['documentId'] },
+          },
+          limit: 500,
+        });
+        if (appointments.length === 0) return;
+
+        const documentCounts = await countPatientDocumentsByCase(
+          strapi,
+          appointments.map((appointment: any) => appointment.medical_case?.documentId),
+        );
+
+        for (const appointment of appointments as any[]) {
+          const startsAt = new Date(appointment.dateTime).getTime();
+          // One reminder per window; the 2 h one supersedes a missed 24 h one.
+          const bucket: '24h' | '2h' | null = startsAt <= inTwoHours
+            ? (appointment.preparationReminder2hSentAt ? null : '2h')
+            : (appointment.preparationReminder24hSentAt ? null : '24h');
+          if (!bucket || !appointment.patient?.id) continue;
+
+          const caseId = appointment.medical_case?.documentId;
+          const copy = PREPARATION_TEXT[appointment.patient.language] || PREPARATION_TEXT.ru;
+          const missingDocuments = caseId && !documentCounts.get(caseId);
+          const message = copy[bucket]
+            .replace('{doctor}', appointment.doctor?.fullName || '')
+            .replace('{day}', astanaDateKey(appointment.dateTime) === astanaDateKey(now) ? copy.today : copy.tomorrow)
+            .replace('{time}', formatAstanaTime(appointment.dateTime))
+            + (missingDocuments ? ` ${copy.noDocuments}` : '');
+
+          await strapi.service('api::notification.notification').notifyUser(appointment.patient.id, {
+            title: copy.title,
+            message,
+            type: 'reminder',
+            link: caseId ? `/patient/cases/${caseId}` : '/patient/appointments',
+            metadata: { appointmentId: appointment.documentId, reminder: bucket, missingDocuments: Boolean(missingDocuments) },
+          });
+          await strapi.documents('api::appointment.appointment').update({
+            documentId: appointment.documentId,
+            data: bucket === '2h'
+              ? { preparationReminder2hSentAt: new Date(now).toISOString() }
+              : { preparationReminder24hSentAt: new Date(now).toISOString() },
+            status: 'published',
+          });
+        }
+      } catch (err: any) {
+        strapi.log.error('[cron:preparation_reminder] Unexpected error:', err.message);
+      }
+    },
+    options: {
+      rule: '*/15 * * * *',
     },
   },
   notifySlaOverdueCases: {

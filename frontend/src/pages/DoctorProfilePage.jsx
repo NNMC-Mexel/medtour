@@ -29,6 +29,30 @@ import api, { normalizeResponse, getMediaUrl } from "../services/api";
 import { formatDate, isDoctorOnline, getSpecName, getDoctorField } from "../utils/helpers";
 import { useUsdRate, formatKztAsUsd } from '../hooks/useUsdRate';
 import { SHOW_DOCTOR_PRICES } from "../utils/constants";
+import {
+    getDoctorScheduleConfig,
+    getDoctorVacationForDate,
+    getDoctorWorkingIntervals,
+    scheduleConfigToLegacyFields,
+} from "../utils/schedule";
+import { getKazakhstanCalendarToday } from "../utils/kazakhstanTime";
+
+// Сводка графика для карточки: часы приёма, перерывы между интервалами,
+// рабочие дни (ISO 1..7) и текущий отпуск.
+const getScheduleSummary = (doctor) => {
+    const intervals = getDoctorWorkingIntervals(doctor);
+    const breaks = intervals.slice(1).map((interval, index) => `${intervals[index].end} — ${interval.start}`);
+    const days = scheduleConfigToLegacyFields(getDoctorScheduleConfig(doctor)).workingDays
+        .split(",")
+        .map(Number)
+        .filter((day) => day >= 1 && day <= 7);
+    return {
+        reception: intervals.length ? `${intervals[0].start} — ${intervals[intervals.length - 1].end}` : "",
+        breaks,
+        days,
+        vacation: getDoctorVacationForDate(doctor, getKazakhstanCalendarToday()),
+    };
+};
 
 function DoctorProfilePage() {
     const usdRate = useUsdRate();
@@ -87,6 +111,7 @@ function DoctorProfilePage() {
 
     const specialization = getSpecName(doctor.specialization, i18n.language)
         || t('doctor_public.specialist');
+    const scheduleSummary = getScheduleSummary(doctor);
     const doctorDisplayName = getDoctorField(doctor, 'fullName', i18n.language) || doctor.fullName
     const doctorDisplayBio = getDoctorField(doctor, 'bio', i18n.language)
     const doctorDisplayEducation = getDoctorField(doctor, 'education', i18n.language)
@@ -237,18 +262,16 @@ function DoctorProfilePage() {
                                             {t('doctor_public.reception')}
                                         </span>
                                         <span className='font-semibold text-slate-900'>
-                                            {doctor.workStartTime || "09:00"} —{" "}
-                                            {doctor.workEndTime || "18:00"}
+                                            {scheduleSummary.reception || '—'}
                                         </span>
                                     </div>
-                                    {doctor.breakStart && doctor.breakEnd && (
+                                    {scheduleSummary.breaks.length > 0 && (
                                         <div className='flex items-center justify-between p-3 bg-slate-50 rounded-xl'>
                                             <span className='text-slate-600 text-sm'>
                                                 {t('doctor_public.break')}
                                             </span>
-                                            <span className='font-semibold text-slate-900'>
-                                                {doctor.breakStart} —{" "}
-                                                {doctor.breakEnd}
+                                            <span className='font-semibold text-slate-900 text-right'>
+                                                {scheduleSummary.breaks.join(', ')}
                                             </span>
                                         </div>
                                     )}
@@ -257,17 +280,25 @@ function DoctorProfilePage() {
                                             {t('doctor_public.working_days')}
                                         </span>
                                         <span className='font-semibold text-slate-900 text-right'>
-                                            {doctor.workingDays
-                                                ? doctor.workingDays
-                                                      .split(",")
-                                                      .map(
-                                                          (d) =>
-                                                              t('doctor_public.days').split(',')[parseInt(d)],
-                                                      )
+                                            {scheduleSummary.days.length
+                                                ? scheduleSummary.days
+                                                      .map((day) => t('doctor_public.days').split(',')[day % 7])
                                                       .join(", ")
                                                 : t('doctor_public.days_default')}
                                         </span>
                                     </div>
+                                    {scheduleSummary.vacation && (
+                                        <div className='flex items-center justify-between p-3 bg-amber-50 rounded-xl'>
+                                            <span className='text-amber-800 text-sm'>
+                                                {t('schedule.vacation_day')}
+                                            </span>
+                                            <span className='font-semibold text-amber-900 text-right'>
+                                                {t('schedule.vacation_until', {
+                                                    date: formatDate(scheduleSummary.vacation.to),
+                                                })}
+                                            </span>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         </div>

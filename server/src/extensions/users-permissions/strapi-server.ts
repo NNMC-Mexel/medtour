@@ -17,6 +17,8 @@
  * В B2B-модели врачи создаются только администратором клиники через админ-панель.
  */
 import { maskUserPIIForRole } from '../../utils/pii-crypto';
+import { issueUserJwt, revokeUserSessions } from '../../utils/user-session';
+import { rejectWeakPassword } from '../../utils/password-policy';
 
 export default (plugin) => {
   // Сохраняем оригинальную factory-функцию контроллера auth
@@ -146,6 +148,7 @@ export default (plugin) => {
     async create(ctx) {
       try {
         const sourceBody = normalizeContentApiBody(ctx.request?.body || {});
+        if (rejectWeakPassword(ctx, sourceBody.password)) return;
         await assignRoleFromUserRole(sourceBody);
         enrichPhoneNormalized(sourceBody);
         ctx.request.body = sourceBody;
@@ -155,6 +158,14 @@ export default (plugin) => {
       }
 
       return originalUserController.create(ctx);
+    },
+
+    // Admin edits of an account (PUT /users/:id): a new password follows the
+    // same policy as self-service registration.
+    async update(ctx) {
+      const sourceBody = normalizeContentApiBody(ctx.request?.body || {});
+      if (sourceBody.password !== undefined && sourceBody.password !== '' && rejectWeakPassword(ctx, sourceBody.password)) return;
+      return originalUserController.update(ctx);
     },
 
     async updateMe(ctx) {
@@ -213,14 +224,32 @@ export default (plugin) => {
     // Вызываем оригинальную factory, чтобы получить все методы контроллера
     const originalController = originalAuthFactory(factoryContext);
     const originalRegister = originalController.register;
-    const originalLogin = originalController.login;
+    const originalCallback = originalController.callback;
+    const originalForgotPassword = originalController.forgotPassword;
+    const originalResetPassword = originalController.resetPassword;
+    const originalChangePassword = originalController.changePassword;
+
+    // JWT, выданный штатным контроллером, перевыпускаем так, чтобы его iat не
+    // попал под отметку отзыва (иначе вход сразу после выхода давал бы 401).
+    const reissueJwt = async (ctx) => {
+      const body: any = ctx.response?.body || ctx.body;
+      if (body?.jwt && body?.user?.id) {
+        body.jwt = await issueUserJwt(strapi, body.user.id);
+      }
+    };
 
     return {
       ...originalController,
 
       // Логин по телефону: если identifier выглядит как номер телефона —
-      // ищем пользователя по полю phone и подставляем его email
-      async login(ctx) {
+      // ищем пользователя по полю phone и подставляем его email.
+      // POST /auth/local маршрутизируется в auth.callback, а не в auth.login:
+      // раньше эта логика висела на login и никогда не вызывалась.
+      async callback(ctx) {
+        if ((ctx.params?.provider || 'local') !== 'local') {
+          return originalCallback(ctx);
+        }
+
         const requestBody = ctx.request?.body || {};
         const sourceBody =
           requestBody?.data && typeof requestBody.data === 'object'
@@ -289,7 +318,46 @@ export default (plugin) => {
           }
         }
 
-        return originalLogin(ctx);
+        await originalCallback(ctx);
+        await reissueJwt(ctx);
+      },
+
+      // Сбой почты не должен давать 500: иначе ответ для существующего email
+      // отличается от ответа для несуществующего и раскрывает наличие аккаунта.
+      async forgotPassword(ctx) {
+        try {
+          await originalForgotPassword(ctx);
+        } catch (error) {
+          const status = (error as any)?.status;
+          if (status && status < 500) throw error;
+          const msg = error instanceof Error ? error.message : String(error);
+          strapi.log.error(`[auth.forgotPassword] reset email failed: ${msg}`);
+          ctx.status = 200;
+          ctx.body = { ok: true };
+        }
+      },
+
+      // Сброс пароля по ссылке из письма обрывает все прежние сессии.
+      async resetPassword(ctx) {
+        if (rejectWeakPassword(ctx, normalizeContentApiBody(ctx.request?.body || {}).password)) return;
+        await originalResetPassword(ctx);
+        const userId = (ctx.response?.body as any)?.user?.id;
+        if (userId) {
+          await revokeUserSessions(strapi, userId);
+          await reissueJwt(ctx);
+        }
+      },
+
+      // Смена пароля обрывает прежние сессии: иначе украденный токен
+      // переживает смену скомпрометированного пароля.
+      async changePassword(ctx) {
+        if (rejectWeakPassword(ctx, normalizeContentApiBody(ctx.request?.body || {}).password)) return;
+        await originalChangePassword(ctx);
+        const userId = ctx.state?.user?.id;
+        if (userId && (ctx.response?.body as any)?.jwt) {
+          await revokeUserSessions(strapi, userId);
+          await reissueJwt(ctx);
+        }
       },
 
       async register(ctx) {
@@ -299,6 +367,7 @@ export default (plugin) => {
         const sourceBody = normalizeContentApiBody(requestBody);
 
         const { userRole: rawRole, fullName, phone, country, language, timezone, iin, doctorData, ...cleanBody } = sourceBody;
+        if (rejectWeakPassword(ctx, cleanBody.password)) return;
 
         // MedTour security: public registration is only for patients.
         // Staff and partner doctors must be created/verified by an admin.

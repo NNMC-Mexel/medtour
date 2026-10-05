@@ -112,6 +112,8 @@ const medTourDoctorPermissions = [
 
 const medTourStaffPermissions = [
   ...medTourReadPermissions,
+  // Managers/coordinators fine-tune doctors' schedules (schedule fields only).
+  'api::doctor.doctor.updateSchedule',
   'api::price-request.price-request.find',
   'api::price-request.price-request.findOne',
   'api::price-request.price-request.update',
@@ -233,6 +235,7 @@ const roleDefinitions = {
       'api::doctor.doctor.find',
       'api::doctor.doctor.findOne',
       'api::doctor.doctor.update',
+      'api::doctor.doctor.updateSchedule',
       ...medTourDoctorPermissions,
       // Specializations — чтение
       'api::specialization.specialization.find',
@@ -378,6 +381,7 @@ const roleDefinitions = {
       'api::doctor.doctor.findOne',
       'api::doctor.doctor.create',
       'api::doctor.doctor.update',
+      'api::doctor.doctor.updateSchedule',
       'api::doctor.doctor.delete',
       ...medTourStaffPermissions,
       ...medTourLogisticsWriterPermissions,

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import api, { authAPI } from '../services/api'
+import api, { authAPI, setUnauthorizedHandler } from '../services/api'
 import i18n from '../i18n'
 import useConsultationStore from './consultationStore'
 
@@ -165,6 +165,8 @@ const useAuthStore = create(
 
       // Logout
       logout: () => {
+        const token = get().token
+        if (token) authAPI.logout(token)
         useConsultationStore.getState().closeConsultation()
         set({
           user: null,
@@ -302,5 +304,11 @@ const useAuthStore = create(
     }
   )
 )
+
+// 401 от любого запроса сбрасывает сессию и в памяти, а не только в
+// localStorage (см. setUnauthorizedHandler в services/api.js).
+setUnauthorizedHandler(() => {
+  useAuthStore.setState({ user: null, token: null, isAuthenticated: false })
+})
 
 export default useAuthStore

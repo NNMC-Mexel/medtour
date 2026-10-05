@@ -9,7 +9,7 @@ import Avatar from '../../components/ui/Avatar'
 import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/Toast'
 import useAuthStore from '../../stores/authStore'
-import { formatDate, cn } from '../../utils/helpers'
+import { formatDate, cn, getPasswordError } from '../../utils/helpers'
 import { normalizeCountryValue } from '../../utils/countries'
 
 const getProfileFormData = (user) => ({
@@ -95,8 +95,9 @@ function PatientProfile() {
   const validatePasswordForm = () => {
     const errors = {}
     if (!passwordForm.currentPassword) errors.currentPassword = t('profile.password_current_required')
-    if (!passwordForm.password || passwordForm.password.length < 6) {
-      errors.password = t('profile.password_min')
+    const passwordErrorKey = getPasswordError(passwordForm.password)
+    if (passwordErrorKey) {
+      errors.password = t(passwordErrorKey)
     }
     if (passwordForm.password && passwordForm.currentPassword === passwordForm.password) {
       errors.password = t('profile.password_same')

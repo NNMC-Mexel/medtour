@@ -185,6 +185,11 @@
     },
     "i18n": {
       "type": "json"
+    },
+    "tokenValidAfter": {
+      "type": "datetime",
+      "private": true,
+      "configurable": false
     }
   }
 }

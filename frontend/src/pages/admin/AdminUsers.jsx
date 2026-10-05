@@ -18,7 +18,7 @@ import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/Toast'
 import api, { getMediaUrl } from '../../services/api'
-import { formatDate } from '../../utils/helpers'
+import { formatDate, getPasswordError } from '../../utils/helpers'
 
 const roleVariants = {
   patient: 'default',
@@ -126,7 +126,7 @@ function AdminUsers() {
     if (!createForm.username.trim()) return toast.warning(t('admin_users.err_login'))
     if (!createForm.email.trim()) return toast.warning(t('admin_users.err_email'))
     if (!createForm.password) return toast.warning(t('admin_users.err_password'))
-    if (createForm.password.length < 6) return toast.warning(t('admin_users.err_short_password'))
+    if (getPasswordError(createForm.password)) return toast.warning(t(getPasswordError(createForm.password)))
     if (createForm.password !== createForm.confirmPassword) return toast.warning(t('admin_users.err_password_mismatch'))
 
     setIsCreating(true)
@@ -177,7 +177,7 @@ function AdminUsers() {
     if (!editForm.fullName.trim()) return toast.warning(t('admin_users.err_name'))
     if (!editForm.username.trim()) return toast.warning(t('admin_users.err_login'))
     if (!editForm.email.trim()) return toast.warning(t('admin_users.err_email'))
-    if (editForm.password && editForm.password.length < 6) return toast.warning(t('admin_users.err_short_password'))
+    if (editForm.password && getPasswordError(editForm.password)) return toast.warning(t(getPasswordError(editForm.password)))
     if (editForm.password !== editForm.confirmPassword) return toast.warning(t('admin_users.err_password_mismatch'))
 
     setIsSavingEdit(true)

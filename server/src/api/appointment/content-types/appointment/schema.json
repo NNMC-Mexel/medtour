@@ -113,6 +113,14 @@
     },
     "doctorDecisionNotes": {
       "type": "text"
+    },
+    "preparationReminder24hSentAt": {
+      "type": "datetime",
+      "private": true
+    },
+    "preparationReminder2hSentAt": {
+      "type": "datetime",
+      "private": true
     }
   }
 }

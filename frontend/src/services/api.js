@@ -151,6 +151,16 @@ let serverTimeOffsetMs = 0;
 export const getServerNow = () => new Date(Date.now() + serverTimeOffsetMs);
 export const getServerTimeOffsetMs = () => serverTimeOffsetMs;
 
+// Сессия закончилась (401). Стор авторизации регистрирует здесь сброс своего
+// состояния в памяти: если чистить только localStorage, ближайший set()
+// стора записывал токен обратно, страница входа возвращала «вошедшего»
+// пользователя в кабинет, тот снова получал 401 — и так десятки раз подряд.
+let onUnauthorized = null;
+let redirectingToLogin = false;
+export const setUnauthorizedHandler = (handler) => {
+    onUnauthorized = handler;
+};
+
 // Response interceptor - обработка ошибок + синхронизация времени
 api.interceptors.response.use(
     (response) => {
@@ -172,8 +182,12 @@ api.interceptors.response.use(
             }
         }
         if (error.response?.status === 401) {
+            onUnauthorized?.();
             localStorage.removeItem("auth-storage");
-            window.location.href = "/login";
+            if (!redirectingToLogin && window.location.pathname !== "/login") {
+                redirectingToLogin = true;
+                window.location.href = "/login";
+            }
         }
         return Promise.reject(error);
     }
@@ -368,6 +382,15 @@ export const authAPI = {
     login: (identifier, password) =>
         api.post("/api/auth/local", { identifier, password }),
 
+    // Отзывает токен на сервере. Идёт мимо axios-инстанса: 401 от уже
+    // отозванного токена не должен запускать редирект интерсептора.
+    logout: (token) =>
+        fetch(`${api.defaults.baseURL || API_URL}/api/auth/logout`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            keepalive: true,
+        }).catch(() => null),
+
     register: (data) =>
         api.post("/api/auth/local/register", {
             username: data.email,
@@ -474,6 +497,9 @@ export const doctorsAPI = {
     
     // Обновление профиля врача (включая настройки расписания)
     update: (id, data) => updatePublishedDocument(`/api/doctors/${id}`, data),
+
+    // Только расписание: доступно самому врачу, менеджеру, координатору и админу.
+    updateSchedule: (id, data) => api.put(`/api/doctors/${id}/schedule`, { data }),
 
     delete: (id) => api.delete(`/api/doctors/${id}`),
     
@@ -686,6 +712,9 @@ export const appointmentsAPI = {
 
     saveOutput: (id, data) =>
         api.put(`/api/appointments/${id}/output`, { data }),
+
+    deleteConclusion: (id, conclusionId) =>
+        api.delete(`/api/appointments/${id}/conclusions/${conclusionId}`),
 
     cancel: (id) =>
         api.put(`/api/appointments/${id}`, { data: { statuse: "cancelled" } }),

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Camera, Check, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { CalendarClock, Camera, Check, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -11,7 +11,12 @@ import Modal from '../../components/ui/Modal'
 import Badge from '../../components/ui/Badge'
 import ImageCropModal from '../../components/ui/ImageCropModal'
 import { useToast } from '../../components/ui/Toast'
-import api, { contentAPI, doctorsAPI, getMediaUrl, normalizeResponse, specializationsAPI, uploadFile } from '../../services/api'
+import api, { clinicsAPI, contentAPI, doctorsAPI, getMediaUrl, normalizeResponse, specializationsAPI, uploadFile } from '../../services/api'
+import { getPasswordError } from '../../utils/helpers'
+import AdminScheduleBuilder from '../../components/admin/AdminScheduleBuilder'
+import DoctorScheduleModal from '../../components/admin/DoctorScheduleModal'
+import { createRecurringSchedule, getDoctorScheduleConfig } from '../../utils/schedule'
+import { buildSchedulePayload, saveWithScheduleConflictConfirm } from '../../utils/scheduleSave'
 import { TREATMENT_DEPARTMENTS, localizeDepartment, mergeTreatmentDepartments } from '../../data/treatmentDepartments'
 
 const defaultForm = {
@@ -27,81 +32,39 @@ const defaultForm = {
   price: '8000',
   licenseNumber: '',
   position: '',
-  workplace: 'ННМЦ',
+  workplace: '',
   bio: '',
   education: '',
   isActive: true,
-  workStartTime: '09:00',
-  workEndTime: '18:00',
-  breakStart: '12:00',
-  breakEnd: '14:00',
   slotDuration: '30',
-  workingDays: '1,2,3,4,5',
+  scheduleConfig: null,
 }
 
-const timeOptions = Array.from({ length: 96 }, (_, index) => {
-  const hours = String(Math.floor(index / 4)).padStart(2, '0')
-  const minutes = String((index % 4) * 15).padStart(2, '0')
-  const value = `${hours}:${minutes}`
-  return { value, label: value }
-})
+const slotDurationOptions = [15, 30, 45, 60]
 
-const weekdayKeys = [
-  'weekday_mon',
-  'weekday_tue',
-  'weekday_wed',
-  'weekday_thu',
-  'weekday_fri',
-  'weekday_sat',
-  'weekday_sun',
-]
+const getClinicRef = (clinic) => String(clinic?.documentId || clinic?.id || '')
 
-function WorkingDaysSelect({ value, onChange, t }) {
-  const selectedDays = String(value || '')
-    .split(',')
-    .map(Number)
-    .filter((day) => day >= 1 && day <= 7)
+const normalizeClinicName = (value) => String(value || '')
+  .trim()
+  .toLocaleLowerCase()
+  .replace(/[^a-zа-яәғқңөұүһ0-9]/gi, '')
 
-  const toggleDay = (day) => {
-    const nextDays = selectedDays.includes(day)
-      ? selectedDays.filter((selectedDay) => selectedDay !== day)
-      : [...selectedDays, day]
+const resolveDoctorWorkplace = (doctor, clinics) => {
+  const relatedClinic = Array.isArray(doctor?.clinic) ? doctor.clinic[0] : doctor?.clinic
+  const relatedClinicRef = getClinicRef(relatedClinic)
+  const clinicByRelation = clinics.find((clinic) => getClinicRef(clinic) === relatedClinicRef)
+  if (clinicByRelation) return clinicByRelation.name
+  if (relatedClinic?.name) return relatedClinic.name
 
-    onChange(nextDays.sort((a, b) => a - b).join(','))
+  const workplace = normalizeClinicName(doctor?.workplace)
+  const clinicByName = clinics.find((clinic) => normalizeClinicName(clinic.name) === workplace)
+  if (clinicByName) return clinicByName.name
+
+  if (workplace === 'ннмц') {
+    return clinics.find((clinic) => clinic.clinicType === 'nnmc' || clinic.slug === 'nnmc')?.name || ''
   }
 
-  const summary = selectedDays.length
-    ? selectedDays.map((day) => t(`admin_doc.${weekdayKeys[day - 1]}`)).join(', ')
-    : t('admin_doc.working_days_placeholder')
-
-  return (
-    <div className='space-y-1.5'>
-      <label className='block text-sm font-medium text-slate-700'>{t('admin_doc.label_working_days')}</label>
-      <details className='group relative'>
-        <summary className='flex w-full cursor-pointer list-none items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-slate-700 transition-colors hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-500'>
-          <span className={selectedDays.length ? '' : 'text-slate-400'}>{summary}</span>
-          <span className='text-slate-400 transition-transform group-open:rotate-180'>⌄</span>
-        </summary>
-        <div className='mt-2 grid w-full gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-lg sm:grid-cols-2'>
-          {weekdayKeys.map((key, index) => {
-            const day = index + 1
-            return (
-              <label key={key} className='flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 hover:bg-slate-50'>
-                <input
-                  type='checkbox'
-                  checked={selectedDays.includes(day)}
-                  onChange={() => toggleDay(day)}
-                  className='h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500'
-                />
-                <span className='text-sm text-slate-700'>{t(`admin_doc.${key}`)}</span>
-              </label>
-            )
-          })}
-        </div>
-      </details>
-      <p className='text-sm text-slate-500'>{t('admin_doc.hint_working_days')}</p>
-    </div>
-  )
+  return ''
 }
 
 const extractUser = (value) => {
@@ -118,7 +81,9 @@ const extractCreatedUser = (response) => {
   return null
 }
 
-function toPayload(form) {
+function toPayload(form, clinics, schedulePayload) {
+  const selectedClinic = clinics.find((clinic) => clinic.name === form.workplace)
+
   return {
     fullName: form.fullName.trim(),
     specialization: form.specialization ? Number(form.specialization) : null,
@@ -127,16 +92,12 @@ function toPayload(form) {
     price: Number(form.price) || 0,
     licenseNumber: form.licenseNumber.trim(),
     position: form.position.trim(),
-    workplace: form.workplace.trim(),
+    workplace: selectedClinic?.name || '',
+    clinic: selectedClinic ? getClinicRef(selectedClinic) : null,
     bio: form.bio || '',
     education: form.education || '',
     isActive: Boolean(form.isActive),
-    workStartTime: form.workStartTime || '09:00',
-    workEndTime: form.workEndTime || '18:00',
-    breakStart: form.breakStart || '12:00',
-    breakEnd: form.breakEnd || '14:00',
-    slotDuration: Number(form.slotDuration) || 30,
-    workingDays: form.workingDays || '1,2,3,4,5',
+    ...schedulePayload,
   }
 }
 
@@ -146,6 +107,8 @@ function AdminDoctors({ readonly = false }) {
   const toast = useToast()
   const [doctors, setDoctors] = useState([])
   const [specializations, setSpecializations] = useState([])
+  const [clinics, setClinics] = useState([])
+  const [scheduleDoctor, setScheduleDoctor] = useState(null)
   const [treatmentDepartments, setTreatmentDepartments] = useState(TREATMENT_DEPARTMENTS)
   const [search, setSearch] = useState('')
   const [specFilter, setSpecFilter] = useState('all')
@@ -160,6 +123,7 @@ function AdminDoctors({ readonly = false }) {
   const [cropModalOpen, setCropModalOpen] = useState(false)
   const [cropImageSrc, setCropImageSrc] = useState(null)
   const [doctorSaveState, setDoctorSaveState] = useState('idle')
+  const photoInputRef = useRef(null)
   const assignmentDepartment = treatmentDepartments.find((department) => department.slug === searchParams.get('department'))
   const assignmentCopy = {
     ru: { title: 'Назначение врачей', text: 'Откройте карточку врача и сохраните её — направление уже выбрано.', back: 'Завершить назначение' },
@@ -189,14 +153,16 @@ function AdminDoctors({ readonly = false }) {
   const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
-      const [doctorsRes, specsRes, globalRes] = await Promise.all([
+      const [doctorsRes, specsRes, clinicsRes, globalRes] = await Promise.all([
         doctorsAPI.getAll({ includeInactive: true }),
         specializationsAPI.getAll(),
+        clinicsAPI.getAll(),
         contentAPI.getGlobal().catch(() => null),
       ])
 
       const { data: doctorsData } = normalizeResponse(doctorsRes)
       const { data: specsData } = normalizeResponse(specsRes)
+      const { data: clinicsData } = normalizeResponse(clinicsRes)
       const { data: globalData } = normalizeResponse(globalRes) || {}
       const usersRes = await api.get('/api/users?populate[role][fields][0]=id&populate[role][fields][1]=type&populate[role][fields][2]=name&pagination[limit]=1000')
       const usersData = Array.isArray(usersRes.data) ? usersRes.data : []
@@ -215,6 +181,7 @@ function AdminDoctors({ readonly = false }) {
 
       setDoctors(normalizedDoctors)
       setSpecializations(specsData || [])
+      setClinics(clinicsData || [])
       setTreatmentDepartments(mergeTreatmentDepartments(globalData?.treatmentDepartments))
     } catch (error) {
       console.error('Error loading admin doctors:', error)
@@ -236,6 +203,22 @@ function AdminDoctors({ readonly = false }) {
     [specializations],
   )
 
+  const workplaceOptions = useMemo(
+    () => clinics.map((clinic) => ({
+      value: clinic.name,
+      label: clinic.name,
+    })),
+    [clinics],
+  )
+
+  const durationOptions = useMemo(
+    () => slotDurationOptions.map((duration) => ({
+      value: String(duration),
+      label: t(`schedule.min_${duration}`),
+    })),
+    [t],
+  )
+
   const filteredDoctors = useMemo(() => {
     return (doctors || []).filter((doctor) => {
       const matchesSearch =
@@ -252,9 +235,11 @@ function AdminDoctors({ readonly = false }) {
   }, [doctors, search, specFilter])
 
   const openCreateModal = () => {
+    const defaultClinic = clinics.find((clinic) => clinic.clinicType === 'nnmc' || clinic.slug === 'nnmc') || clinics[0]
     setEditingDoctor(null)
     setForm({
       ...defaultForm,
+      workplace: defaultClinic?.name || '',
       treatmentDepartments: assignmentDepartment ? [assignmentDepartment.slug] : [],
     })
     setPhotoFile(null)
@@ -285,16 +270,12 @@ function AdminDoctors({ readonly = false }) {
       price: String(doctor.price || 0),
       licenseNumber: doctor.licenseNumber || '',
       position: doctor.position || '',
-      workplace: doctor.workplace || 'ННМЦ',
+      workplace: resolveDoctorWorkplace(doctor, clinics),
       bio: doctor.bio || '',
       education: doctor.education || '',
       isActive: doctor.isActive !== false,
-      workStartTime: doctor.workStartTime || '09:00',
-      workEndTime: doctor.workEndTime || '18:00',
-      breakStart: doctor.breakStart || '12:00',
-      breakEnd: doctor.breakEnd || '14:00',
       slotDuration: String(doctor.slotDuration || 30),
-      workingDays: doctor.workingDays || '1,2,3,4,5',
+      scheduleConfig: getDoctorScheduleConfig(doctor),
     })
     setPhotoFile(null)
     setPhotoPreview(getMediaUrl(doctor.photo) || '')
@@ -371,8 +352,8 @@ function AdminDoctors({ readonly = false }) {
       return
     }
 
-    if (form.password && form.password.length < 6) {
-      toast.warning(t('admin_doc.err_short_password'))
+    if (form.password && getPasswordError(form.password)) {
+      toast.warning(t(getPasswordError(form.password)))
       return
     }
 
@@ -381,10 +362,19 @@ function AdminDoctors({ readonly = false }) {
       return
     }
 
+    const { payload: schedulePayload, errorKey: scheduleErrorKey } = buildSchedulePayload(
+      form.scheduleConfig || createRecurringSchedule(),
+      form.slotDuration,
+    )
+    if (scheduleErrorKey) {
+      toast.warning(t(scheduleErrorKey))
+      return
+    }
+
     setIsSaving(true)
     setDoctorSaveState('idle')
     try {
-      const payload = toPayload(form)
+      const payload = toPayload(form, clinics, schedulePayload)
       if (photoFile) {
         const uploaded = await uploadFile(photoFile)
         payload.photo = uploaded.id
@@ -413,11 +403,12 @@ function AdminDoctors({ readonly = false }) {
           userId = createdUser.id
         }
 
-        await doctorsAPI.update(editingDoctor.documentId, {
-          ...payload,
-          users_permissions_user: userId,
-          userId,
-        })
+        const saved = await saveWithScheduleConflictConfirm(
+          (data) => doctorsAPI.update(editingDoctor.documentId, data),
+          { ...payload, users_permissions_user: userId, userId },
+          t,
+        )
+        if (!saved) return
       } else {
         const createdUser = await createDoctorUser()
         await doctorsAPI.create({
@@ -557,28 +548,39 @@ function AdminDoctors({ readonly = false }) {
                           {doctor.isActive === false ? t('admin_doc.inactive') : t('admin_doc.active')}
                         </Badge>
                       </td>
-                      {!readonly && (
-                        <td className='py-4 px-6'>
-                          <div className='flex justify-end gap-2'>
-                            <Button
-                              size='icon'
-                              variant='secondary'
-                              onClick={() => openEditModal(doctor)}
-                              aria-label={t('admin_doc.edit_aria')}
-                            >
-                              <Pencil className='w-4 h-4' />
-                            </Button>
-                            <Button
-                              size='icon'
-                              variant='secondary'
-                              onClick={() => handleDelete(doctor)}
-                              aria-label={t('admin_doc.delete_aria')}
-                            >
-                              <Trash2 className='w-4 h-4 text-rose-600' />
-                            </Button>
-                          </div>
-                        </td>
-                      )}
+                      <td className='py-4 px-6'>
+                        <div className='flex justify-end gap-2'>
+                          <Button
+                            size='icon'
+                            variant='secondary'
+                            onClick={() => setScheduleDoctor(doctor)}
+                            aria-label={t('admin_doc.schedule_title')}
+                            title={t('admin_doc.schedule_title')}
+                          >
+                            <CalendarClock className='w-4 h-4' />
+                          </Button>
+                          {!readonly && (
+                            <>
+                              <Button
+                                size='icon'
+                                variant='secondary'
+                                onClick={() => openEditModal(doctor)}
+                                aria-label={t('admin_doc.edit_aria')}
+                              >
+                                <Pencil className='w-4 h-4' />
+                              </Button>
+                              <Button
+                                size='icon'
+                                variant='secondary'
+                                onClick={() => handleDelete(doctor)}
+                                aria-label={t('admin_doc.delete_aria')}
+                              >
+                                <Trash2 className='w-4 h-4 text-rose-600' />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -656,21 +658,29 @@ function AdminDoctors({ readonly = false }) {
             />
           </div>
 
-          <div className='flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200'>
-            <div className='w-20 h-20 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center'>
+          {/* flex-wrap: on a 320 px phone the buttons move under the photo
+              instead of pushing out of the dialog. */}
+          <div className='flex flex-wrap items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200'>
+            <input ref={photoInputRef} type='file' accept='image/*' className='hidden' onChange={handlePhotoSelect} />
+            <button
+              type='button'
+              onClick={() => photoInputRef.current?.click()}
+              className='group relative h-20 w-20 shrink-0 overflow-hidden rounded-full bg-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2'
+              aria-label={t('admin_doc.upload_photo')}
+            >
               {photoPreview ? (
                 <img src={photoPreview} alt={t('admin_doc.photo_alt')} className='w-full h-full object-cover' />
               ) : (
                 <Camera className='w-8 h-8 text-slate-500' />
               )}
-            </div>
+              <span className='absolute inset-0 flex items-center justify-center bg-slate-900/50 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100'>
+                <Pencil className='h-5 w-5' />
+              </span>
+            </button>
             <div className='flex flex-wrap gap-2'>
-              <label className='inline-flex'>
-                <input type='file' accept='image/*' className='hidden' onChange={handlePhotoSelect} />
-                <span className='inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer transition-colors'>
-                  {t('admin_doc.upload_photo')}
-                </span>
-              </label>
+              <Button type='button' variant='secondary' onClick={() => photoInputRef.current?.click()} leftIcon={<Camera className='w-4 h-4' />}>
+                {t('admin_doc.upload_photo')}
+              </Button>
               {photoPreview && (
                 <Button type='button' variant='secondary' onClick={handleRemovePhoto} leftIcon={<X className='w-4 h-4' />}>
                   {t('admin_doc.remove_photo')}
@@ -739,11 +749,11 @@ function AdminDoctors({ readonly = false }) {
               onChange={(e) => setForm((prev) => ({ ...prev, position: e.target.value }))}
               placeholder={t('admin_doc.placeholder_position')}
             />
-            <Input
+            <Select
               label={t('admin_doc.label_workplace')}
               value={form.workplace}
               onChange={(e) => setForm((prev) => ({ ...prev, workplace: e.target.value }))}
-              placeholder='ННМЦ'
+              options={workplaceOptions}
             />
           </div>
 
@@ -763,49 +773,17 @@ function AdminDoctors({ readonly = false }) {
               value={form.price}
               onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))}
             />
-            <Input
+            <Select
               label={t('admin_doc.label_duration')}
-              type='number'
-              min='10'
               value={form.slotDuration}
               onChange={(e) => setForm((prev) => ({ ...prev, slotDuration: e.target.value }))}
+              options={durationOptions}
             />
           </div>
 
-          <div className='grid md:grid-cols-2 gap-4'>
-            <Select
-              label={t('admin_doc.label_start')}
-              value={form.workStartTime}
-              onChange={(e) => setForm((prev) => ({ ...prev, workStartTime: e.target.value }))}
-              options={timeOptions}
-            />
-            <Select
-              label={t('admin_doc.label_end')}
-              value={form.workEndTime}
-              onChange={(e) => setForm((prev) => ({ ...prev, workEndTime: e.target.value }))}
-              options={timeOptions}
-            />
-          </div>
-
-          <div className='grid md:grid-cols-2 gap-4'>
-            <Select
-              label={t('admin_doc.label_break_start')}
-              value={form.breakStart}
-              onChange={(e) => setForm((prev) => ({ ...prev, breakStart: e.target.value }))}
-              options={timeOptions}
-            />
-            <Select
-              label={t('admin_doc.label_break_end')}
-              value={form.breakEnd}
-              onChange={(e) => setForm((prev) => ({ ...prev, breakEnd: e.target.value }))}
-              options={timeOptions}
-            />
-          </div>
-
-          <WorkingDaysSelect
-            value={form.workingDays}
-            onChange={(workingDays) => setForm((prev) => ({ ...prev, workingDays }))}
-            t={t}
+          <AdminScheduleBuilder
+            value={form.scheduleConfig || createRecurringSchedule()}
+            onChange={(scheduleConfig) => setForm((prev) => ({ ...prev, scheduleConfig }))}
           />
 
           <Textarea
@@ -842,6 +820,13 @@ function AdminDoctors({ readonly = false }) {
         imageSrc={cropImageSrc}
         onCropComplete={handleCroppedPhoto}
         aspect={1}
+      />
+
+      <DoctorScheduleModal
+        doctor={scheduleDoctor}
+        isOpen={Boolean(scheduleDoctor)}
+        onClose={() => setScheduleDoctor(null)}
+        onSaved={loadData}
       />
     </div>
   )

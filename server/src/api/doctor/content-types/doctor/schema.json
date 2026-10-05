@@ -151,6 +151,12 @@
     },
     "workingDays": {
       "type": "string"
+    },
+    "workingIntervals": {
+      "type": "json"
+    },
+    "scheduleConfig": {
+      "type": "json"
     }
   }
 }

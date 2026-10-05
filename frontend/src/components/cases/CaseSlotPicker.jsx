@@ -21,34 +21,16 @@ import {
   getKazakhstanMinutesNow,
   KAZAKHSTAN_TIME_ZONE,
 } from '../../utils/kazakhstanTime'
+import { generateSlotsFromIntervals, getDoctorIntervalsForDate, isDoctorWorkingOnDate } from '../../utils/schedule'
 
 // Free consultations are the current production default. Set
 // VITE_FREE_CONSULTATIONS=false only when paid consultations are re-enabled.
 const FREE_CONSULTATIONS = import.meta.env.VITE_FREE_CONSULTATIONS !== 'false'
 
-const generateTimeSlots = (doctor) => {
-  const workStart = doctor?.workStartTime || '09:00'
-  const workEnd = doctor?.workEndTime || '18:00'
-  const slotDuration = doctor?.slotDuration || 30
-  const breakStart = doctor?.breakStart || '12:00'
-  const breakEnd = doctor?.breakEnd || '14:00'
-
-  const slots = []
-  const [sh, sm] = workStart.split(':').map(Number)
-  const [eh, em] = workEnd.split(':').map(Number)
-  const [bsh, bsm] = breakStart.split(':').map(Number)
-  const [beh, bem] = breakEnd.split(':').map(Number)
-
-  let h = sh, m = sm
-  while (h < eh || (h === eh && m < em)) {
-    const total = h * 60 + m
-    const inBreak = total >= bsh * 60 + bsm && total < beh * 60 + bem
-    if (!inBreak) slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
-    m += slotDuration
-    if (m >= 60) { h += Math.floor(m / 60); m = m % 60 }
-  }
-  return slots
-}
+// Слоты дня по графику врача: интервалы недели или конкретной даты, отпуск
+// убирает день целиком. Сервер проверяет ту же сетку (utils/doctor-schedule.ts).
+const generateTimeSlots = (doctor, date) =>
+  generateSlotsFromIntervals(getDoctorIntervalsForDate(doctor || {}, date), Number(doctor?.slotDuration) || 30)
 
 const filterPastSlots = (slots, date) => {
   if (getCalendarDateKey(date) !== getKazakhstanDateKey()) return slots
@@ -86,18 +68,7 @@ export default function CaseSlotPicker({
 
   const dates = Array.from({ length: 14 }, (_, i) => addDays(getKazakhstanCalendarToday(), i))
 
-  const getWorkingDays = () => {
-    if (!doctor?.workingDays) return [1, 2, 3, 4, 5]
-    if (typeof doctor.workingDays === 'string')
-      return doctor.workingDays.split(',').map(Number).filter(n => !isNaN(n))
-    return doctor.workingDays
-  }
-
-  const workingDays = getWorkingDays()
-  const isWorkingDay = (date) => {
-    const iso = date.getDay() === 0 ? 7 : date.getDay()
-    return workingDays.includes(iso)
-  }
+  const isWorkingDay = (date) => isDoctorWorkingOnDate(doctor || {}, date)
 
   useEffect(() => {
     if (!isOpen) {
@@ -119,7 +90,7 @@ export default function CaseSlotPicker({
       .finally(() => setIsLoadingSlots(false))
   }, [selectedDate, doctor?.id])
 
-  const allSlots = selectedDate ? generateTimeSlots(doctor) : []
+  const allSlots = selectedDate ? generateTimeSlots(doctor, selectedDate) : []
   const available = filterPastSlots(
     allSlots.filter(t => !bookedSlots.includes(t)),
     selectedDate || new Date()

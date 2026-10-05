@@ -24,6 +24,7 @@ function Modal({
   footer,
   className,
 }) {
+  const { t } = useTranslation()
   const handleEscape = useCallback((e) => {
     if (e.key === 'Escape') onClose()
   }, [onClose])
@@ -60,8 +61,8 @@ function Modal({
       >
         {/* Header */}
         {(title || showClose) && (
-          <div className="flex items-start justify-between p-6 border-b border-slate-100 shrink-0">
-            <div>
+          <div className="flex items-start justify-between gap-3 p-6 border-b border-slate-100 shrink-0">
+            <div className="min-w-0 break-words">
               {title && (
                 <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
               )}
@@ -72,7 +73,8 @@ function Modal({
             {showClose && (
               <button
                 onClick={onClose}
-                className="p-2 -m-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                aria-label={t('common.close')}
+                className="shrink-0 p-2 -m-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -80,8 +82,9 @@ function Modal({
           </div>
         )}
 
-        {/* Content */}
-        <div className="p-6 overflow-y-auto flex-1">{children}</div>
+        {/* Content. overflow-x-hidden — форма никогда не прокручивается вбок,
+            даже если что-то внутри шире панели. */}
+        <div className="min-w-0 p-4 sm:p-6 overflow-y-auto overflow-x-hidden overscroll-contain flex-1">{children}</div>
 
         {/* Footer */}
         {footer && (
