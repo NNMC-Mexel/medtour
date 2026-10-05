@@ -1267,7 +1267,9 @@
       }
     },
     "unread_messages": "Новые сообщения в чате: {{n}}",
-    "new_messages_short": "в чате"
+    "new_messages_short": "в чате",
+    "room_time_left": "осталось {{time}}",
+    "room_time_left_hint": "Консультация рассчитана на {{minutes}} мин, комната открыта до {{until}}"
   },
   "appointment_detail": {
     "back": "Назад",

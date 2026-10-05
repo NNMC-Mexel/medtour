@@ -1267,7 +1267,9 @@
       }
     },
     "unread_messages": "Чатта жаңа хабарлама: {{n}}",
-    "new_messages_short": "чатта"
+    "new_messages_short": "чатта",
+    "room_time_left": "{{time}} қалды",
+    "room_time_left_hint": "Консультация {{minutes}} минутқа есептелген, бөлме {{until}} дейін ашық"
   },
   "appointment_detail": {
     "back": "Артқа",

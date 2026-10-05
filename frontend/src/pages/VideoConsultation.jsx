@@ -36,6 +36,7 @@ import {
   Download,
   Image,
   RefreshCw,
+  Hourglass,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { io } from 'socket.io-client'
@@ -44,11 +45,12 @@ import Avatar from '../components/ui/Avatar'
 import { useToast } from '../components/ui/Toast'
 import { cn, getSpecName } from '../utils/helpers'
 import useAuthStore from '../stores/authStore'
-import api, { appointmentsAPI, documentsAPI, uploadFile, getSignalingUrl, openMediaInNewTab } from '../services/api'
+import api, { appointmentsAPI, documentsAPI, uploadFile, getSignalingUrl, openMediaInNewTab, getServerNow } from '../services/api'
 import { formatDateTimeInTimeZone, getDeviceTimeZone, KAZAKHSTAN_TIME_ZONE } from '../utils/kazakhstanTime'
 import { MEDIA_KIND, MEDIA_REASON, acquireLocalMedia, describeMediaOutcome } from '../utils/mediaAccess'
 import { playChatChime } from '../utils/audioCues'
 import { isChatSurfaceVisible, isOwnChatMessage, resolveIncomingChatSignal } from '../utils/chatSignals'
+import { CONSULTATION_SURFACE, isNegotiationInitiator, resolveConsultationSurface } from '../utils/consultationFlow'
 
 // Подсказку «браузер не умеет» или «нужен HTTPS» бессмысленно писать отдельно
 // про камеру и отдельно про микрофон — причина одна на оба устройства.
@@ -82,6 +84,75 @@ const ICE_SERVERS = {
     // ВНИМАНИЕ: публичный open relay удалён — медицинские данные не должны
     // проходить через сторонние серверы. Настройте VITE_TURN_URL для production.
   ],
+}
+
+/**
+ * Временные учётные данные TURN от сервера (coturn `use-auth-secret`).
+ * Статические VITE_TURN_* видны каждому, кто скачал бандл; они остаются только
+ * запасным вариантом, пока на сервере не задан TURN_STATIC_AUTH_SECRET.
+ */
+const fetchEphemeralIceServers = async () => {
+  try {
+    const { data } = await api.get('/api/turn-credentials')
+    const payload = data?.data
+    if (!payload?.username || !payload?.credential || !payload?.urls?.length) return null
+    return payload.urls.map((urls) => ({ urls, username: payload.username, credential: payload.credential }))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * `?force-relay=1` — отладка: только TURN relay, без host/srflx. Внутри одной
+ * сети звонок идёт напрямую, и relay не проверяется вовсе; собеседник за
+ * границей почти всегда за симметричным NAT и зависит от relay целиком. Флаг
+ * воспроизводит этот путь двумя клиентами рядом.
+ */
+const shouldForceRelay = () => {
+  try {
+    return new URLSearchParams(window.location.search).get('force-relay') === '1'
+  } catch {
+    return false
+  }
+}
+
+// Отметка начала звонка живёт вне React-состояния: после обновления страницы
+// счётчик продолжает идти, а не начинается с 00:00. Протухшую отметку (звонок
+// не завершили кнопкой и вернулись в ту же комнату позже) отбрасываем.
+const CALL_START_STORAGE_PREFIX = 'consultation:call-start:'
+const CALL_START_MAX_AGE_MS = 12 * 60 * 60 * 1000
+
+function readCallStart(roomId) {
+  if (!roomId) return null
+  try {
+    const value = Number(window.localStorage.getItem(CALL_START_STORAGE_PREFIX + roomId))
+    if (!Number.isFinite(value) || value <= 0) return null
+    if (Date.now() - value > CALL_START_MAX_AGE_MS) {
+      window.localStorage.removeItem(CALL_START_STORAGE_PREFIX + roomId)
+      return null
+    }
+    return value
+  } catch {
+    return null
+  }
+}
+
+function writeCallStart(roomId, value) {
+  if (!roomId) return
+  try {
+    window.localStorage.setItem(CALL_START_STORAGE_PREFIX + roomId, String(value))
+  } catch {
+    /* приватный режим — счётчик просто пойдёт с нуля */
+  }
+}
+
+function clearCallStart(roomId) {
+  if (!roomId) return
+  try {
+    window.localStorage.removeItem(CALL_START_STORAGE_PREFIX + roomId)
+  } catch {
+    /* см. writeCallStart */
+  }
 }
 
 const SIGNALING_SERVER = getSignalingUrl();
@@ -163,6 +234,9 @@ function VideoConsultation({
   // авторитет только у сервера.
   const [accessStatus, setAccessStatus] = useState('checking')
   const [accessDenyInfo, setAccessDenyInfo] = useState(null)
+  // Окно комнаты по серверному времени: до какого момента доступна консультация.
+  const [roomWindow, setRoomWindow] = useState(null)
+  const [roomRemainingMs, setRoomRemainingMs] = useState(null)
 
   // Notes state
   const [notesTab, setNotesTab] = useState('diagnosis')
@@ -204,6 +278,11 @@ function VideoConsultation({
   const reconnectAttemptsRef = useRef(0)
   const reconnectTimerRef = useRef(null)
   const pendingIceCandidatesRef = useRef([])
+  // socketId собеседника текущего раунда согласования: по нему отбрасываем
+  // offer/answer/кандидаты, опоздавшие от предыдущего соединения.
+  const peerSocketIdRef = useRef(null)
+  const makingOfferRef = useRef(false)
+  const iceServersRef = useRef(ICE_SERVERS)
   const isEndingCallRef = useRef(false)
   const [miniPosition, setMiniPosition] = useState(null)
 
@@ -385,6 +464,10 @@ function VideoConsultation({
         const payload = res?.data?.data || res?.data || {}
         if (payload.allowed) {
           setAccessStatus('allowed')
+          setRoomWindow({
+            windowEnd: payload.windowEnd,
+            consultationDuration: payload.consultationDuration,
+          })
         } else {
           setAccessStatus('denied')
           setAccessDenyInfo({
@@ -409,6 +492,13 @@ function VideoConsultation({
       cancelled = true
     }
   }, [roomId])
+
+  // Свёрнутая комната, оказавшаяся недоступной (окно закрылось, запись
+  // отменена), снимается со стора сама — иначе она висела бы невидимой до
+  // перезагрузки, а раньше и вовсе перекрывала весь экран отказом.
+  useEffect(() => {
+    if (isMinimized && accessStatus === 'denied') onClose?.()
+  }, [isMinimized, accessStatus, onClose])
 
   useEffect(() => {
     const fetchAppointment = async () => {
@@ -550,6 +640,19 @@ function VideoConsultation({
         setIsVideoOn(Boolean(stream?.getVideoTracks().length))
         setIsMuted(!stream?.getAudioTracks().length)
 
+        // Временные TURN-учётки — до первого соединения, иначе первый звонок
+        // ушёл бы со статическими (или вовсе без relay).
+        const ephemeralTurn = await fetchEphemeralIceServers()
+        if (!mounted) {
+          stream?.getTracks().forEach(track => track.stop())
+          return
+        }
+        if (ephemeralTurn) {
+          iceServersRef.current = {
+            iceServers: [...ICE_SERVERS.iceServers.filter((entry) => !entry.username), ...ephemeralTurn],
+          }
+        }
+
         const socket = io(SIGNALING_SERVER, {
           transports: ['websocket', 'polling'],
           auth: { token },
@@ -584,7 +687,7 @@ function VideoConsultation({
             const peer = participants[0]
             setRemoteUser(peer)
             setRemoteIsPortrait(peer.isPortrait ?? false)
-            createPeerConnection(socket, peer.socketId)
+            startNegotiation(socket, peer.socketId)
           }
         })
 
@@ -597,20 +700,12 @@ function VideoConsultation({
             isPortrait: window.innerHeight > window.innerWidth,
           })
 
-          const pc = createPeerConnection(socket, data.socketId)
-
-          try {
-            const offer = await pc.createOffer()
-            await pc.setLocalDescription(offer)
-            socket.emit('offer', { targetSocketId: data.socketId, offer })
-          } catch (err) {
-            console.error('Error creating offer:', err)
-          }
+          startNegotiation(socket, data.socketId)
         })
 
         socket.on('offer', async ({ senderSocketId, offer }) => {
           setConnectionState('connecting')
-          const pc = createPeerConnection(socket, senderSocketId)
+          const pc = ensurePeerConnection(socket, senderSocketId)
 
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(offer))
@@ -623,16 +718,28 @@ function VideoConsultation({
           }
         })
 
-        socket.on('answer', async ({ answer }) => {
+        socket.on('answer', async ({ senderSocketId, answer }) => {
+          const pc = peerConnectionRef.current
+          // Ответ прошлого раунда согласования к новому соединению не применяем.
+          const currentPeer = peerSocketIdRef.current
+          if (!pc || (senderSocketId && currentPeer && senderSocketId !== currentPeer)) return
+          if (pc.signalingState !== 'have-local-offer') {
+            console.warn('[WebRTC] Ignoring answer in state', pc.signalingState)
+            return
+          }
           try {
-            await peerConnectionRef.current?.setRemoteDescription(new RTCSessionDescription(answer))
-            await flushPendingIceCandidates(peerConnectionRef.current)
+            await pc.setRemoteDescription(new RTCSessionDescription(answer))
+            await flushPendingIceCandidates(pc)
           } catch (err) {
             console.error('Error setting remote description:', err)
           }
         })
 
-        socket.on('ice-candidate', async ({ candidate }) => {
+        socket.on('ice-candidate', async ({ senderSocketId, candidate }) => {
+          // Отбрасываем только заведомо чужие кандидаты; пока собеседник не
+          // зафиксирован, кандидат уходит в очередь — терять его нельзя.
+          const currentPeer = peerSocketIdRef.current
+          if (senderSocketId && currentPeer && senderSocketId !== currentPeer) return
           await addIceCandidateSafely(candidate)
         })
 
@@ -648,6 +755,9 @@ function VideoConsultation({
             peerConnectionRef.current.close()
             peerConnectionRef.current = null
           }
+          peerSocketIdRef.current = null
+          pendingIceCandidatesRef.current = []
+          makingOfferRef.current = false
         })
 
         // История чата при переподключении (восстановление после refresh)
@@ -737,6 +847,9 @@ function VideoConsultation({
       peerConnectionRef.current.close()
       peerConnectionRef.current = null
     }
+    peerSocketIdRef.current = null
+    pendingIceCandidatesRef.current = []
+    makingOfferRef.current = false
 
     // Re-join room after random delay to avoid both sides colliding
     const delay = 1000 + Math.random() * 1500
@@ -771,10 +884,18 @@ function VideoConsultation({
   const createPeerConnection = (socket, targetSocketId) => {
     if (peerConnectionRef.current) peerConnectionRef.current.close()
     activeSocketRef.current = socket
+    peerSocketIdRef.current = targetSocketId
+    makingOfferRef.current = false
     pendingIceCandidatesRef.current = []
 
-    console.log('[WebRTC] ICE servers config:', JSON.stringify(ICE_SERVERS, null, 2))
-    const pc = new RTCPeerConnection(ICE_SERVERS)
+    // Учётки TURN в лог не пишем — только адреса.
+    console.log('[WebRTC] ICE servers:', iceServersRef.current.iceServers.map((server) => server.urls))
+    const forceRelay = shouldForceRelay()
+    if (forceRelay) console.warn('[WebRTC] force-relay: only TURN, host and srflx disabled')
+    const pc = new RTCPeerConnection({
+      ...iceServersRef.current,
+      ...(forceRelay ? { iceTransportPolicy: 'relay' } : {}),
+    })
     peerConnectionRef.current = pc
 
     const localTracks = localStreamRef.current?.getTracks() || []
@@ -836,10 +957,23 @@ function VideoConsultation({
       } else if (state === 'connected' || state === 'completed') {
         clearTimeout(reconnectTimerRef.current)
         reconnectAttemptsRef.current = 0
+        logSelectedCandidatePair(pc)
       } else if (state === 'failed') {
         clearTimeout(reconnectTimerRef.current)
-        handleReconnect()
+        logIceDiagnostics(pc)
+        // Провалилось прошлое соединение, а текущее уже другое — не сносим живой звонок.
+        if (peerConnectionRef.current === pc) handleReconnect()
       }
+    }
+
+    // Единственный источник правды о том, почему не поднялся TURN: без него
+    // неудачная аллокация (401, 403, 701) не видна нигде.
+    pc.onicecandidateerror = (event) => {
+      console.warn('[WebRTC] ICE candidate error:', {
+        url: event.url,
+        errorCode: event.errorCode,
+        errorText: event.errorText,
+      })
     }
 
     pc.onconnectionstatechange = () => {
@@ -854,6 +988,77 @@ function VideoConsultation({
     }
 
     return pc
+  }
+
+  // Какая пара адресов выиграла: отличает «не хватило TURN» от «relay выбран,
+  // но медиа не идёт».
+  const logSelectedCandidatePair = async (pc) => {
+    try {
+      const stats = await pc.getStats()
+      stats.forEach((report) => {
+        if (report.type === 'candidate-pair' && report.state === 'succeeded' && report.nominated) {
+          const local = stats.get(report.localCandidateId)
+          const remote = stats.get(report.remoteCandidateId)
+          console.log('[WebRTC] Selected pair:',
+            `${local?.candidateType}/${local?.protocol}`, '<->', `${remote?.candidateType}/${remote?.protocol}`)
+        }
+      })
+    } catch (err) {
+      console.warn('[WebRTC] Could not read stats:', err)
+    }
+  }
+
+  // Сколько своих и чужих кандидатов каждого типа дошло к моменту провала.
+  const logIceDiagnostics = async (pc) => {
+    try {
+      const stats = await pc.getStats()
+      const tally = { local: {}, remote: {} }
+      stats.forEach((report) => {
+        if (report.type === 'local-candidate') tally.local[report.candidateType] = (tally.local[report.candidateType] || 0) + 1
+        if (report.type === 'remote-candidate') tally.remote[report.candidateType] = (tally.remote[report.candidateType] || 0) + 1
+      })
+      console.warn('[WebRTC] ICE failed. Candidates seen:', tally)
+    } catch (err) {
+      console.warn('[WebRTC] Could not read stats:', err)
+    }
+  }
+
+  // Живое соединение с тем же собеседником переиспользуем; пересоздаём только
+  // мёртвое — иначе встречный offer сносил соединение с собственным offer'ом.
+  const ensurePeerConnection = (socket, peerSocketId) => {
+    const existing = peerConnectionRef.current
+    const reusable = existing &&
+      peerSocketIdRef.current === peerSocketId &&
+      existing.connectionState !== 'failed' &&
+      existing.connectionState !== 'closed'
+    if (reusable) {
+      activeSocketRef.current = socket
+      return existing
+    }
+    return createPeerConnection(socket, peerSocketId)
+  }
+
+  // Offer делает ровно одна сторона — решение по socketId, одинаковое у обоих
+  // без обмена сообщениями. Раньше при одновременном переподключении offer
+  // слали оба, и согласование после первого же сбоя не восстанавливалось.
+  const startNegotiation = async (socket, peerSocketId) => {
+    const pc = ensurePeerConnection(socket, peerSocketId)
+    if (!isNegotiationInitiator(socket.id, peerSocketId)) return
+    if (makingOfferRef.current) return
+
+    makingOfferRef.current = true
+    try {
+      // Повторное согласование на живом соединении — ICE restart.
+      const offer = await pc.createOffer(pc.localDescription ? { iceRestart: true } : undefined)
+      await pc.setLocalDescription(offer)
+      // Пока собирали offer, соединение могли пересоздать — старый offer не шлём.
+      if (peerConnectionRef.current !== pc) return
+      socket.emit('offer', { targetSocketId: peerSocketId, offer })
+    } catch (err) {
+      console.error('Error creating offer:', err)
+    } finally {
+      makingOfferRef.current = false
+    }
   }
 
   const flushPendingIceCandidates = async (pc = peerConnectionRef.current) => {
@@ -871,8 +1076,9 @@ function VideoConsultation({
 
   const addIceCandidateSafely = async (candidate) => {
     const pc = peerConnectionRef.current
-    if (!pc || !candidate) return
-    if (!pc.remoteDescription) {
+    if (!candidate) return
+    // Кандидаты обгоняют offer/answer (и даже создание соединения): копим их.
+    if (!pc || !pc.remoteDescription) {
       pendingIceCandidatesRef.current.push(candidate)
       return
     }
@@ -883,19 +1089,53 @@ function VideoConsultation({
     }
   }
 
+  // Счётчик считает от сохранённой отметки старта, а не от монтирования.
   useEffect(() => {
-    let interval
-    if (connectionState === 'connected') {
-      interval = setInterval(() => setDuration(prev => prev + 1), 1000)
+    if (connectionState !== 'connected') return undefined
+    let startedAt = readCallStart(roomId)
+    if (!startedAt) {
+      startedAt = Date.now()
+      writeCallStart(roomId, startedAt)
     }
+    const tick = () => setDuration(Math.max(0, Math.round((Date.now() - startedAt) / 1000)))
+    tick()
+    const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
-  }, [connectionState])
+  }, [connectionState, roomId])
+
+  // Сколько осталось до закрытия комнаты — по серверному времени: доступ
+  // решает сервер, а часы устройства могут врать.
+  useEffect(() => {
+    const endMs = Date.parse(roomWindow?.windowEnd || '')
+    if (!Number.isFinite(endMs)) {
+      setRoomRemainingMs(null)
+      return undefined
+    }
+    const tick = () => setRoomRemainingMs(endMs - getServerNow().getTime())
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [roomWindow?.windowEnd])
 
   const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
+
+  const formatAstanaClock = (iso) => {
+    if (!iso) return ''
+    try {
+      return new Date(iso).toLocaleTimeString(timeLocale, { timeZone: 'Asia/Almaty', hour: '2-digit', minute: '2-digit' })
+    } catch {
+      return ''
+    }
+  }
+
+  const roomTimeLeftLabel = roomRemainingMs === null
+    ? null
+    : formatDuration(Math.max(0, Math.floor(roomRemainingMs / 1000)))
+  const isRoomTimeRunningOut = roomRemainingMs !== null && roomRemainingMs <= 5 * 60 * 1000
 
   // Пока устройства не запрошены, считаем их исправными: панель управления не
   // должна мигать блокировками на первой секунде звонка.
@@ -990,7 +1230,11 @@ function VideoConsultation({
     setTimeout(() => setLinkCopied(false), 2000)
   }
 
+  // Вызывается при реальном завершении звонка — только здесь сбрасываем
+  // отметку старта. При обновлении страницы React cleanup не работает, и
+  // отметка переживает F5, что и нужно.
   const cleanupCall = () => {
+    clearCallStart(roomId)
     localStreamRef.current?.getTracks().forEach(track => track.stop())
     localStreamRef.current = null
     peerConnectionRef.current?.close()
@@ -1295,6 +1539,107 @@ function VideoConsultation({
     </div>
   ) : null
 
+  const ratingModal = showRatingModal ? (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 animate-scaleIn">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Star className="w-8 h-8 text-teal-600" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900">{t('video.rate_title')}</h2>
+          <p className="text-slate-500 text-sm mt-1">
+            {t('video.rate_desc')}
+          </p>
+        </div>
+
+        {/* Stars */}
+        <div className="flex items-center justify-center gap-2 mb-6">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              onClick={() => setRating(star)}
+              onMouseEnter={() => setHoverRating(star)}
+              onMouseLeave={() => setHoverRating(0)}
+              title={t(`video.rating_${star}`)}
+              aria-label={t(`video.rating_${star}`)}
+              className="p-1 transition-transform hover:scale-110"
+            >
+              <Star
+                className={cn(
+                  'w-10 h-10 transition-colors',
+                  (hoverRating || rating) >= star
+                    ? 'text-amber-400 fill-amber-400'
+                    : 'text-slate-300'
+                )}
+              />
+            </button>
+          ))}
+        </div>
+
+        {rating > 0 && (
+          <p className="text-center text-sm font-medium text-slate-600 mb-4">
+            {t(`video.rating_${rating}`)}
+          </p>
+        )}
+
+        {/* Review text */}
+        <div className="mb-6">
+          <textarea
+            value={reviewText}
+            onChange={(e) => setReviewText(e.target.value)}
+            placeholder={t('video.review_placeholder')}
+            className="w-full h-28 px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          />
+        </div>
+
+        {/* Buttons */}
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={skipRating}
+            disabled={isSubmittingRating}
+          >
+            {t('common.skip')}
+          </Button>
+          <Button
+            className="flex-1"
+            onClick={submitRating}
+            disabled={rating === 0 || isSubmittingRating}
+          >
+            {isSubmittingRating ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : null}
+            {t('video.submit')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  ) : null
+
+  // Фоновый (свёрнутый) звонок не имеет права занимать экран: проверка доступа
+  // и отказ — полноэкранные слои, и над любой страницей они выглядели бы как
+  // зависшая консультация. В фоне показываем только мини-окно или модалки.
+  const surface = resolveConsultationSurface({
+    isMinimized,
+    accessStatus,
+    hasBlockingModal: showRatingModal,
+  })
+
+  if (surface === CONSULTATION_SURFACE.HIDDEN) {
+    return null
+  }
+
+  if (surface === CONSULTATION_SURFACE.MODALS) {
+    return (
+      <>
+        {endConfirmationModal}
+        {ratingModal}
+      </>
+    )
+  }
+
   if (accessStatus === 'checking') {
     return (
       <div className="fixed inset-0 z-[900] bg-slate-900 flex flex-col items-center justify-center text-white px-6 pt-[var(--safe-top)]">
@@ -1534,6 +1879,24 @@ function VideoConsultation({
                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                 <Clock className="w-3.5 h-3.5 text-emerald-400" />
                 <span className="text-emerald-400 text-sm font-medium">{formatDuration(duration)}</span>
+              </div>
+            )}
+            {roomTimeLeftLabel && (
+              <div
+                className={cn(
+                  'flex items-center gap-2 px-3 py-1.5 rounded-full',
+                  isRoomTimeRunningOut ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700/60 text-slate-300'
+                )}
+                title={t('video.room_time_left_hint', {
+                  minutes: roomWindow?.consultationDuration || '',
+                  until: formatAstanaClock(roomWindow?.windowEnd),
+                })}
+              >
+                <Hourglass className="w-3.5 h-3.5" />
+                <span className="text-sm font-medium">
+                  <span className="hidden sm:inline">{t('video.room_time_left', { time: roomTimeLeftLabel })}</span>
+                  <span className="sm:hidden">{roomTimeLeftLabel}</span>
+                </span>
               </div>
             )}
             <button
@@ -2233,85 +2596,7 @@ function VideoConsultation({
 
       {endConfirmationModal}
 
-      {/* Patient Rating Modal */}
-      {showRatingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 animate-scaleIn">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Star className="w-8 h-8 text-teal-600" />
-              </div>
-              <h2 className="text-xl font-bold text-slate-900">{t('video.rate_title')}</h2>
-              <p className="text-slate-500 text-sm mt-1">
-                {t('video.rate_desc')}
-              </p>
-            </div>
-
-            {/* Stars */}
-            <div className="flex items-center justify-center gap-2 mb-6">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  onClick={() => setRating(star)}
-                  onMouseEnter={() => setHoverRating(star)}
-                  onMouseLeave={() => setHoverRating(0)}
-                  title={t(`video.rating_${star}`)}
-                  aria-label={t(`video.rating_${star}`)}
-                  className="p-1 transition-transform hover:scale-110"
-                >
-                  <Star
-                    className={cn(
-                      'w-10 h-10 transition-colors',
-                      (hoverRating || rating) >= star
-                        ? 'text-amber-400 fill-amber-400'
-                        : 'text-slate-300'
-                    )}
-                  />
-                </button>
-              ))}
-            </div>
-
-            {rating > 0 && (
-              <p className="text-center text-sm font-medium text-slate-600 mb-4">
-                {t(`video.rating_${rating}`)}
-              </p>
-            )}
-
-            {/* Review text */}
-            <div className="mb-6">
-              <textarea
-                value={reviewText}
-                onChange={(e) => setReviewText(e.target.value)}
-                placeholder={t('video.review_placeholder')}
-                className="w-full h-28 px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Buttons */}
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={skipRating}
-                disabled={isSubmittingRating}
-              >
-                {t('common.skip')}
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={submitRating}
-                disabled={rating === 0 || isSubmittingRating}
-              >
-                {isSubmittingRating ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : null}
-                {t('video.submit')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {ratingModal}
     </div>
   )
 }

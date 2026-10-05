@@ -1267,7 +1267,9 @@
       }
     },
     "unread_messages": "New chat messages: {{n}}",
-    "new_messages_short": "in chat"
+    "new_messages_short": "in chat",
+    "room_time_left": "{{time}} left",
+    "room_time_left_hint": "The consultation is booked for {{minutes}} min; the room stays open until {{until}}"
   },
   "appointment_detail": {
     "back": "Back",
