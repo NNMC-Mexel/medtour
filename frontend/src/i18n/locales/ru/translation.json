@@ -155,7 +155,9 @@
       "stats_quality": "Качество",
       "stats_doctors": "Врачей",
       "stats_consultations": "Консультаций",
-      "stats_rating": "Рейтинг"
+      "stats_rating": "Рейтинг",
+      "show_password": "Показать пароль",
+      "hide_password": "Скрыть пароль"
     },
     "register": {
       "title": "Регистрация",
@@ -1790,7 +1792,11 @@
     "err_short_password": "Пароль должен быть не менее 6 символов",
     "err_password_mismatch": "Пароли не совпадают",
     "err_save": "Не удалось создать пользователя",
-    "err_save_msg": "Ошибка: {{message}}"
+    "err_save_msg": "Ошибка: {{message}}",
+    "role_coordinator": "Координатор",
+    "role_doctor_locked": "Роль врача связана с его карточкой — она меняется в разделе «Врачи».",
+    "role_self_locked": "Свою роль администратора изменить нельзя.",
+    "role_change_warning": "После смены роли пользователь будет разлогинен и войдёт уже в новый кабинет."
   },
   "admin_content": {
     "title": "Контент лендинга MedTour",

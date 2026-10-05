@@ -86,6 +86,42 @@
     min-width: 0;
   }
 
+  /* Корень кабинета не прокручивается вбок. clip, в отличие от hidden, не
+     создаёт контейнер прокрутки, и sticky-шапка и нижняя полоса таблиц
+     остаются прилипшими к окну. Старый Safari clip не знает — там hidden. */
+  .cabinet-shell {
+    overflow-x: hidden;
+  }
+  @supports (overflow: clip) {
+    .cabinet-shell {
+      overflow-x: clip;
+    }
+  }
+
+  /* HScroll: у широкой таблицы полосы прокрутки сверху и снизу
+     (components/ui/HScroll). Собственную полосу содержимого прячем — её роль
+     играют эти две; они толще обычных, чтобы в них было легко попасть мышью. */
+  .hscroll-content {
+    scrollbar-width: none;
+  }
+  .hscroll-content::-webkit-scrollbar {
+    display: none;
+  }
+  .hscroll-bar {
+    scrollbar-width: auto;
+    scrollbar-color: #94a3b8 #f1f5f9;
+  }
+  .hscroll-bar::-webkit-scrollbar {
+    height: 12px;
+  }
+  .hscroll-bar::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border: 2px solid #f1f5f9;
+  }
+  .hscroll-bar::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+
   /* Поле ввода чата: над полоской «домой», пока клавиатура закрыта, и вплотную
      к клавиатуре, когда открыта. */
   .chat-composer {

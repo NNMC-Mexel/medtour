@@ -13,19 +13,28 @@ import {
 import { Card, CardContent } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import PasswordInput from '../../components/ui/PasswordInput'
 import Avatar from '../../components/ui/Avatar'
 import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/Toast'
 import api, { getMediaUrl } from '../../services/api'
+import Select from '../../components/ui/Select'
+import useAuthStore from '../../stores/authStore'
 import { formatDate, getPasswordError } from '../../utils/helpers'
+import usePersistentFilters from '../../hooks/usePersistentFilters'
+import HScroll from '../../components/ui/HScroll'
 
 const roleVariants = {
   patient: 'default',
   doctor: 'primary',
   admin: 'danger',
   manager: 'warning',
+  coordinator: 'warning',
 }
+
+// Roles an admin can switch an account to here; doctors are managed under "Doctors".
+const ASSIGNABLE_ROLES = ['patient', 'manager', 'coordinator', 'admin']
 
 const defaultCreateForm = {
   fullName: '',
@@ -43,15 +52,25 @@ const defaultEditForm = {
   phone: '',
   password: '',
   confirmPassword: '',
+  userRole: '',
 }
+
+// Фильтры списка переживают перезагрузку; строка поиска (бывают ФИО и email)
+// живёт только до закрытия вкладки.
+const USER_FILTER_DEFAULTS = { search: '', role: 'all' }
+const USER_FILTER_OPTIONS = { sessionKeys: ['search'] }
 
 function AdminUsers() {
   const { t } = useTranslation()
   const toast = useToast()
+  const currentUserId = useAuthStore((state) => state.user?.id)
   const [users, setUsers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [roleFilter, setRoleFilter] = useState('all')
+  const { filters: listFilters, setFilter } = usePersistentFilters('admin-users', USER_FILTER_DEFAULTS, USER_FILTER_OPTIONS)
+  const searchQuery = listFilters.search
+  const setSearchQuery = (value) => setFilter('search', value)
+  const roleFilter = listFilters.role
+  const setRoleFilter = (value) => setFilter('role', value)
   const [selectedUser, setSelectedUser] = useState(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -61,6 +80,7 @@ function AdminUsers() {
     doctor: t('admin_users.role_doctor'),
     admin: t('admin_users.role_admin'),
     manager: t('admin_users.role_manager'),
+    coordinator: t('admin_users.role_coordinator'),
   }
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -167,6 +187,7 @@ function AdminUsers() {
       phone: user.phone || '',
       password: '',
       confirmPassword: '',
+      userRole: user.userRole || '',
     })
     setIsEditModalOpen(true)
   }
@@ -192,11 +213,20 @@ function AdminUsers() {
       if (editForm.password) {
         payload.password = editForm.password
       }
+      const roleChanged = Boolean(editForm.userRole) && editForm.userRole !== editingUser.userRole
+      if (roleChanged) payload.userRole = editForm.userRole
 
       await api.put(`/api/users/${editingUser.id}`, payload)
       setUsers(prev => prev.map(u =>
         u.id === editingUser.id
-          ? { ...u, fullName: payload.fullName, username: payload.username, email: payload.email, phone: payload.phone }
+          ? {
+              ...u,
+              fullName: payload.fullName,
+              username: payload.username,
+              email: payload.email,
+              phone: payload.phone,
+              ...(roleChanged ? { userRole: payload.userRole } : {}),
+            }
           : u
       ))
       setEditSaveState('saved')
@@ -299,7 +329,7 @@ function AdminUsers() {
       {/* Users Table */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <HScroll>
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200">
@@ -400,7 +430,7 @@ function AdminUsers() {
                 )}
               </tbody>
             </table>
-          </div>
+          </HScroll>
         </CardContent>
       </Card>
 
@@ -467,12 +497,32 @@ function AdminUsers() {
         }
       >
         <form onSubmit={handleEditUser} className="space-y-4">
-          {editingUser && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
-              <span className="text-sm text-slate-500">{t('admin_users.label_role')}:</span>
-              <Badge variant={roleVariants[editingUser.userRole] || 'default'}>
-                {roleLabels[editingUser.userRole] || editingUser.userRole}
-              </Badge>
+          {editingUser && (editingUser.userRole === 'doctor' || (editingUser.id === currentUserId && editingUser.userRole === 'admin')) && (
+            <div className="space-y-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500">{t('admin_users.label_role')}:</span>
+                <Badge variant={roleVariants[editingUser.userRole] || 'default'}>
+                  {roleLabels[editingUser.userRole] || editingUser.userRole}
+                </Badge>
+              </div>
+              <p className="text-xs text-slate-500">
+                {editingUser.userRole === 'doctor' ? t('admin_users.role_doctor_locked') : t('admin_users.role_self_locked')}
+              </p>
+            </div>
+          )}
+          {editingUser && editingUser.userRole !== 'doctor' && !(editingUser.id === currentUserId && editingUser.userRole === 'admin') && (
+            <div className="space-y-2">
+              <Select
+                label={t('admin_users.label_role')}
+                value={editForm.userRole}
+                onChange={(e) => setEditForm(prev => ({ ...prev, userRole: e.target.value }))}
+                options={ASSIGNABLE_ROLES.map((role) => ({ value: role, label: roleLabels[role] }))}
+              />
+              {editForm.userRole && editForm.userRole !== editingUser.userRole && (
+                <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  {t('admin_users.role_change_warning')}
+                </p>
+              )}
             </div>
           )}
 
@@ -513,17 +563,15 @@ function AdminUsers() {
           <div className="border-t border-slate-200 pt-4">
             <p className="text-sm font-medium text-slate-700 mb-3">{t('admin_users.section_password')}</p>
             <div className="grid grid-cols-2 gap-4">
-              <Input
+              <PasswordInput
                 label={t('admin_users.label_new_password')}
-                type="password"
                 value={editForm.password}
                 onChange={(e) => setEditForm(prev => ({ ...prev, password: e.target.value }))}
                 placeholder="••••••"
                 hint={t('admin_users.hint_password')}
               />
-              <Input
+              <PasswordInput
                 label={t('admin_users.label_confirm')}
-                type="password"
                 value={editForm.confirmPassword}
                 onChange={(e) => setEditForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
                 placeholder="••••••"
@@ -587,17 +635,15 @@ function AdminUsers() {
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Input
+            <PasswordInput
               label={t('admin_users.label_password')}
-              type="password"
               required
               value={createForm.password}
               onChange={(e) => setCreateForm(prev => ({ ...prev, password: e.target.value }))}
               placeholder="••••••"
             />
-            <Input
+            <PasswordInput
               label={t('admin_users.label_confirm')}
-              type="password"
               required
               value={createForm.confirmPassword}
               onChange={(e) => setCreateForm(prev => ({ ...prev, confirmPassword: e.target.value }))}

@@ -27,6 +27,8 @@ export default (plugin) => {
   const originalContentApiRoutes = plugin.routes['content-api'];
 
   const allowedUserRoles = ['patient', 'doctor', 'manager', 'coordinator', 'admin'];
+  // Roles an admin may switch an account to from the users section.
+  const ASSIGNABLE_ROLES = ['patient', 'manager', 'coordinator', 'admin'];
 
   const resolveRoleByType = async (roleType: string) => {
     let role = await strapi
@@ -165,7 +167,67 @@ export default (plugin) => {
     async update(ctx) {
       const sourceBody = normalizeContentApiBody(ctx.request?.body || {});
       if (sourceBody.password !== undefined && sourceBody.password !== '' && rejectWeakPassword(ctx, sourceBody.password)) return;
-      return originalUserController.update(ctx);
+
+      // Role change by an admin. The role is stored twice — the `role` relation
+      // (server permissions) and `userRole` (which cabinet the UI opens) — and
+      // both must point to the same role, or the user sees one cabinet while
+      // the server answers with another's rights.
+      let roleChange: { from: string | null; to: string } | null = null;
+      if (sourceBody.userRole !== undefined || sourceBody.role !== undefined) {
+        const actor = ctx.state?.user;
+        const targetId = Number(ctx.params?.id);
+        const target = await strapi.query('plugin::users-permissions.user').findOne({
+          where: { id: targetId },
+          populate: { role: true },
+        });
+        if (!target) return ctx.notFound('User not found');
+
+        const requestedType = typeof sourceBody.userRole === 'string'
+          ? sourceBody.userRole.toLowerCase()
+          : (await strapi.query('plugin::users-permissions.role').findOne({
+              where: { id: Number(sourceBody.role?.id ?? sourceBody.role) || 0 },
+            }))?.type;
+        if (requestedType === 'doctor' && (target.role?.type || target.userRole) !== 'doctor') {
+          return ctx.badRequest('The doctor role is managed in the doctors section', { code: 'doctor_role_managed_in_doctors' });
+        }
+        if (!requestedType || !ASSIGNABLE_ROLES.includes(requestedType) && requestedType !== 'doctor') {
+          return ctx.badRequest('Unsupported role', { code: 'invalid_role' });
+        }
+        const nextRole = await resolveRoleByType(requestedType);
+        if (!nextRole) return ctx.badRequest('Unsupported role', { code: 'invalid_role' });
+
+        const previous = target.role?.type || target.userRole || null;
+        if (previous !== requestedType) {
+          // A doctor's role comes with a catalogue card; it is managed under "Doctors".
+          if (previous === 'doctor' || requestedType === 'doctor') {
+            return ctx.badRequest('The doctor role is managed in the doctors section', { code: 'doctor_role_managed_in_doctors' });
+          }
+          // An admin demoting themselves can leave the platform without any admin.
+          if (actor?.id === targetId && previous === 'admin') {
+            return ctx.badRequest('You cannot change your own admin role', { code: 'cannot_change_own_admin_role' });
+          }
+          roleChange = { from: previous, to: requestedType };
+        }
+        sourceBody.role = nextRole.id;
+        sourceBody.userRole = requestedType;
+        if (ctx.request.body?.data && typeof ctx.request.body.data === 'object') ctx.request.body.data = sourceBody;
+        else ctx.request.body = sourceBody;
+      }
+
+      await originalUserController.update(ctx);
+
+      if (roleChange && ctx.status < 400) {
+        // An open tab must not keep working in the old cabinet with old rights.
+        await revokeUserSessions(strapi, Number(ctx.params.id));
+        strapi.log.info(JSON.stringify({
+          audit: 'ROLE_CHANGED',
+          userId: Number(ctx.params.id),
+          from: roleChange.from,
+          to: roleChange.to,
+          changedBy: ctx.state?.user?.id,
+          ts: new Date().toISOString(),
+        }));
+      }
     },
 
     async updateMe(ctx) {

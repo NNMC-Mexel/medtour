@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearPersistentFilters } from "../hooks/usePersistentFilters";
 
 // =====================================================
 // КОНФИГУРАЦИЯ ДОМЕНОВ ДЛЯ ПРОДАКШНА
@@ -184,6 +185,8 @@ api.interceptors.response.use(
         if (error.response?.status === 401) {
             onUnauthorized?.();
             localStorage.removeItem("auth-storage");
+            // Сессия кончилась — как и при выходе, чужие фильтры не оставляем.
+            clearPersistentFilters();
             if (!redirectingToLogin && window.location.pathname !== "/login") {
                 redirectingToLogin = true;
                 window.location.href = "/login";

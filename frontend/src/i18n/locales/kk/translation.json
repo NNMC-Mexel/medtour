@@ -155,7 +155,9 @@
       "stats_quality": "Сапа",
       "stats_doctors": "Дәрігерлер",
       "stats_consultations": "Кеңестер",
-      "stats_rating": "Рейтинг"
+      "stats_rating": "Рейтинг",
+      "show_password": "Құпия сөзді көрсету",
+      "hide_password": "Құпия сөзді жасыру"
     },
     "register": {
       "title": "Тіркелу",
@@ -1790,7 +1792,11 @@
     "err_short_password": "Құпия сөз кемінде 6 таңбадан тұруы керек",
     "err_password_mismatch": "Құпия сөздер сәйкес келмейді",
     "err_save": "Пайдаланушыны жасау мүмкін болмады",
-    "err_save_msg": "Қате: {{message}}"
+    "err_save_msg": "Қате: {{message}}",
+    "role_coordinator": "Үйлестіруші",
+    "role_doctor_locked": "Дәрігер рөлі оның карточкасымен байланысты — оны «Дәрігерлер» бөлімінде өзгертіңіз.",
+    "role_self_locked": "Өз әкімші рөліңізді өзгерту мүмкін емес.",
+    "role_change_warning": "Рөл өзгергеннен кейін пайдаланушы жүйеден шығарылады және жаңа кабинетке кіреді."
   },
   "admin_content": {
     "title": "MedTour лендинг контенті",

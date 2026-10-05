@@ -155,7 +155,9 @@
       "stats_quality": "Quality",
       "stats_doctors": "Doctors",
       "stats_consultations": "Consultations",
-      "stats_rating": "Rating"
+      "stats_rating": "Rating",
+      "show_password": "Show password",
+      "hide_password": "Hide password"
     },
     "register": {
       "title": "Sign Up",
@@ -1790,7 +1792,11 @@
     "err_short_password": "Password must be at least 6 characters",
     "err_password_mismatch": "Passwords do not match",
     "err_save": "Failed to create user",
-    "err_save_msg": "Error: {{message}}"
+    "err_save_msg": "Error: {{message}}",
+    "role_coordinator": "Coordinator",
+    "role_doctor_locked": "A doctor's role comes with their profile card — change it in the Doctors section.",
+    "role_self_locked": "You cannot change your own admin role.",
+    "role_change_warning": "After the role change the user is signed out and will sign in to the new cabinet."
   },
   "admin_content": {
     "title": "MedTour Landing Content",

@@ -182,7 +182,7 @@ function DashboardLayout({ navItems }) {
   }
 
   return (
-    <div className="cabinet-shell min-h-(--app-height) overflow-x-hidden bg-gradient-to-br from-slate-50 via-teal-50/30 to-sky-50/30">
+    <div className="cabinet-shell min-h-(--app-height) bg-gradient-to-br from-slate-50 via-teal-50/30 to-sky-50/30">
       {/* Sidebar */}
       <div
         className={cn(

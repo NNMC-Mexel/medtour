@@ -27,6 +27,8 @@ import Modal from '../../components/ui/Modal'
 import { useToast } from '../../components/ui/Toast'
 import api, { normalizeResponse, getMediaUrl } from '../../services/api'
 import { formatDateTime, formatPrice, formatDate } from '../../utils/helpers'
+import usePersistentFilters from '../../hooks/usePersistentFilters'
+import HScroll from '../../components/ui/HScroll'
 
 const STATUS_VARIANTS = {
   pending:     { variant: 'warning',  icon: Clock },
@@ -55,6 +57,11 @@ const TYPE_ICONS = {
   video: Video,
   chat:  MessageCircle,
 }
+
+// Фильтры списка переживают перезагрузку; строка поиска (ФИО пациентов) —
+// только до закрытия вкладки.
+const APPOINTMENT_FILTER_DEFAULTS = { search: '', status: 'all', payment: 'all' }
+const APPOINTMENT_FILTER_OPTIONS = { sessionKeys: ['search'] }
 
 function StatCard({ icon: Icon, label, value, color }) {
   return (
@@ -278,9 +285,13 @@ function AdminAppointments() {
   const [isLoading, setIsLoading]       = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  const [search, setSearch]               = useState('')
-  const [statusFilter, setStatusFilter]   = useState('all')
-  const [paymentFilter, setPaymentFilter] = useState('all')
+  const { filters: listFilters, setFilter } = usePersistentFilters('admin-appointments', APPOINTMENT_FILTER_DEFAULTS, APPOINTMENT_FILTER_OPTIONS)
+  const search = listFilters.search
+  const setSearch = (value) => setFilter('search', value)
+  const statusFilter = listFilters.status
+  const setStatusFilter = (value) => setFilter('status', value)
+  const paymentFilter = listFilters.payment
+  const setPaymentFilter = (value) => setFilter('payment', value)
   const [dateFrom, setDateFrom]           = useState('')
   const [dateTo, setDateTo]               = useState('')
 
@@ -559,7 +570,7 @@ function AdminAppointments() {
               <p className="text-sm mt-1">{t('admin_apt.empty_hint')}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <HScroll>
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/50">
@@ -647,7 +658,7 @@ function AdminAppointments() {
                   </strong>
                 </span>
               </div>
-            </div>
+            </HScroll>
           )}
         </CardContent>
       </Card>

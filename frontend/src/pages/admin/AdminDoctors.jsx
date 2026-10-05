@@ -5,6 +5,7 @@ import { CalendarClock, Camera, Check, Loader2, Pencil, Plus, Search, Trash2, X 
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
+import PasswordInput from '../../components/ui/PasswordInput'
 import Select from '../../components/ui/Select'
 import Textarea from '../../components/ui/Textarea'
 import Modal from '../../components/ui/Modal'
@@ -18,6 +19,8 @@ import DoctorScheduleModal from '../../components/admin/DoctorScheduleModal'
 import { createRecurringSchedule, getDoctorScheduleConfig } from '../../utils/schedule'
 import { buildSchedulePayload, saveWithScheduleConflictConfirm } from '../../utils/scheduleSave'
 import { TREATMENT_DEPARTMENTS, localizeDepartment, mergeTreatmentDepartments } from '../../data/treatmentDepartments'
+import usePersistentFilters from '../../hooks/usePersistentFilters'
+import HScroll from '../../components/ui/HScroll'
 
 const defaultForm = {
   username: '',
@@ -101,6 +104,10 @@ function toPayload(form, clinics, schedulePayload) {
   }
 }
 
+// Фильтры списка переживают перезагрузку; строка поиска — только до закрытия вкладки.
+const DOCTOR_FILTER_DEFAULTS = { search: '', specialization: 'all' }
+const DOCTOR_FILTER_OPTIONS = { sessionKeys: ['search'] }
+
 function AdminDoctors({ readonly = false }) {
   const { t, i18n } = useTranslation()
   const [searchParams] = useSearchParams()
@@ -110,8 +117,11 @@ function AdminDoctors({ readonly = false }) {
   const [clinics, setClinics] = useState([])
   const [scheduleDoctor, setScheduleDoctor] = useState(null)
   const [treatmentDepartments, setTreatmentDepartments] = useState(TREATMENT_DEPARTMENTS)
-  const [search, setSearch] = useState('')
-  const [specFilter, setSpecFilter] = useState('all')
+  const { filters: listFilters, setFilter } = usePersistentFilters('admin-doctors', DOCTOR_FILTER_DEFAULTS, DOCTOR_FILTER_OPTIONS)
+  const search = listFilters.search
+  const setSearch = (value) => setFilter('search', value)
+  const specFilter = listFilters.specialization
+  const setSpecFilter = (value) => setFilter('specialization', value)
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -507,7 +517,7 @@ function AdminDoctors({ readonly = false }) {
           <CardTitle>{t('admin_doc.list_title', { count: filteredDoctors.length })}</CardTitle>
         </CardHeader>
         <CardContent className='p-0'>
-          <div className='overflow-x-auto'>
+          <HScroll>
             <table className='w-full'>
               <thead>
                 <tr className='border-b border-slate-200'>
@@ -586,7 +596,7 @@ function AdminDoctors({ readonly = false }) {
                 )}
               </tbody>
             </table>
-          </div>
+          </HScroll>
         </CardContent>
       </Card>
 
@@ -639,18 +649,16 @@ function AdminDoctors({ readonly = false }) {
           </div>
 
           <div className='grid md:grid-cols-2 gap-4'>
-            <Input
+            <PasswordInput
               label={editingDoctor ? t('admin_doc.label_password_new') : t('admin_doc.label_password')}
-              type='password'
               required={!editingDoctor}
               value={form.password}
               onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
               placeholder={editingDoctor ? t('admin_doc.placeholder_password_new') : t('admin_doc.placeholder_password')}
               hint={editingDoctor ? t('admin_doc.hint_password') : undefined}
             />
-            <Input
+            <PasswordInput
               label={editingDoctor ? t('admin_doc.label_confirm_new') : t('admin_doc.label_confirm')}
-              type='password'
               required={!editingDoctor}
               value={form.confirmPassword}
               onChange={(e) => setForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}

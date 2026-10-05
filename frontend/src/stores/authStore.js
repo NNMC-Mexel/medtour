@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import api, { authAPI, setUnauthorizedHandler } from '../services/api'
 import i18n from '../i18n'
 import useConsultationStore from './consultationStore'
+import { clearPersistentFilters } from '../hooks/usePersistentFilters'
 
 // Decode JWT expiry without external library (no signature verification — just expiry)
 function getJwtExpiry(token) {
@@ -167,6 +168,8 @@ const useAuthStore = create(
       logout: () => {
         const token = get().token
         if (token) authAPI.logout(token)
+        // Следующий человек за этим браузером начинает с чистых фильтров.
+        clearPersistentFilters()
         useConsultationStore.getState().closeConsultation()
         set({
           user: null,
