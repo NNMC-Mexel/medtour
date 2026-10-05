@@ -384,7 +384,9 @@ function AdminAppointments() {
     if (!appointment || !newStatus) return
     setIsSaving(true)
     try {
-      await api.put(`/api/appointments/${appointment.id}`, { data: { statuse: newStatus } })
+      // Strapi v5 addresses documents by documentId; a numeric id silently
+      // resolves to nothing and returns 200 without persisting anything.
+      await api.put(`/api/appointments/${appointment.documentId || appointment.id}`, { data: { statuse: newStatus } })
       setAppointments(prev =>
         prev.map(a => a.id === appointment.id ? { ...a, status: newStatus, statuse: newStatus } : a)
       )
@@ -403,7 +405,7 @@ function AdminAppointments() {
 
   const handlePaymentStatusChange = async (apt, newPaymentStatus) => {
     try {
-      await api.put(`/api/appointments/${apt.id}`, { data: { paymentStatus: newPaymentStatus } })
+      await api.put(`/api/appointments/${apt.documentId || apt.id}`, { data: { paymentStatus: newPaymentStatus } })
       setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, paymentStatus: newPaymentStatus } : a))
       if (detailAppointment?.id === apt.id) {
         setDetailAppointment(prev => ({ ...prev, paymentStatus: newPaymentStatus }))
