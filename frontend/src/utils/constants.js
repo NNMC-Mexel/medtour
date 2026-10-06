@@ -114,6 +114,7 @@ export const ADMIN_NAV_ITEMS = [
   { path: '/admin/prices', label: 'nav.admin_prices', icon: 'receipt-text' },
   { path: '/admin/price-requests', label: 'nav.price_requests', icon: 'shopping-cart' },
   { path: '/admin/guide-videos', label: 'nav.admin_guide_videos', icon: 'circle-help' },
+  { path: '/admin/analytics', label: 'nav.admin_analytics', icon: 'bar-chart' },
   { path: '/admin/settings', label: 'nav.admin_settings', icon: 'settings' },
 ]
 

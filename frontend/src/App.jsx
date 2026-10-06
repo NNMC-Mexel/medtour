@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ToastProvider } from './components/ui/Toast'
 import ActiveConsultation from './components/consultation/ActiveConsultation'
+import RouteAnalytics from './components/routing/RouteAnalytics'
 import ConsultationRoute from './components/consultation/ConsultationRoute'
 
 // Layouts
@@ -58,6 +59,7 @@ const AdminAppointments = lazy(() => import('./pages/admin/AdminAppointments'))
 const AdminSpecializations = lazy(() => import('./pages/admin/AdminSpecializations'))
 const AdminPriceList = lazy(() => import('./pages/admin/AdminPriceList'))
 const AdminGuideVideos = lazy(() => import('./pages/admin/AdminGuideVideos'))
+const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'))
 const AdminContent = lazy(() => import('./pages/admin/AdminContent'))
 const AdminTreatmentDepartments = lazy(() => import('./pages/admin/AdminTreatmentDepartments'))
 const StaffDashboard = lazy(() => import('./pages/staff/StaffDashboard'))
@@ -170,6 +172,7 @@ function App() {
     <ToastProvider>
     <BrowserRouter>
       <ScrollRestoration />
+      <RouteAnalytics />
       <Suspense fallback={<LoadingScreen />}>
       <Routes>
         {/* Public Routes */}
@@ -275,6 +278,7 @@ function App() {
           <Route path="prices" element={<AdminPriceList />} />
           <Route path="price-requests" element={<StaffPriceRequests />} />
           <Route path="guide-videos" element={<AdminGuideVideos />} />
+          <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="settings" element={<AdminContent />} />
           <Route path="cases" element={<MedicalCasesPage />} />
           <Route path="cases/:id" element={<MedicalCaseDetail />} />

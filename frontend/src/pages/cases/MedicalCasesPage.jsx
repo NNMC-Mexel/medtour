@@ -32,6 +32,7 @@ import { documentsAPI, medicalCasesAPI, normalizeResponse, specializationsAPI, u
 import { getCaseSla, formatCaseStatus, MEDICAL_CASE_STATUSES, normalizeCaseStatus, STATUS_VARIANTS } from '../../utils/medicalCaseWorkflow'
 import { cn } from '../../utils/helpers'
 import { foldCountryText, getCountryOptions, normalizeCountryValue } from '../../utils/countries'
+import { trackEvent } from '../../services/analytics'
 
 function roleBase(role) {
   if (role === 'admin') return '/admin'
@@ -354,6 +355,7 @@ function CreateCaseModal({ onClose, onCreated }) {
         timezone: user?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
       })
       const { data } = normalizeResponse(response)
+      trackEvent('case_created')
 
       const caseRef = data?.documentId || data?.id
       let hasDocumentLinkError = false

@@ -19,6 +19,7 @@ import { normalizeCountryValue } from '../utils/countries'
 import { getDefaultTimezoneForCountry } from '../utils/timezones'
 import { formatPhoneForCountry, getPhoneRule, isValidPhoneForCountry } from '../utils/phone'
 import BrandLogo from '../components/ui/BrandLogo'
+import { trackEvent } from '../services/analytics'
 
 const defaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Almaty'
 const languageOptions = [
@@ -223,6 +224,7 @@ function RegisterPage() {
 
     const result = await register(userData)
     if (!result.success) return
+    trackEvent('sign_up')
 
     // Clear cache on successful registration
     clearRegisterCache()

@@ -8,6 +8,7 @@ import { priceItemsAPI, priceRequestsAPI } from '../../services/api'
 import { formatPrice } from '../../utils/pricing'
 import useAuthStore from '../../stores/authStore'
 import { useToast } from '../ui/Toast'
+import { trackEvent } from '../../services/analytics'
 
 const copy = {
   ru: { all: 'Все услуги', checkup: 'Check-up и пакеты', analysis: 'Анализы', service: 'Другие услуги', search: 'Поиск услуги или кода', category: 'Все направления', add: 'В корзину', remove: 'Убрать', cart: 'Моя корзина', sentHistory: 'Отправленные корзины', emptyCart: 'Выберите услуги, чтобы отправить запрос менеджеру.', note: 'Комментарий менеджеру (необязательно)', send: 'Отправить менеджеру', sent: 'Запрос отправлен менеджеру', signIn: 'Войдите как пациент, чтобы отправить запрос. Корзина сохранится.', max: 'Можно выбрать до 50 услуг.', estimate: 'Ориентировочная сумма. Менеджер уточнит состав и стоимость.', changed: 'Состав или цены услуг обновились. Проверьте корзину и отправьте запрос ещё раз.', previous: 'Назад', next: 'Далее', result: 'Найдено услуг', loadError: 'Не удалось загрузить прайс.', noResults: 'Услуги не найдены.', sendError: 'Не удалось отправить запрос.' },
@@ -135,6 +136,7 @@ function PriceListSection({ compact = false, limit, featuredOnly = false, showCt
         return
       }
       const response = await priceRequestsAPI.create(basket.map((item) => item.documentId), note)
+      trackEvent('price_request')
       if (Math.abs(Number(response.data?.data?.totalUSD) - total) > 0.01) toast.warning(labels.changed)
       setBasket([])
       setNote('')

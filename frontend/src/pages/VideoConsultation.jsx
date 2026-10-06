@@ -264,6 +264,18 @@ function VideoConsultation({
   // while `complete` also completes the appointment for both participants.
   const [isCompletingCall, setIsCompletingCall] = useState(false)
   const [pendingEndAction, setPendingEndAction] = useState(null)
+  // На телефоне выход — через шторку: врачу здесь же предлагается завершить
+  // приём, пациент подтверждает выход.
+  const [showLeaveSheet, setShowLeaveSheet] = useState(false)
+
+  useEffect(() => {
+    if (!showLeaveSheet) return undefined
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setShowLeaveSheet(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [showLeaveSheet])
 
   const localVideoRef = useRef(null)
   const remoteVideoRef = useRef(null)
@@ -1291,11 +1303,13 @@ function VideoConsultation({
     setPendingEndAction(action)
   }
 
-  const confirmEndCall = async () => {
-    if (isEndingCallRef.current || !pendingEndAction) return
+  // requestedAction — выбор, сделанный в шторке: она сама служит подтверждением.
+  const confirmEndCall = async (requestedAction) => {
+    const chosen = typeof requestedAction === 'string' ? requestedAction : pendingEndAction
+    if (isEndingCallRef.current || !chosen) return
     // Without a loaded appointment we cannot complete it server-side, but the
     // participant must still be able to get out of the call, so degrade to leave.
-    const action = pendingEndAction === 'complete' && appointment?.documentId ? 'complete' : 'leave'
+    const action = chosen === 'complete' && appointment?.documentId ? 'complete' : 'leave'
 
     isEndingCallRef.current = true
     setIsCompletingCall(true)
@@ -1319,6 +1333,7 @@ function VideoConsultation({
       cleanupCall()
       setConnectionState('waiting')
       setPendingEndAction(null)
+      setShowLeaveSheet(false)
       closeConsultation(isDoctor ? '/doctor' : '/patient/appointments')
     } finally {
       isEndingCallRef.current = false
@@ -2166,26 +2181,7 @@ function VideoConsultation({
 
           {/* Controls */}
           <div className="pointer-events-none absolute inset-x-0 bottom-[max(1rem,calc(env(safe-area-inset-bottom)+1rem))] z-20 flex flex-col items-center gap-2 px-3">
-            {isDoctor && (
-              <button
-                onClick={() => requestEndCall('complete')}
-                disabled={isCompletingCall}
-                title={t('video.complete_btn')}
-                aria-label={t('video.complete_btn')}
-                className="pointer-events-auto inline-flex max-w-full items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-xl ring-1 ring-white/10 backdrop-blur-xl transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isCompletingCall ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Check className="w-4 h-4" />
-                )}
-                <span className="truncate">
-                  {isCompletingCall ? t('common.loading') : t('video.complete_btn')}
-                </span>
-              </button>
-            )}
-
-            <div className="pointer-events-auto flex items-center justify-center gap-2 rounded-3xl bg-slate-950/90 px-3 py-3 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl">
+            <div className="pointer-events-auto flex items-center justify-center gap-1.5 rounded-3xl bg-slate-950/90 px-2 py-3 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl sm:gap-2 sm:px-3">
               <button
                 onClick={toggleMute}
                 disabled={!hasMicrophone}
@@ -2227,11 +2223,34 @@ function VideoConsultation({
                 <ChevronLeft className="w-5 h-5" />
               </button>
 
+              {/* Завершение приёма — в той же панели, отдельным цветом. На
+                  телефоне места нет: врач завершает через шторку выхода. */}
+              {isDoctor && (
+                <button
+                  onClick={() => requestEndCall('complete')}
+                  disabled={isCompletingCall}
+                  title={t('video.complete_btn')}
+                  aria-label={t('video.complete_btn')}
+                  className="hidden h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 font-semibold text-white transition-all hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-70 sm:flex"
+                >
+                  {isCompletingCall ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+                  <span className="text-sm">{t('video.complete_btn')}</span>
+                </button>
+              )}
+
               <button
                 onClick={() => requestEndCall('leave')}
                 title={t('common.leave_call')}
                 aria-label={t('common.leave_call')}
-                className="h-12 w-16 rounded-2xl bg-rose-500 text-white flex items-center justify-center transition-all hover:bg-rose-600"
+                className="hidden h-12 w-16 rounded-2xl bg-rose-500 text-white items-center justify-center transition-all hover:bg-rose-600 sm:flex"
+              >
+                <PhoneOff className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setShowLeaveSheet(true)}
+                title={t('common.leave_call')}
+                aria-label={t('common.leave_call')}
+                className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500 text-white transition-all hover:bg-rose-600 sm:hidden"
               >
                 <PhoneOff className="w-5 h-5" />
               </button>
@@ -2595,6 +2614,52 @@ function VideoConsultation({
       </div>
 
       {endConfirmationModal}
+
+      {showLeaveSheet && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowLeaveSheet(false)} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="leave-sheet-title"
+            className="relative w-full max-w-sm overflow-y-auto rounded-t-3xl bg-white p-5 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+1rem))] shadow-2xl animate-scaleIn sm:rounded-2xl sm:p-6"
+          >
+            <h2 id="leave-sheet-title" className="text-center text-lg font-bold text-slate-900">
+              {isDoctor ? t('video.leave_sheet_title_doctor') : t('video.leave_sheet_title_patient')}
+            </h2>
+            <p className="mt-1 text-center text-sm text-slate-500">
+              {isDoctor ? t('video.leave_sheet_desc_doctor') : t('video.leave_sheet_desc_patient')}
+            </p>
+            <div className="mt-5 space-y-2.5">
+              {isDoctor && (
+                <Button
+                  size="lg"
+                  variant="success"
+                  className="w-full"
+                  onClick={() => confirmEndCall('complete')}
+                  disabled={isCompletingCall}
+                  leftIcon={isCompletingCall ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
+                >
+                  {t('video.leave_sheet_complete')}
+                </Button>
+              )}
+              <Button
+                size="lg"
+                variant={isDoctor ? 'secondary' : 'danger'}
+                className="w-full"
+                onClick={() => confirmEndCall('leave')}
+                disabled={isCompletingCall}
+                leftIcon={<PhoneOff className="h-5 w-5" />}
+              >
+                {isDoctor ? t('video.leave_sheet_leave_only') : t('video.leave_sheet_leave')}
+              </Button>
+              <Button size="lg" variant="ghost" className="w-full" onClick={() => setShowLeaveSheet(false)}>
+                {t('video.leave_sheet_stay')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {ratingModal}
     </div>

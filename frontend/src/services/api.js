@@ -198,6 +198,9 @@ api.interceptors.response.use(
 
 export default api;
 
+// Базовый адрес API для запросов мимо axios (sendBeacon аналитики и т. п.).
+export const getApiBaseUrl = () => api.defaults.baseURL || API_URL;
+
 // ===========================================
 // HELPER FUNCTIONS для работы со Strapi v5
 // ===========================================

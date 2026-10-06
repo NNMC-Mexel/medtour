@@ -22,6 +22,7 @@ import {
   KAZAKHSTAN_TIME_ZONE,
 } from '../../utils/kazakhstanTime'
 import { generateSlotsFromIntervals, getDoctorIntervalsForDate, isDoctorWorkingOnDate } from '../../utils/schedule'
+import { trackEvent } from '../../services/analytics'
 
 // Free consultations are the current production default. Set
 // VITE_FREE_CONSULTATIONS=false only when paid consultations are re-enabled.
@@ -147,6 +148,7 @@ export default function CaseSlotPicker({
         roomId: `room-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       })
       toast.success(t('case_slot.booked_success'))
+      trackEvent('booking_complete')
       onBooked?.()
       onClose()
     } catch (err) {

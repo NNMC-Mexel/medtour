@@ -20,6 +20,8 @@ const DEFAULT_LIMITS: Record<string, RateLimitRule> = {
   // Рассылка писем от имени платформы: без лимита это спам-шлюз.
   '/api/auth/send-email-confirmation': { max: 5,  windowMs: 60 * 60 * 1000 },
   '/api/auth/change-password':         { max: 10, windowMs: 60 * 60 * 1000 },
+  // Анонимный сбор аналитики: защита от накрутки и забивания таблицы.
+  '/api/analytics/collect':            { max: 300, windowMs: 5 * 60 * 1000 },
 }
 
 // Prefix limits (matched when no exact rule applies). Keyed by prefix so all

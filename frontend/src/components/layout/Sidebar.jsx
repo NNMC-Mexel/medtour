@@ -17,6 +17,7 @@ import {
   CircleHelp,
   ClipboardList,
   ShoppingCart,
+  BarChart3,
   X,
 } from 'lucide-react'
 import { cn } from '../../utils/helpers'
@@ -39,6 +40,7 @@ const iconMap = {
   stethoscope: Stethoscope,
   'receipt-text': ReceiptText,
   'shopping-cart': ShoppingCart,
+  'bar-chart': BarChart3,
   tags: Tags,
   activity: Activity,
   'circle-help': CircleHelp,

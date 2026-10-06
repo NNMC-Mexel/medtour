@@ -225,6 +225,27 @@ export default {
       rule: '*/15 * * * *',
     },
   },
+  // Сырые события аналитики хранятся ограниченное время: старше
+  // ANALYTICS_RETENTION_DAYS (по умолчанию 400 дней) удаляются раз в сутки.
+  purgeOldAnalyticsEvents: {
+    task: async ({ strapi }: { strapi: any }) => {
+      try {
+        const retentionDays = Number(process.env.ANALYTICS_RETENTION_DAYS) > 0
+          ? Number(process.env.ANALYTICS_RETENTION_DAYS)
+          : 400;
+        const cutoff = new Date(Date.now() + 5 * 60 * 60 * 1000 - retentionDays * 86_400_000)
+          .toISOString()
+          .slice(0, 10);
+        const removed = await strapi.db.connection('analytics_events').where('day', '<', cutoff).del();
+        if (removed) strapi.log.info(`[cron:analytics_purge] removed ${removed} events older than ${cutoff}`);
+      } catch (err: any) {
+        strapi.log.error('[cron:analytics_purge] Unexpected error:', err.message);
+      }
+    },
+    options: {
+      rule: '40 3 * * *',
+    },
+  },
   notifySlaOverdueCases: {
     task: async ({ strapi }: { strapi: any }) => {
       try {

@@ -1,0 +1,126 @@
+{
+  "kind": "collectionType",
+  "collectionName": "analytics_events",
+  "info": {
+    "singularName": "analytics-event",
+    "pluralName": "analytics-events",
+    "displayName": "AnalyticsEvent",
+    "description": "Anonymous site visits and funnel events. No IP, no raw user agent, no user id."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {
+    "content-manager": {
+      "visible": false
+    },
+    "content-type-builder": {
+      "visible": false
+    }
+  },
+  "attributes": {
+    "kind": {
+      "type": "enumeration",
+      "enum": [
+        "pageview",
+        "event"
+      ],
+      "required": true
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "path": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "day": {
+      "type": "string",
+      "maxLength": 10,
+      "required": true
+    },
+    "visitorId": {
+      "type": "string",
+      "maxLength": 64,
+      "required": true
+    },
+    "sessionId": {
+      "type": "string",
+      "maxLength": 64,
+      "required": true
+    },
+    "referrerHost": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "utmSource": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "utmMedium": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "utmCampaign": {
+      "type": "string",
+      "maxLength": 150
+    },
+    "utmContent": {
+      "type": "string",
+      "maxLength": 150
+    },
+    "utmTerm": {
+      "type": "string",
+      "maxLength": 150
+    },
+    "clickSource": {
+      "type": "enumeration",
+      "enum": [
+        "meta",
+        "yandex",
+        "google"
+      ]
+    },
+    "device": {
+      "type": "enumeration",
+      "enum": [
+        "mobile",
+        "tablet",
+        "desktop"
+      ]
+    },
+    "browser": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "os": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "platform": {
+      "type": "enumeration",
+      "enum": [
+        "web",
+        "app"
+      ],
+      "default": "web"
+    },
+    "role": {
+      "type": "enumeration",
+      "enum": [
+        "guest",
+        "patient",
+        "doctor",
+        "admin",
+        "manager",
+        "coordinator"
+      ],
+      "default": "guest"
+    },
+    "value": {
+      "type": "integer",
+      "min": 0
+    }
+  }
+}
