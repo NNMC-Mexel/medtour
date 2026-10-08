@@ -13,9 +13,11 @@ import FinalCtaSection from '../components/landing/FinalCtaSection'
 import { landingCopy } from '../data/landingCopy'
 import { mergeTreatmentDepartments, TREATMENT_DEPARTMENTS } from '../data/treatmentDepartments'
 import { contentAPI, doctorsAPI, normalizeResponse } from '../services/api'
+import useSeo from '../components/seo/useSeo'
 
 function LandingPage() {
   const { i18n } = useTranslation()
+  useSeo({ title: i18n.t('seo.home_title'), description: i18n.t('seo.home_description'), path: '/' })
   const lang = i18n.language?.split('-')?.[0] || 'ru'
   const copy = landingCopy[lang] || landingCopy.ru
   const [departments, setDepartments] = useState(TREATMENT_DEPARTMENTS)

@@ -62,6 +62,12 @@ export default {
     const { result } = event;
     const documentId = result?.documentId;
     if (!documentId) return;
+    // Draft & publish: creating an appointment inserts the draft row, and every
+    // publish — including each update(..., status: 'published') — inserts a new
+    // published row, which fires afterCreate again. Only the draft row marks a
+    // genuinely new appointment; otherwise the doctor got "New appointment"
+    // after every status change and paid bookings got duplicate ledger entries.
+    if (result.publishedAt) return;
 
     try {
       const appointment = await strapi.documents('api::appointment.appointment').findOne({

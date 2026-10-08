@@ -9,6 +9,7 @@ import {
   uploadFile,
 } from '../services/api'
 import { showMessageNotification, clearNotificationReminder } from '../utils/notifications'
+import useAuthStore from './authStore'
 
 const conversationKey = (conversation) => conversation?.documentId || conversation?.id
 const messageKey = (message) => message?.documentId || message?.id
@@ -20,6 +21,22 @@ const upsertByKey = (items, item, getKey) => {
   return exists ? items.map((existing) => (getKey(existing) === key ? { ...existing, ...item } : existing)) : [item, ...items]
 }
 
+// A message can reach us twice: through the open conversation's room and as a
+// personal "chat:unread" signal. Count each message once.
+const countedUnreadMessages = new Set()
+const markCounted = (conversationId, messageId) => {
+  if (!messageId) return true
+  const key = `${conversationId}:${messageId}`
+  if (countedUnreadMessages.has(key)) return false
+  if (countedUnreadMessages.size > 500) countedUnreadMessages.clear()
+  countedUnreadMessages.add(key)
+  return true
+}
+const currentUserId = () => useAuthStore.getState().user?.id
+
+/** Непрочитанные во всех беседах — для отметки на пункте «Сообщения». */
+export const selectTotalUnread = (state) =>
+  state.conversations.reduce((sum, conversation) => sum + (Number(conversation.unreadCount) || 0), 0)
 
 const useChatStore = create((set, get) => ({
   conversations: [],
@@ -38,7 +55,9 @@ const useChatStore = create((set, get) => ({
     if (existing?.connected || !token) return existing
 
     const socket = io(getSignalingUrl(), {
-      auth: { token },
+      // Функция, а не объект: после смены пароля сервер выдаёт новый JWT, и
+      // переподключение должно идти с ним, а не с отозванным.
+      auth: (cb) => cb({ token: getAuthToken() || token }),
       transports: ['websocket', 'polling'],
       reconnection: true,
     })
@@ -76,6 +95,8 @@ const useChatStore = create((set, get) => ({
             },
             lastMessageAt: message.createdAt,
             unreadCount: String(currentId) === String(conversationId)
+              || String(message.sender?.id ?? '') === String(currentUserId() ?? '')
+              || !markCounted(conversationId, message.id)
               ? conversation.unreadCount || 0
               : (conversation.unreadCount || 0) + 1,
           }
@@ -88,6 +109,25 @@ const useChatStore = create((set, get) => ({
           messages: exists ? state.messages : [...state.messages, message],
         }
       })
+    })
+    // Personal signal: someone wrote in one of our conversations, even if it is
+    // not open (and its room not joined). Carries no message text.
+    socket.on('chat:unread', ({ conversationId, messageId } = {}) => {
+      if (!conversationId) return
+      if (String(conversationKey(get().currentConversation)) === String(conversationId)) return
+      if (!markCounted(conversationId, messageId)) return
+      const known = get().conversations.some((conversation) => String(conversationKey(conversation)) === String(conversationId))
+      if (!known) {
+        get().refreshConversations()
+        return
+      }
+      set((state) => ({
+        conversations: state.conversations.map((conversation) => (
+          String(conversationKey(conversation)) === String(conversationId)
+            ? { ...conversation, unreadCount: (Number(conversation.unreadCount) || 0) + 1 }
+            : conversation
+        )),
+      }))
     })
     socket.on('chat:read', ({ conversationId }) => {
       set((state) => ({
@@ -143,6 +183,20 @@ const useChatStore = create((set, get) => ({
       console.error('Error fetching conversations:', error)
       set({ error: error.message, isLoading: false, conversations: [] })
       return []
+    }
+  },
+
+  // Silent re-sync of the conversation list (unread counters) for the cabinet
+  // menu: no loading state, so an open chat screen does not flicker.
+  refreshConversations: async () => {
+    if (!getAuthToken()) return
+    try {
+      get().connectSocket()
+      const response = await conversationsAPI.getAll()
+      const { data } = normalizeResponse(response)
+      if (Array.isArray(data)) set({ conversations: data })
+    } catch {
+      // The badge is auxiliary; keep the previous value when the API is down.
     }
   },
 
@@ -330,6 +384,7 @@ const useChatStore = create((set, get) => ({
   clearMessages: () => set({ messages: [], currentConversation: null, typingUsers: {} }),
   clearError: () => set({ error: null }),
   reset: () => {
+    countedUnreadMessages.clear()
     get().socket?.disconnect()
     set({
       conversations: [],

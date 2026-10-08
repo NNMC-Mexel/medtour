@@ -80,6 +80,9 @@ export default ({ env }) => {
         },
       },
     },
+    { name: 'global::permissions-policy', config: {} },
+    // Rejects revoked JWTs (logout, password change) and blocked accounts.
+    { name: 'global::session-revocation', config: {} },
     'strapi::poweredBy',
     'strapi::query',
     'strapi::body',

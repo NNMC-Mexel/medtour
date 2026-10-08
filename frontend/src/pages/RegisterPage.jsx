@@ -13,12 +13,13 @@ import TimeZoneSelect from '../components/ui/TimeZoneSelect'
 import LanguageSwitcher from '../components/ui/LanguageSwitcher'
 import { Card, CardContent } from '../components/ui/Card'
 import useAuthStore from '../stores/authStore'
-import { isValidEmail, isValidIIN } from '../utils/helpers'
+import { getPasswordError, isValidEmail, isValidIIN } from '../utils/helpers'
 import { specializationsAPI, normalizeResponse } from '../services/api'
 import { normalizeCountryValue } from '../utils/countries'
 import { getDefaultTimezoneForCountry } from '../utils/timezones'
 import { formatPhoneForCountry, getPhoneRule, isValidPhoneForCountry } from '../utils/phone'
 import BrandLogo from '../components/ui/BrandLogo'
+import { trackEvent } from '../services/analytics'
 
 const defaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Almaty'
 const languageOptions = [
@@ -157,8 +158,9 @@ function RegisterPage() {
     const errors = {}
     if (formData.iin && !isValidIIN(formData.iin))
       errors.iin = t('auth.register.validation.iin')
-    if (!formData.password || formData.password.length < 6)
-      errors.password = t('auth.register.validation.password')
+    const passwordErrorKey = getPasswordError(formData.password)
+    if (passwordErrorKey)
+      errors.password = t(passwordErrorKey)
     if (formData.password !== formData.confirmPassword)
       errors.confirmPassword = t('auth.register.validation.confirm_password')
     if (!agreedToTerms)
@@ -222,6 +224,7 @@ function RegisterPage() {
 
     const result = await register(userData)
     if (!result.success) return
+    trackEvent('sign_up')
 
     // Clear cache on successful registration
     clearRegisterCache()

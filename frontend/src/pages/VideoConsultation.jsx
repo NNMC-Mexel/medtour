@@ -35,6 +35,8 @@ import {
   Paperclip,
   Download,
   Image,
+  RefreshCw,
+  Hourglass,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { io } from 'socket.io-client'
@@ -43,8 +45,20 @@ import Avatar from '../components/ui/Avatar'
 import { useToast } from '../components/ui/Toast'
 import { cn, getSpecName } from '../utils/helpers'
 import useAuthStore from '../stores/authStore'
-import api, { appointmentsAPI, documentsAPI, uploadFile, getSignalingUrl, openMediaInNewTab } from '../services/api'
+import api, { appointmentsAPI, documentsAPI, uploadFile, getSignalingUrl, openMediaInNewTab, getServerNow } from '../services/api'
 import { formatDateTimeInTimeZone, getDeviceTimeZone, KAZAKHSTAN_TIME_ZONE } from '../utils/kazakhstanTime'
+import { MEDIA_KIND, MEDIA_REASON, acquireLocalMedia, describeMediaOutcome } from '../utils/mediaAccess'
+import { playChatChime } from '../utils/audioCues'
+import { isChatSurfaceVisible, isOwnChatMessage, resolveIncomingChatSignal } from '../utils/chatSignals'
+import { CONSULTATION_SURFACE, isNegotiationInitiator, resolveConsultationSurface } from '../utils/consultationFlow'
+
+// Подсказку «браузер не умеет» или «нужен HTTPS» бессмысленно писать отдельно
+// про камеру и отдельно про микрофон — причина одна на оба устройства.
+const SHARED_MEDIA_REASONS = new Set([MEDIA_REASON.UNSUPPORTED, MEDIA_REASON.INSECURE])
+const mediaStringKey = (kind, reason) =>
+  SHARED_MEDIA_REASONS.has(reason)
+    ? `video.media.common.${reason}`
+    : `video.media.${kind}.${reason}`
 
 const _TURN_USER = import.meta.env.VITE_TURN_USERNAME || '';
 const _TURN_CRED = import.meta.env.VITE_TURN_CREDENTIAL || '';
@@ -72,6 +86,75 @@ const ICE_SERVERS = {
   ],
 }
 
+/**
+ * Временные учётные данные TURN от сервера (coturn `use-auth-secret`).
+ * Статические VITE_TURN_* видны каждому, кто скачал бандл; они остаются только
+ * запасным вариантом, пока на сервере не задан TURN_STATIC_AUTH_SECRET.
+ */
+const fetchEphemeralIceServers = async () => {
+  try {
+    const { data } = await api.get('/api/turn-credentials')
+    const payload = data?.data
+    if (!payload?.username || !payload?.credential || !payload?.urls?.length) return null
+    return payload.urls.map((urls) => ({ urls, username: payload.username, credential: payload.credential }))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * `?force-relay=1` — отладка: только TURN relay, без host/srflx. Внутри одной
+ * сети звонок идёт напрямую, и relay не проверяется вовсе; собеседник за
+ * границей почти всегда за симметричным NAT и зависит от relay целиком. Флаг
+ * воспроизводит этот путь двумя клиентами рядом.
+ */
+const shouldForceRelay = () => {
+  try {
+    return new URLSearchParams(window.location.search).get('force-relay') === '1'
+  } catch {
+    return false
+  }
+}
+
+// Отметка начала звонка живёт вне React-состояния: после обновления страницы
+// счётчик продолжает идти, а не начинается с 00:00. Протухшую отметку (звонок
+// не завершили кнопкой и вернулись в ту же комнату позже) отбрасываем.
+const CALL_START_STORAGE_PREFIX = 'consultation:call-start:'
+const CALL_START_MAX_AGE_MS = 12 * 60 * 60 * 1000
+
+function readCallStart(roomId) {
+  if (!roomId) return null
+  try {
+    const value = Number(window.localStorage.getItem(CALL_START_STORAGE_PREFIX + roomId))
+    if (!Number.isFinite(value) || value <= 0) return null
+    if (Date.now() - value > CALL_START_MAX_AGE_MS) {
+      window.localStorage.removeItem(CALL_START_STORAGE_PREFIX + roomId)
+      return null
+    }
+    return value
+  } catch {
+    return null
+  }
+}
+
+function writeCallStart(roomId, value) {
+  if (!roomId) return
+  try {
+    window.localStorage.setItem(CALL_START_STORAGE_PREFIX + roomId, String(value))
+  } catch {
+    /* приватный режим — счётчик просто пойдёт с нуля */
+  }
+}
+
+function clearCallStart(roomId) {
+  if (!roomId) return
+  try {
+    window.localStorage.removeItem(CALL_START_STORAGE_PREFIX + roomId)
+  } catch {
+    /* см. writeCallStart */
+  }
+}
+
 const SIGNALING_SERVER = getSignalingUrl();
 
 function VideoConsultation({
@@ -90,6 +173,12 @@ function VideoConsultation({
   const toast = useToast()
 
   const [connectionState, setConnectionState] = useState('initializing')
+  // Результат запроса камеры/микрофона: каждое устройство отдельно, чтобы
+  // отсутствие одного не закрывало вход в комнату.
+  const [mediaOutcome, setMediaOutcome] = useState(null)
+  const [mediaNoticeDismissed, setMediaNoticeDismissed] = useState(false)
+  const [mediaAttempt, setMediaAttempt] = useState(0)
+  const allowNoDevicesRef = useRef(false)
   const [isMuted, setIsMuted] = useState(false)
   const [isVideoOn, setIsVideoOn] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -107,11 +196,47 @@ function VideoConsultation({
   const [containerHeight, setContainerHeight] = useState(0)
   const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 
+  // Непрочитанные сообщения чата: счётчик растёт, пока чат не на экране
+  // (панель закрыта, открыта другая вкладка, звонок свёрнут или страница в фоне).
+  const [unreadChatCount, setUnreadChatCount] = useState(0)
+  // Обработчик 'chat-message' навешивается один раз, поэтому видимость чата
+  // читаем через ref — иначе в замыкании навсегда останется начальное значение.
+  const chatVisibilityRef = useRef({ sidebarOpen: true, sidebarTab: 'chat', isMinimized: false })
+  const lastChimeAtRef = useRef(null)
+  const isChatVisible = isChatSurfaceVisible({
+    sidebarOpen,
+    sidebarTab,
+    isMinimized,
+    documentVisibility: typeof document === 'undefined' ? 'visible' : document.visibilityState,
+  })
+
+  useEffect(() => {
+    chatVisibilityRef.current = { sidebarOpen, sidebarTab, isMinimized }
+  }, [sidebarOpen, sidebarTab, isMinimized])
+
+  useEffect(() => {
+    if (isChatVisible) setUnreadChatCount(0)
+  }, [isChatVisible, messages.length])
+
+  // Возврат на вкладку при открытом чате тоже снимает отметку.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (isChatSurfaceVisible({ ...chatVisibilityRef.current, documentVisibility: document.visibilityState })) {
+        setUnreadChatCount(0)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
+
   // Серверная проверка временного окна подключения.
   // 'checking' | 'allowed' | 'denied'. Девайсные часы здесь не используются —
   // авторитет только у сервера.
   const [accessStatus, setAccessStatus] = useState('checking')
   const [accessDenyInfo, setAccessDenyInfo] = useState(null)
+  // Окно комнаты по серверному времени: до какого момента доступна консультация.
+  const [roomWindow, setRoomWindow] = useState(null)
+  const [roomRemainingMs, setRoomRemainingMs] = useState(null)
 
   // Notes state
   const [notesTab, setNotesTab] = useState('diagnosis')
@@ -139,6 +264,18 @@ function VideoConsultation({
   // while `complete` also completes the appointment for both participants.
   const [isCompletingCall, setIsCompletingCall] = useState(false)
   const [pendingEndAction, setPendingEndAction] = useState(null)
+  // На телефоне выход — через шторку: врачу здесь же предлагается завершить
+  // приём, пациент подтверждает выход.
+  const [showLeaveSheet, setShowLeaveSheet] = useState(false)
+
+  useEffect(() => {
+    if (!showLeaveSheet) return undefined
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setShowLeaveSheet(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [showLeaveSheet])
 
   const localVideoRef = useRef(null)
   const remoteVideoRef = useRef(null)
@@ -153,6 +290,11 @@ function VideoConsultation({
   const reconnectAttemptsRef = useRef(0)
   const reconnectTimerRef = useRef(null)
   const pendingIceCandidatesRef = useRef([])
+  // socketId собеседника текущего раунда согласования: по нему отбрасываем
+  // offer/answer/кандидаты, опоздавшие от предыдущего соединения.
+  const peerSocketIdRef = useRef(null)
+  const makingOfferRef = useRef(false)
+  const iceServersRef = useRef(ICE_SERVERS)
   const isEndingCallRef = useRef(false)
   const [miniPosition, setMiniPosition] = useState(null)
 
@@ -334,6 +476,10 @@ function VideoConsultation({
         const payload = res?.data?.data || res?.data || {}
         if (payload.allowed) {
           setAccessStatus('allowed')
+          setRoomWindow({
+            windowEnd: payload.windowEnd,
+            consultationDuration: payload.consultationDuration,
+          })
         } else {
           setAccessStatus('denied')
           setAccessDenyInfo({
@@ -358,6 +504,13 @@ function VideoConsultation({
       cancelled = true
     }
   }, [roomId])
+
+  // Свёрнутая комната, оказавшаяся недоступной (окно закрылось, запись
+  // отменена), снимается со стора сама — иначе она висела бы невидимой до
+  // перезагрузки, а раньше и вовсе перекрывала весь экран отказом.
+  useEffect(() => {
+    if (isMinimized && accessStatus === 'denied') onClose?.()
+  }, [isMinimized, accessStatus, onClose])
 
   useEffect(() => {
     const fetchAppointment = async () => {
@@ -465,19 +618,51 @@ function VideoConsultation({
     const init = async () => {
       try {
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: isMobile ? { facingMode: 'user' } : { width: 1280, height: 720 },
-          audio: true,
+        const media = await acquireLocalMedia({
+          getUserMedia: (request) => navigator.mediaDevices.getUserMedia(request),
+          videoConstraints: isMobile ? { facingMode: { ideal: 'user' } } : { width: { ideal: 1280 }, height: { ideal: 720 } },
+          audioConstraints: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          isSupported: Boolean(navigator.mediaDevices?.getUserMedia),
+          isSecureContext: window.isSecureContext !== false,
         })
 
         if (!mounted) {
-          stream.getTracks().forEach(track => track.stop())
+          media.stream?.getTracks().forEach(track => track.stop())
           return
         }
 
-        localStreamRef.current = stream
-        if (localVideoRef.current) {
+        const outcome = describeMediaOutcome(media)
+        setMediaOutcome(outcome)
+        setMediaNoticeDismissed(false)
+
+        // Ни камеры, ни микрофона: сначала объясняем, что случилось, и даём
+        // выбрать между повтором и входом «только смотреть и слушать».
+        if (outcome.needsConfirmation && !allowNoDevicesRef.current) {
+          media.stream?.getTracks().forEach(track => track.stop())
+          setConnectionState('media-blocked')
+          return
+        }
+
+        const stream = media.stream
+        localStreamRef.current = stream || null
+        if (stream && localVideoRef.current) {
           localVideoRef.current.srcObject = stream
+        }
+        // Кнопки отражают реальное положение дел: без дорожки нечего включать.
+        setIsVideoOn(Boolean(stream?.getVideoTracks().length))
+        setIsMuted(!stream?.getAudioTracks().length)
+
+        // Временные TURN-учётки — до первого соединения, иначе первый звонок
+        // ушёл бы со статическими (или вовсе без relay).
+        const ephemeralTurn = await fetchEphemeralIceServers()
+        if (!mounted) {
+          stream?.getTracks().forEach(track => track.stop())
+          return
+        }
+        if (ephemeralTurn) {
+          iceServersRef.current = {
+            iceServers: [...ICE_SERVERS.iceServers.filter((entry) => !entry.username), ...ephemeralTurn],
+          }
         }
 
         const socket = io(SIGNALING_SERVER, {
@@ -514,7 +699,7 @@ function VideoConsultation({
             const peer = participants[0]
             setRemoteUser(peer)
             setRemoteIsPortrait(peer.isPortrait ?? false)
-            createPeerConnection(socket, peer.socketId)
+            startNegotiation(socket, peer.socketId)
           }
         })
 
@@ -527,20 +712,12 @@ function VideoConsultation({
             isPortrait: window.innerHeight > window.innerWidth,
           })
 
-          const pc = createPeerConnection(socket, data.socketId)
-
-          try {
-            const offer = await pc.createOffer()
-            await pc.setLocalDescription(offer)
-            socket.emit('offer', { targetSocketId: data.socketId, offer })
-          } catch (err) {
-            console.error('Error creating offer:', err)
-          }
+          startNegotiation(socket, data.socketId)
         })
 
         socket.on('offer', async ({ senderSocketId, offer }) => {
           setConnectionState('connecting')
-          const pc = createPeerConnection(socket, senderSocketId)
+          const pc = ensurePeerConnection(socket, senderSocketId)
 
           try {
             await pc.setRemoteDescription(new RTCSessionDescription(offer))
@@ -553,16 +730,28 @@ function VideoConsultation({
           }
         })
 
-        socket.on('answer', async ({ answer }) => {
+        socket.on('answer', async ({ senderSocketId, answer }) => {
+          const pc = peerConnectionRef.current
+          // Ответ прошлого раунда согласования к новому соединению не применяем.
+          const currentPeer = peerSocketIdRef.current
+          if (!pc || (senderSocketId && currentPeer && senderSocketId !== currentPeer)) return
+          if (pc.signalingState !== 'have-local-offer') {
+            console.warn('[WebRTC] Ignoring answer in state', pc.signalingState)
+            return
+          }
           try {
-            await peerConnectionRef.current?.setRemoteDescription(new RTCSessionDescription(answer))
-            await flushPendingIceCandidates(peerConnectionRef.current)
+            await pc.setRemoteDescription(new RTCSessionDescription(answer))
+            await flushPendingIceCandidates(pc)
           } catch (err) {
             console.error('Error setting remote description:', err)
           }
         })
 
-        socket.on('ice-candidate', async ({ candidate }) => {
+        socket.on('ice-candidate', async ({ senderSocketId, candidate }) => {
+          // Отбрасываем только заведомо чужие кандидаты; пока собеседник не
+          // зафиксирован, кандидат уходит в очередь — терять его нельзя.
+          const currentPeer = peerSocketIdRef.current
+          if (senderSocketId && currentPeer && senderSocketId !== currentPeer) return
           await addIceCandidateSafely(candidate)
         })
 
@@ -578,6 +767,9 @@ function VideoConsultation({
             peerConnectionRef.current.close()
             peerConnectionRef.current = null
           }
+          peerSocketIdRef.current = null
+          pendingIceCandidatesRef.current = []
+          makingOfferRef.current = false
         })
 
         // История чата при переподключении (восстановление после refresh)
@@ -594,15 +786,33 @@ function VideoConsultation({
         })
 
         socket.on('chat-message', (data) => {
-          const currentUserId = String(user?.id ?? '')
+          const isOwn = isOwnChatMessage(data, user?.id)
           setMessages(prev => [...prev, {
             id: data.id,
-            sender: (data.userId != null && String(data.userId) === currentUserId) ? 'me' : 'other',
+            sender: isOwn ? 'me' : 'other',
             text: data.message,
             attachment: data.attachment || null,
             senderName: data.senderName,
             time: new Date(data.timestamp),
           }])
+
+          // Глаза на видео, а не на чате: сообщение собеседника сопровождаем
+          // сигналом (не чаще раза в 1,2 с) и счётчиком, пока чат не виден.
+          const { playChime, countUnread, nextChimeAt } = resolveIncomingChatSignal({
+            isOwnMessage: isOwn,
+            chatVisible: isChatSurfaceVisible({
+              ...chatVisibilityRef.current,
+              documentVisibility: document.visibilityState,
+            }),
+            now: Date.now(),
+            lastChimeAt: lastChimeAtRef.current,
+          })
+          lastChimeAtRef.current = nextChimeAt
+          if (playChime) {
+            playChatChime()
+            navigator.vibrate?.([30, 60, 30])
+          }
+          if (countUnread) setUnreadChatCount((count) => count + 1)
         })
 
         socket.on('remote-orientation-update', ({ isPortrait }) => {
@@ -633,7 +843,7 @@ function VideoConsultation({
       socketRef.current?.emit('leave-room')
       socketRef.current?.disconnect()
     }
-  }, [roomId, user?.id, user?.userRole, token, accessStatus])
+  }, [roomId, user?.id, user?.userRole, token, accessStatus, mediaAttempt])
 
   const handleReconnect = () => {
     if (reconnectAttemptsRef.current >= 3) {
@@ -649,6 +859,9 @@ function VideoConsultation({
       peerConnectionRef.current.close()
       peerConnectionRef.current = null
     }
+    peerSocketIdRef.current = null
+    pendingIceCandidatesRef.current = []
+    makingOfferRef.current = false
 
     // Re-join room after random delay to avoid both sides colliding
     const delay = 1000 + Math.random() * 1500
@@ -683,15 +896,34 @@ function VideoConsultation({
   const createPeerConnection = (socket, targetSocketId) => {
     if (peerConnectionRef.current) peerConnectionRef.current.close()
     activeSocketRef.current = socket
+    peerSocketIdRef.current = targetSocketId
+    makingOfferRef.current = false
     pendingIceCandidatesRef.current = []
 
-    console.log('[WebRTC] ICE servers config:', JSON.stringify(ICE_SERVERS, null, 2))
-    const pc = new RTCPeerConnection(ICE_SERVERS)
+    // Учётки TURN в лог не пишем — только адреса.
+    console.log('[WebRTC] ICE servers:', iceServersRef.current.iceServers.map((server) => server.urls))
+    const forceRelay = shouldForceRelay()
+    if (forceRelay) console.warn('[WebRTC] force-relay: only TURN, host and srflx disabled')
+    const pc = new RTCPeerConnection({
+      ...iceServersRef.current,
+      ...(forceRelay ? { iceTransportPolicy: 'relay' } : {}),
+    })
     peerConnectionRef.current = pc
 
-    localStreamRef.current?.getTracks().forEach(track => {
+    const localTracks = localStreamRef.current?.getTracks() || []
+    localTracks.forEach(track => {
       pc.addTrack(track, localStreamRef.current)
     })
+
+    // Без своей дорожки соответствующей m-линии в offer не будет, и собеседник
+    // не сможет прислать звук или картинку. Участнику без камеры/микрофона
+    // добавляем приёмный трансивер: отдавать нечего, но видеть и слышать он должен.
+    if (!localTracks.some(track => track.kind === 'audio')) {
+      pc.addTransceiver('audio', { direction: 'recvonly' })
+    }
+    if (!localTracks.some(track => track.kind === 'video')) {
+      pc.addTransceiver('video', { direction: 'recvonly' })
+    }
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -737,10 +969,23 @@ function VideoConsultation({
       } else if (state === 'connected' || state === 'completed') {
         clearTimeout(reconnectTimerRef.current)
         reconnectAttemptsRef.current = 0
+        logSelectedCandidatePair(pc)
       } else if (state === 'failed') {
         clearTimeout(reconnectTimerRef.current)
-        handleReconnect()
+        logIceDiagnostics(pc)
+        // Провалилось прошлое соединение, а текущее уже другое — не сносим живой звонок.
+        if (peerConnectionRef.current === pc) handleReconnect()
       }
+    }
+
+    // Единственный источник правды о том, почему не поднялся TURN: без него
+    // неудачная аллокация (401, 403, 701) не видна нигде.
+    pc.onicecandidateerror = (event) => {
+      console.warn('[WebRTC] ICE candidate error:', {
+        url: event.url,
+        errorCode: event.errorCode,
+        errorText: event.errorText,
+      })
     }
 
     pc.onconnectionstatechange = () => {
@@ -755,6 +1000,77 @@ function VideoConsultation({
     }
 
     return pc
+  }
+
+  // Какая пара адресов выиграла: отличает «не хватило TURN» от «relay выбран,
+  // но медиа не идёт».
+  const logSelectedCandidatePair = async (pc) => {
+    try {
+      const stats = await pc.getStats()
+      stats.forEach((report) => {
+        if (report.type === 'candidate-pair' && report.state === 'succeeded' && report.nominated) {
+          const local = stats.get(report.localCandidateId)
+          const remote = stats.get(report.remoteCandidateId)
+          console.log('[WebRTC] Selected pair:',
+            `${local?.candidateType}/${local?.protocol}`, '<->', `${remote?.candidateType}/${remote?.protocol}`)
+        }
+      })
+    } catch (err) {
+      console.warn('[WebRTC] Could not read stats:', err)
+    }
+  }
+
+  // Сколько своих и чужих кандидатов каждого типа дошло к моменту провала.
+  const logIceDiagnostics = async (pc) => {
+    try {
+      const stats = await pc.getStats()
+      const tally = { local: {}, remote: {} }
+      stats.forEach((report) => {
+        if (report.type === 'local-candidate') tally.local[report.candidateType] = (tally.local[report.candidateType] || 0) + 1
+        if (report.type === 'remote-candidate') tally.remote[report.candidateType] = (tally.remote[report.candidateType] || 0) + 1
+      })
+      console.warn('[WebRTC] ICE failed. Candidates seen:', tally)
+    } catch (err) {
+      console.warn('[WebRTC] Could not read stats:', err)
+    }
+  }
+
+  // Живое соединение с тем же собеседником переиспользуем; пересоздаём только
+  // мёртвое — иначе встречный offer сносил соединение с собственным offer'ом.
+  const ensurePeerConnection = (socket, peerSocketId) => {
+    const existing = peerConnectionRef.current
+    const reusable = existing &&
+      peerSocketIdRef.current === peerSocketId &&
+      existing.connectionState !== 'failed' &&
+      existing.connectionState !== 'closed'
+    if (reusable) {
+      activeSocketRef.current = socket
+      return existing
+    }
+    return createPeerConnection(socket, peerSocketId)
+  }
+
+  // Offer делает ровно одна сторона — решение по socketId, одинаковое у обоих
+  // без обмена сообщениями. Раньше при одновременном переподключении offer
+  // слали оба, и согласование после первого же сбоя не восстанавливалось.
+  const startNegotiation = async (socket, peerSocketId) => {
+    const pc = ensurePeerConnection(socket, peerSocketId)
+    if (!isNegotiationInitiator(socket.id, peerSocketId)) return
+    if (makingOfferRef.current) return
+
+    makingOfferRef.current = true
+    try {
+      // Повторное согласование на живом соединении — ICE restart.
+      const offer = await pc.createOffer(pc.localDescription ? { iceRestart: true } : undefined)
+      await pc.setLocalDescription(offer)
+      // Пока собирали offer, соединение могли пересоздать — старый offer не шлём.
+      if (peerConnectionRef.current !== pc) return
+      socket.emit('offer', { targetSocketId: peerSocketId, offer })
+    } catch (err) {
+      console.error('Error creating offer:', err)
+    } finally {
+      makingOfferRef.current = false
+    }
   }
 
   const flushPendingIceCandidates = async (pc = peerConnectionRef.current) => {
@@ -772,8 +1088,9 @@ function VideoConsultation({
 
   const addIceCandidateSafely = async (candidate) => {
     const pc = peerConnectionRef.current
-    if (!pc || !candidate) return
-    if (!pc.remoteDescription) {
+    if (!candidate) return
+    // Кандидаты обгоняют offer/answer (и даже создание соединения): копим их.
+    if (!pc || !pc.remoteDescription) {
       pendingIceCandidatesRef.current.push(candidate)
       return
     }
@@ -784,18 +1101,101 @@ function VideoConsultation({
     }
   }
 
+  // Счётчик считает от сохранённой отметки старта, а не от монтирования.
   useEffect(() => {
-    let interval
-    if (connectionState === 'connected') {
-      interval = setInterval(() => setDuration(prev => prev + 1), 1000)
+    if (connectionState !== 'connected') return undefined
+    let startedAt = readCallStart(roomId)
+    if (!startedAt) {
+      startedAt = Date.now()
+      writeCallStart(roomId, startedAt)
     }
+    const tick = () => setDuration(Math.max(0, Math.round((Date.now() - startedAt) / 1000)))
+    tick()
+    const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
-  }, [connectionState])
+  }, [connectionState, roomId])
+
+  // Сколько осталось до закрытия комнаты — по серверному времени: доступ
+  // решает сервер, а часы устройства могут врать.
+  useEffect(() => {
+    const endMs = Date.parse(roomWindow?.windowEnd || '')
+    if (!Number.isFinite(endMs)) {
+      setRoomRemainingMs(null)
+      return undefined
+    }
+    const tick = () => setRoomRemainingMs(endMs - getServerNow().getTime())
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [roomWindow?.windowEnd])
 
   const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const formatAstanaClock = (iso) => {
+    if (!iso) return ''
+    try {
+      return new Date(iso).toLocaleTimeString(timeLocale, { timeZone: 'Asia/Almaty', hour: '2-digit', minute: '2-digit' })
+    } catch {
+      return ''
+    }
+  }
+
+  const roomTimeLeftLabel = roomRemainingMs === null
+    ? null
+    : formatDuration(Math.max(0, Math.floor(roomRemainingMs / 1000)))
+  const isRoomTimeRunningOut = roomRemainingMs !== null && roomRemainingMs <= 5 * 60 * 1000
+
+  // Пока устройства не запрошены, считаем их исправными: панель управления не
+  // должна мигать блокировками на первой секунде звонка.
+  const hasMicrophone = mediaOutcome ? mediaOutcome.devices[MEDIA_KIND.MICROPHONE].ok : true
+  const hasCamera = mediaOutcome ? mediaOutcome.devices[MEDIA_KIND.CAMERA].ok : true
+  const missingDevices = mediaOutcome?.missing || []
+  const isMediaBlocked = connectionState === 'media-blocked'
+  const showMediaNotice = missingDevices.length > 0 && !mediaNoticeDismissed && !isMediaBlocked
+
+  const retryMediaDevices = () => {
+    setMediaNoticeDismissed(false)
+    setConnectionState('initializing')
+    setMediaAttempt((attempt) => attempt + 1)
+  }
+
+  const joinWithoutDevices = () => {
+    allowNoDevicesRef.current = true
+    retryMediaDevices()
+  }
+
+  // Плашка в комнате говорит о последствиях («врач вас не увидит»), подсказка
+  // под ней — о причине и способе починить.
+  const mediaNotice = (() => {
+    if (!showMediaNotice) return null
+    if (missingDevices.length === 2) {
+      return { Icon: MicOff, title: t('video.media.notice_none.title'), hint: t('video.media.notice_none.hint') }
+    }
+    const kind = missingDevices[0]
+    const reason = mediaOutcome.devices[kind].reason
+    return {
+      Icon: kind === MEDIA_KIND.CAMERA ? VideoOff : MicOff,
+      title: t(kind === MEDIA_KIND.CAMERA ? 'video.media.notice_no_camera.title' : 'video.media.notice_no_microphone.title'),
+      hint: t(`${mediaStringKey(kind, reason)}.hint`),
+    }
+  })()
+
+  const renderMediaDeviceRow = (kind) => {
+    const reason = mediaOutcome?.devices?.[kind]?.reason || MEDIA_REASON.OTHER
+    const Icon = kind === MEDIA_KIND.CAMERA ? VideoOff : MicOff
+    return (
+      <li key={kind} className="flex gap-3 rounded-xl bg-slate-900/60 p-3 text-left">
+        <Icon className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-white">{t(`${mediaStringKey(kind, reason)}.title`)}</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-400">{t(`${mediaStringKey(kind, reason)}.hint`)}</p>
+        </div>
+      </li>
+    )
   }
 
   const toggleMute = () => {
@@ -842,11 +1242,20 @@ function VideoConsultation({
     setTimeout(() => setLinkCopied(false), 2000)
   }
 
+  // Вызывается при реальном завершении звонка — только здесь сбрасываем
+  // отметку старта. При обновлении страницы React cleanup не работает, и
+  // отметка переживает F5, что и нужно.
   const cleanupCall = () => {
+    clearCallStart(roomId)
     localStreamRef.current?.getTracks().forEach(track => track.stop())
+    localStreamRef.current = null
     peerConnectionRef.current?.close()
+    peerConnectionRef.current = null
     socketRef.current?.emit('leave-room')
     socketRef.current?.disconnect()
+    socketRef.current = null
+    activeSocketRef.current = null
+    clearTimeout(reconnectTimerRef.current)
     remoteStreamRef.current = null
   }
 
@@ -894,10 +1303,13 @@ function VideoConsultation({
     setPendingEndAction(action)
   }
 
-  const confirmEndCall = async () => {
-    if (isEndingCallRef.current || !pendingEndAction) return
-    const action = pendingEndAction
-    if (action === 'complete' && !appointment?.documentId) return
+  // requestedAction — выбор, сделанный в шторке: она сама служит подтверждением.
+  const confirmEndCall = async (requestedAction) => {
+    const chosen = typeof requestedAction === 'string' ? requestedAction : pendingEndAction
+    if (isEndingCallRef.current || !chosen) return
+    // Without a loaded appointment we cannot complete it server-side, but the
+    // participant must still be able to get out of the call, so degrade to leave.
+    const action = chosen === 'complete' && appointment?.documentId ? 'complete' : 'leave'
 
     isEndingCallRef.current = true
     setIsCompletingCall(true)
@@ -907,14 +1319,24 @@ function VideoConsultation({
         await appointmentsAPI.update(appointment.documentId, { status: 'completed' })
         socketRef.current?.emit('force-end-call')
       }
-      cleanupCall()
-      setPendingEndAction(null)
-
-      closeConsultation(isDoctor ? '/doctor' : '/patient/appointments')
     } catch (err) {
+      // Completing the appointment is best-effort. Leaving the call must never
+      // depend on it, otherwise the button looks dead and gets clicked again.
       console.error('Error completing appointment:', err)
-      isEndingCallRef.current = false
+      const message = err?.response?.data?.error?.message
+      toast.error(message || t('video.complete_error'))
+    }
+
+    // Always tear the call down and release the participant — a failed status
+    // update must not trap them behind an unresponsive confirmation dialog.
+    try {
+      cleanupCall()
+      setConnectionState('waiting')
+      setPendingEndAction(null)
+      setShowLeaveSheet(false)
+      closeConsultation(isDoctor ? '/doctor' : '/patient/appointments')
     } finally {
+      isEndingCallRef.current = false
       setIsCompletingCall(false)
     }
   }
@@ -1116,7 +1538,7 @@ function VideoConsultation({
                 : 'bg-rose-500 hover:bg-rose-600'
             )}
             onClick={confirmEndCall}
-            disabled={isCompletingCall || (pendingEndAction === 'complete' && !appointment?.documentId)}
+            disabled={isCompletingCall}
           >
             {isCompletingCall ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -1131,6 +1553,107 @@ function VideoConsultation({
       </div>
     </div>
   ) : null
+
+  const ratingModal = showRatingModal ? (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 animate-scaleIn">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Star className="w-8 h-8 text-teal-600" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900">{t('video.rate_title')}</h2>
+          <p className="text-slate-500 text-sm mt-1">
+            {t('video.rate_desc')}
+          </p>
+        </div>
+
+        {/* Stars */}
+        <div className="flex items-center justify-center gap-2 mb-6">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              onClick={() => setRating(star)}
+              onMouseEnter={() => setHoverRating(star)}
+              onMouseLeave={() => setHoverRating(0)}
+              title={t(`video.rating_${star}`)}
+              aria-label={t(`video.rating_${star}`)}
+              className="p-1 transition-transform hover:scale-110"
+            >
+              <Star
+                className={cn(
+                  'w-10 h-10 transition-colors',
+                  (hoverRating || rating) >= star
+                    ? 'text-amber-400 fill-amber-400'
+                    : 'text-slate-300'
+                )}
+              />
+            </button>
+          ))}
+        </div>
+
+        {rating > 0 && (
+          <p className="text-center text-sm font-medium text-slate-600 mb-4">
+            {t(`video.rating_${rating}`)}
+          </p>
+        )}
+
+        {/* Review text */}
+        <div className="mb-6">
+          <textarea
+            value={reviewText}
+            onChange={(e) => setReviewText(e.target.value)}
+            placeholder={t('video.review_placeholder')}
+            className="w-full h-28 px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          />
+        </div>
+
+        {/* Buttons */}
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={skipRating}
+            disabled={isSubmittingRating}
+          >
+            {t('common.skip')}
+          </Button>
+          <Button
+            className="flex-1"
+            onClick={submitRating}
+            disabled={rating === 0 || isSubmittingRating}
+          >
+            {isSubmittingRating ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            ) : null}
+            {t('video.submit')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  ) : null
+
+  // Фоновый (свёрнутый) звонок не имеет права занимать экран: проверка доступа
+  // и отказ — полноэкранные слои, и над любой страницей они выглядели бы как
+  // зависшая консультация. В фоне показываем только мини-окно или модалки.
+  const surface = resolveConsultationSurface({
+    isMinimized,
+    accessStatus,
+    hasBlockingModal: showRatingModal,
+  })
+
+  if (surface === CONSULTATION_SURFACE.HIDDEN) {
+    return null
+  }
+
+  if (surface === CONSULTATION_SURFACE.MODALS) {
+    return (
+      <>
+        {endConfirmationModal}
+        {ratingModal}
+      </>
+    )
+  }
 
   if (accessStatus === 'checking') {
     return (
@@ -1193,6 +1716,7 @@ function VideoConsultation({
       connected: t('video.connected'),
       reconnecting: t('video.reconnecting'),
       failed: t('video.failed_title'),
+      'media-blocked': t('video.media.gate_title'),
     }[connectionState] || connectionState
 
     return (
@@ -1271,10 +1795,11 @@ function VideoConsultation({
               <button
                 type="button"
                 onClick={toggleMute}
-                title={isMuted ? t('common.mic_on') : t('common.mic_off')}
-                aria-label={isMuted ? t('common.mic_on') : t('common.mic_off')}
+                disabled={!hasMicrophone}
+                title={hasMicrophone ? (isMuted ? t('common.mic_on') : t('common.mic_off')) : t('video.media.microphone_unavailable')}
+                aria-label={hasMicrophone ? (isMuted ? t('common.mic_on') : t('common.mic_off')) : t('video.media.microphone_unavailable')}
                 className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-xl transition-colors sm:h-10 sm:w-10',
+                  'flex h-9 w-9 items-center justify-center rounded-xl transition-colors sm:h-10 sm:w-10 disabled:cursor-not-allowed disabled:opacity-50',
                   isMuted ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-slate-800 text-white hover:bg-slate-700'
                 )}
               >
@@ -1283,10 +1808,11 @@ function VideoConsultation({
               <button
                 type="button"
                 onClick={toggleVideo}
-                title={isVideoOn ? t('common.cam_off') : t('common.cam_on')}
-                aria-label={isVideoOn ? t('common.cam_off') : t('common.cam_on')}
+                disabled={!hasCamera}
+                title={hasCamera ? (isVideoOn ? t('common.cam_off') : t('common.cam_on')) : t('video.media.camera_unavailable')}
+                aria-label={hasCamera ? (isVideoOn ? t('common.cam_off') : t('common.cam_on')) : t('video.media.camera_unavailable')}
                 className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-xl transition-colors sm:h-10 sm:w-10',
+                  'flex h-9 w-9 items-center justify-center rounded-xl transition-colors sm:h-10 sm:w-10 disabled:cursor-not-allowed disabled:opacity-50',
                   !isVideoOn ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-slate-800 text-white hover:bg-slate-700'
                 )}
               >
@@ -1295,11 +1821,16 @@ function VideoConsultation({
               <button
                 type="button"
                 onClick={onRestore}
-                title={t('video.restore')}
-                aria-label={t('video.restore')}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-600 text-white transition-colors hover:bg-teal-500 sm:h-10 sm:w-10"
+                title={unreadChatCount > 0 ? t('video.unread_messages', { n: unreadChatCount }) : t('video.restore')}
+                aria-label={unreadChatCount > 0 ? t('video.unread_messages', { n: unreadChatCount }) : t('video.restore')}
+                className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-teal-600 text-white transition-colors hover:bg-teal-500 sm:h-10 sm:w-10"
               >
                 <Maximize className="h-4 w-4" />
+                {unreadChatCount > 0 && (
+                  <span aria-hidden="true" className="absolute -top-1 -right-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-slate-950">
+                    {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                  </span>
+                )}
               </button>
               <button
                 type="button"
@@ -1365,6 +1896,24 @@ function VideoConsultation({
                 <span className="text-emerald-400 text-sm font-medium">{formatDuration(duration)}</span>
               </div>
             )}
+            {roomTimeLeftLabel && (
+              <div
+                className={cn(
+                  'flex items-center gap-2 px-3 py-1.5 rounded-full',
+                  isRoomTimeRunningOut ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700/60 text-slate-300'
+                )}
+                title={t('video.room_time_left_hint', {
+                  minutes: roomWindow?.consultationDuration || '',
+                  until: formatAstanaClock(roomWindow?.windowEnd),
+                })}
+              >
+                <Hourglass className="w-3.5 h-3.5" />
+                <span className="text-sm font-medium">
+                  <span className="hidden sm:inline">{t('video.room_time_left', { time: roomTimeLeftLabel })}</span>
+                  <span className="sm:hidden">{roomTimeLeftLabel}</span>
+                </span>
+              </div>
+            )}
             <button
               onClick={copyInviteLink}
               title={linkCopied ? t('video.copied') : t('video.link')}
@@ -1384,16 +1933,56 @@ function VideoConsultation({
             </button>
             {!sidebarOpen && (
               <button
-                onClick={() => setSidebarOpen(true)}
-                title={t('video.open_chat')}
-                aria-label={t('video.open_chat')}
-                className="p-2 rounded-lg bg-teal-600 text-white hover:bg-teal-500 transition-colors"
+                onClick={() => {
+                  setSidebarTab('chat')
+                  setSidebarOpen(true)
+                }}
+                title={unreadChatCount > 0 ? t('video.unread_messages', { n: unreadChatCount }) : t('video.open_chat')}
+                aria-label={unreadChatCount > 0 ? t('video.unread_messages', { n: unreadChatCount }) : t('video.open_chat')}
+                className={cn(
+                  'relative p-2 rounded-lg text-white transition-colors',
+                  unreadChatCount > 0 ? 'bg-amber-500 hover:bg-amber-400 animate-pulse' : 'bg-teal-600 hover:bg-teal-500'
+                )}
               >
                 <MessageCircle className="w-4 h-4" />
+                {unreadChatCount > 0 && (
+                  <span aria-hidden="true" className="absolute -top-1 -right-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-slate-800">
+                    {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                  </span>
+                )}
               </button>
             )}
           </div>
         </div>
+
+        {/* Ограничения по устройствам: не ошибка, а предупреждение о том,
+            чего собеседник не получит */}
+        {mediaNotice && (
+          <div className="flex items-start gap-3 border-b border-amber-400/20 bg-amber-400/10 px-3 py-2.5 sm:px-4">
+            <mediaNotice.Icon className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-amber-100">{mediaNotice.title}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-amber-200/70">{mediaNotice.hint}</p>
+            </div>
+            <button
+              type="button"
+              onClick={retryMediaDevices}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-400/15 px-2.5 py-1.5 text-xs font-medium text-amber-100 transition-colors hover:bg-amber-400/25"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{t('video.media.retry_devices')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMediaNoticeDismissed(true)}
+              aria-label={t('common.close')}
+              title={t('common.close')}
+              className="shrink-0 rounded-lg p-1.5 text-amber-200/70 transition-colors hover:bg-amber-400/15 hover:text-amber-100"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         {/* Video Container */}
         <div ref={videoContainerRef} className="flex-1 relative bg-slate-900">
@@ -1495,6 +2084,43 @@ function VideoConsultation({
             </div>
           )}
 
+          {isMediaBlocked && (
+            <div className="absolute inset-0 z-[25] flex items-start justify-center overflow-y-auto bg-slate-900 px-4 py-6 sm:items-center">
+              <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-800/70 p-5 sm:p-6">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-400/15">
+                  <Settings className="h-7 w-7 text-amber-300" />
+                </div>
+                <h3 className="text-center text-xl font-semibold text-white">{t('video.media.gate_title')}</h3>
+                <p className="mt-2 text-center text-sm text-slate-300">{t('video.media.gate_desc')}</p>
+                <ul className="mt-5 space-y-2">
+                  {[MEDIA_KIND.MICROPHONE, MEDIA_KIND.CAMERA].map(renderMediaDeviceRow)}
+                </ul>
+                <div className="mt-6 space-y-2">
+                  <Button className="w-full" onClick={retryMediaDevices} leftIcon={<RefreshCw className="h-4 w-4" />}>
+                    {t('video.media.retry_devices')}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={joinWithoutDevices}
+                    className="w-full rounded-xl border border-slate-600 px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-700/50"
+                  >
+                    {t('video.media.join_without')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate(isDoctor ? '/doctor/schedule' : '/patient/appointments')}
+                    className="w-full px-4 py-2 text-sm text-slate-400 transition-colors hover:text-slate-200"
+                  >
+                    {t('video.back_to_appointments')}
+                  </button>
+                </div>
+                <p className="mt-4 text-center text-xs leading-relaxed text-slate-500">
+                  {t('video.media.join_without_hint')}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-36 bg-gradient-to-t from-slate-950/85 via-slate-950/35 to-transparent" />
 
           {/* Remote Video — always preserve full frame; black side bars come from the container background */}
@@ -1555,32 +2181,14 @@ function VideoConsultation({
 
           {/* Controls */}
           <div className="pointer-events-none absolute inset-x-0 bottom-[max(1rem,calc(env(safe-area-inset-bottom)+1rem))] z-20 flex flex-col items-center gap-2 px-3">
-            {isDoctor && (
-              <button
-                onClick={() => requestEndCall('complete')}
-                disabled={isCompletingCall}
-                title={t('video.complete_btn')}
-                aria-label={t('video.complete_btn')}
-                className="pointer-events-auto inline-flex max-w-full items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-xl ring-1 ring-white/10 backdrop-blur-xl transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isCompletingCall ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Check className="w-4 h-4" />
-                )}
-                <span className="truncate">
-                  {isCompletingCall ? t('common.loading') : t('video.complete_btn')}
-                </span>
-              </button>
-            )}
-
-            <div className="pointer-events-auto flex items-center justify-center gap-2 rounded-3xl bg-slate-950/90 px-3 py-3 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl">
+            <div className="pointer-events-auto flex items-center justify-center gap-1.5 rounded-3xl bg-slate-950/90 px-2 py-3 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl sm:gap-2 sm:px-3">
               <button
                 onClick={toggleMute}
-                title={isMuted ? t('common.mic_on') : t('common.mic_off')}
-                aria-label={isMuted ? t('common.mic_on') : t('common.mic_off')}
+                disabled={!hasMicrophone}
+                title={hasMicrophone ? (isMuted ? t('common.mic_on') : t('common.mic_off')) : t('video.media.microphone_unavailable')}
+                aria-label={hasMicrophone ? (isMuted ? t('common.mic_on') : t('common.mic_off')) : t('video.media.microphone_unavailable')}
                 className={cn(
-                  'h-12 w-12 rounded-2xl flex items-center justify-center transition-all',
+                  'h-12 w-12 rounded-2xl flex items-center justify-center transition-all disabled:cursor-not-allowed disabled:opacity-50',
                   isMuted
                     ? 'bg-rose-500 text-white hover:bg-rose-600'
                     : 'bg-slate-700 text-white hover:bg-slate-600'
@@ -1591,10 +2199,11 @@ function VideoConsultation({
 
               <button
                 onClick={toggleVideo}
-                title={isVideoOn ? t('common.cam_off') : t('common.cam_on')}
-                aria-label={isVideoOn ? t('common.cam_off') : t('common.cam_on')}
+                disabled={!hasCamera}
+                title={hasCamera ? (isVideoOn ? t('common.cam_off') : t('common.cam_on')) : t('video.media.camera_unavailable')}
+                aria-label={hasCamera ? (isVideoOn ? t('common.cam_off') : t('common.cam_on')) : t('video.media.camera_unavailable')}
                 className={cn(
-                  'h-12 w-12 rounded-2xl flex items-center justify-center transition-all',
+                  'h-12 w-12 rounded-2xl flex items-center justify-center transition-all disabled:cursor-not-allowed disabled:opacity-50',
                   !isVideoOn
                     ? 'bg-rose-500 text-white hover:bg-rose-600'
                     : 'bg-slate-700 text-white hover:bg-slate-600'
@@ -1614,11 +2223,34 @@ function VideoConsultation({
                 <ChevronLeft className="w-5 h-5" />
               </button>
 
+              {/* Завершение приёма — в той же панели, отдельным цветом. На
+                  телефоне места нет: врач завершает через шторку выхода. */}
+              {isDoctor && (
+                <button
+                  onClick={() => requestEndCall('complete')}
+                  disabled={isCompletingCall}
+                  title={t('video.complete_btn')}
+                  aria-label={t('video.complete_btn')}
+                  className="hidden h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 font-semibold text-white transition-all hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-70 sm:flex"
+                >
+                  {isCompletingCall ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+                  <span className="text-sm">{t('video.complete_btn')}</span>
+                </button>
+              )}
+
               <button
                 onClick={() => requestEndCall('leave')}
                 title={t('common.leave_call')}
                 aria-label={t('common.leave_call')}
-                className="h-12 w-16 rounded-2xl bg-rose-500 text-white flex items-center justify-center transition-all hover:bg-rose-600"
+                className="hidden h-12 w-16 rounded-2xl bg-rose-500 text-white items-center justify-center transition-all hover:bg-rose-600 sm:flex"
+              >
+                <PhoneOff className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setShowLeaveSheet(true)}
+                title={t('common.leave_call')}
+                aria-label={t('common.leave_call')}
+                className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500 text-white transition-all hover:bg-rose-600 sm:hidden"
               >
                 <PhoneOff className="w-5 h-5" />
               </button>
@@ -1648,6 +2280,11 @@ function VideoConsultation({
             >
               <MessageCircle className="w-4 h-4" />
               {t('video.tab_chat')}
+              {unreadChatCount > 0 && sidebarTab !== 'chat' && (
+                <span className="min-w-[1.25rem] rounded-full bg-rose-500 px-1.5 py-0.5 text-xs font-semibold leading-none text-white">
+                  {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                </span>
+              )}
             </button>
             {isDoctor && (
               <button
@@ -1978,85 +2615,53 @@ function VideoConsultation({
 
       {endConfirmationModal}
 
-      {/* Patient Rating Modal */}
-      {showRatingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 animate-scaleIn">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Star className="w-8 h-8 text-teal-600" />
-              </div>
-              <h2 className="text-xl font-bold text-slate-900">{t('video.rate_title')}</h2>
-              <p className="text-slate-500 text-sm mt-1">
-                {t('video.rate_desc')}
-              </p>
-            </div>
-
-            {/* Stars */}
-            <div className="flex items-center justify-center gap-2 mb-6">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  onClick={() => setRating(star)}
-                  onMouseEnter={() => setHoverRating(star)}
-                  onMouseLeave={() => setHoverRating(0)}
-                  title={t(`video.rating_${star}`)}
-                  aria-label={t(`video.rating_${star}`)}
-                  className="p-1 transition-transform hover:scale-110"
+      {showLeaveSheet && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowLeaveSheet(false)} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="leave-sheet-title"
+            className="relative w-full max-w-sm overflow-y-auto rounded-t-3xl bg-white p-5 pb-[max(1.25rem,calc(env(safe-area-inset-bottom)+1rem))] shadow-2xl animate-scaleIn sm:rounded-2xl sm:p-6"
+          >
+            <h2 id="leave-sheet-title" className="text-center text-lg font-bold text-slate-900">
+              {isDoctor ? t('video.leave_sheet_title_doctor') : t('video.leave_sheet_title_patient')}
+            </h2>
+            <p className="mt-1 text-center text-sm text-slate-500">
+              {isDoctor ? t('video.leave_sheet_desc_doctor') : t('video.leave_sheet_desc_patient')}
+            </p>
+            <div className="mt-5 space-y-2.5">
+              {isDoctor && (
+                <Button
+                  size="lg"
+                  variant="success"
+                  className="w-full"
+                  onClick={() => confirmEndCall('complete')}
+                  disabled={isCompletingCall}
+                  leftIcon={isCompletingCall ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
                 >
-                  <Star
-                    className={cn(
-                      'w-10 h-10 transition-colors',
-                      (hoverRating || rating) >= star
-                        ? 'text-amber-400 fill-amber-400'
-                        : 'text-slate-300'
-                    )}
-                  />
-                </button>
-              ))}
-            </div>
-
-            {rating > 0 && (
-              <p className="text-center text-sm font-medium text-slate-600 mb-4">
-                {t(`video.rating_${rating}`)}
-              </p>
-            )}
-
-            {/* Review text */}
-            <div className="mb-6">
-              <textarea
-                value={reviewText}
-                onChange={(e) => setReviewText(e.target.value)}
-                placeholder={t('video.review_placeholder')}
-                className="w-full h-28 px-4 py-3 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              />
-            </div>
-
-            {/* Buttons */}
-            <div className="flex gap-3">
+                  {t('video.leave_sheet_complete')}
+                </Button>
+              )}
               <Button
-                variant="outline"
-                className="flex-1"
-                onClick={skipRating}
-                disabled={isSubmittingRating}
+                size="lg"
+                variant={isDoctor ? 'secondary' : 'danger'}
+                className="w-full"
+                onClick={() => confirmEndCall('leave')}
+                disabled={isCompletingCall}
+                leftIcon={<PhoneOff className="h-5 w-5" />}
               >
-                {t('common.skip')}
+                {isDoctor ? t('video.leave_sheet_leave_only') : t('video.leave_sheet_leave')}
               </Button>
-              <Button
-                className="flex-1"
-                onClick={submitRating}
-                disabled={rating === 0 || isSubmittingRating}
-              >
-                {isSubmittingRating ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : null}
-                {t('video.submit')}
+              <Button size="lg" variant="ghost" className="w-full" onClick={() => setShowLeaveSheet(false)}>
+                {t('video.leave_sheet_stay')}
               </Button>
             </div>
           </div>
         </div>
       )}
+
+      {ratingModal}
     </div>
   )
 }

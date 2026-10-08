@@ -64,7 +64,8 @@
     "cam_on": "Включить камеру",
     "cam_off": "Выключить камеру",
     "leave_call": "Выйти из звонка",
-    "next": "Далее"
+    "next": "Далее",
+    "previous": "Назад"
   },
   "pricing": {
     "badge": "Прайскурант",
@@ -122,7 +123,10 @@
     "login_as_patient": "Войти как пациент",
     "login_as_doctor": "Войти как врач",
     "patient_cabinet": "Личный кабинет пациента",
-    "doctor_cabinet": "Личный кабинет врача"
+    "doctor_cabinet": "Личный кабинет врача",
+    "open_profile": "Открыть профиль",
+    "account_menu": "Меню аккаунта",
+    "admin_analytics": "Аналитика"
   },
   "auth": {
     "login": {
@@ -152,7 +156,9 @@
       "stats_quality": "Качество",
       "stats_doctors": "Врачей",
       "stats_consultations": "Консультаций",
-      "stats_rating": "Рейтинг"
+      "stats_rating": "Рейтинг",
+      "show_password": "Показать пароль",
+      "hide_password": "Скрыть пароль"
     },
     "register": {
       "title": "Регистрация",
@@ -444,7 +450,9 @@
       "/coordinator/doctors_sub": "Врачи партнерских клиник",
       "/coordinator/documents": "Документы",
       "/coordinator/documents_sub": "Документы по заявкам",
-      "default": "Страница"
+      "default": "Страница",
+      "/admin/analytics": "Аналитика",
+      "/admin/analytics_sub": "Посещения, реклама и воронка до консультации"
     }
   },
   "patient": {
@@ -797,7 +805,7 @@
     "password_new": "Новый пароль",
     "password_confirm": "Повторите новый пароль",
     "password_save": "Сменить пароль",
-    "password_hint": "Минимум 6 символов.",
+    "password_hint": "Минимум 8 символов: заглавная и строчная буквы, цифра и спецсимвол.",
     "password_current_required": "Введите текущий пароль",
     "password_min": "Новый пароль должен быть не короче 6 символов",
     "password_same": "Новый пароль должен отличаться от текущего",
@@ -1013,7 +1021,18 @@
     "min_60": "60 минут",
     "save_error_no_profile": "Профиль врача не найден",
     "save_success": "Настройки сохранены!",
-    "save_error": "Ошибка сохранения настроек"
+    "save_error": "Ошибка сохранения настроек",
+    "conflicts_title": "Новое расписание затрагивает уже созданные записи: {{count}}",
+    "conflicts_more": "…и ещё записей: {{count}}",
+    "conflicts_question": "Записи не будут отменены автоматически — они останутся вне рабочих часов. Сохранить расписание?",
+    "err_interval_empty": "Добавьте хотя бы один рабочий интервал",
+    "err_interval_invalid": "Проверьте время начала и конца интервалов",
+    "err_interval_overlap": "Интервалы не должны пересекаться или идти подряд",
+    "err_interval_no_space": "Недостаточно времени для нового интервала",
+    "vacation_day": "Отпуск",
+    "vacation_until": "Отпуск до {{date}}",
+    "day_off": "Выходной",
+    "interval_label": "Интервал {{number}}"
   },
   "patients": {
     "title": "Мои пациенты",
@@ -1186,7 +1205,84 @@
     "review_placeholder": "Напишите отзыв (необязательно)...",
     "submit": "Отправить",
     "media_error": "Не удалось получить доступ к камере и микрофону",
-    "complete_error": "Не удалось завершить консультацию на сервере. Звонок закрыт — проверьте статус в расписании."
+    "complete_error": "Не удалось завершить консультацию на сервере. Звонок закрыт — проверьте статус в расписании.",
+    "media": {
+      "gate_title": "Камера и микрофон не найдены",
+      "gate_desc": "Пока не удалось получить ни одно устройство. Вот что можно сделать:",
+      "retry_devices": "Проверить снова",
+      "join_without": "Войти без камеры и микрофона",
+      "join_without_hint": "Вы будете видеть и слышать врача, а ответить сможете в чате консультации.",
+      "microphone_unavailable": "Микрофон недоступен",
+      "camera_unavailable": "Камера недоступна",
+      "notice_no_camera": {
+        "title": "Консультация идёт без вашей камеры"
+      },
+      "notice_no_microphone": {
+        "title": "Консультация идёт без вашего микрофона"
+      },
+      "notice_none": {
+        "title": "Вы подключились без камеры и микрофона",
+        "hint": "Вы видите и слышите врача — ответить можно в чате консультации."
+      },
+      "common": {
+        "unsupported": {
+          "title": "Браузер не поддерживает видеозвонки",
+          "hint": "Откройте консультацию в свежей версии Chrome, Safari или Firefox: во встроенных браузерах мессенджеров камера и микрофон не работают."
+        },
+        "insecure": {
+          "title": "Соединение не защищено",
+          "hint": "Камера и микрофон работают только по адресу https. Откройте ссылку на консультацию заново."
+        }
+      },
+      "microphone": {
+        "denied": {
+          "title": "Доступ к микрофону запрещён",
+          "hint": "Нажмите значок замка слева от адреса страницы, разрешите микрофон и нажмите «Проверить снова»."
+        },
+        "not_found": {
+          "title": "Микрофон не найден",
+          "hint": "Подключите гарнитуру или микрофон и нажмите «Проверить снова». Можно продолжить и без него — тогда пишите врачу в чате."
+        },
+        "busy": {
+          "title": "Микрофон занят другой программой",
+          "hint": "Закройте Zoom, Teams, Skype или другую вкладку со звонком и нажмите «Проверить снова»."
+        },
+        "other": {
+          "title": "Не удалось включить микрофон",
+          "hint": "Проверьте, что устройство подключено, и нажмите «Проверить снова». Если не помогло — перезапустите браузер."
+        }
+      },
+      "camera": {
+        "denied": {
+          "title": "Доступ к камере запрещён",
+          "hint": "Нажмите значок замка слева от адреса страницы, разрешите камеру и нажмите «Проверить снова»."
+        },
+        "not_found": {
+          "title": "Камера не найдена",
+          "hint": "Подключите камеру и нажмите «Проверить снова». Консультацию можно провести и голосом — врач вас услышит."
+        },
+        "busy": {
+          "title": "Камера занята другой программой",
+          "hint": "Закройте Zoom, Teams, Skype или другую вкладку со звонком и нажмите «Проверить снова»."
+        },
+        "other": {
+          "title": "Не удалось включить камеру",
+          "hint": "Проверьте подключение камеры и нажмите «Проверить снова». Если не помогло — перезапустите браузер."
+        }
+      }
+    },
+    "unread_messages": "Новые сообщения в чате: {{n}}",
+    "new_messages_short": "в чате",
+    "room_time_left": "осталось {{time}}",
+    "room_time_left_hint": "Консультация рассчитана на {{minutes}} мин, комната открыта до {{until}}",
+    "leave_sheet_title_doctor": "Завершить приём?",
+    "leave_sheet_desc_doctor": "Завершите консультацию, если приём окончен. Если нужно отойти — выйдите, не завершая: вернуться можно из расписания.",
+    "leave_sheet_title_patient": "Выйти из консультации?",
+    "leave_sheet_desc_patient": "Вернуться можно из раздела «Мои записи», пока идёт время приёма.",
+    "leave_sheet_complete": "Завершить консультацию",
+    "leave_sheet_leave_only": "Выйти, не завершая",
+    "leave_sheet_leave": "Выйти",
+    "leave_sheet_stay": "Остаться"
   },
   "appointment_detail": {
     "back": "Назад",
@@ -1283,7 +1379,7 @@
     "reset_done_desc": "Теперь вы можете войти с новым паролем.",
     "reset_login": "Войти",
     "reset_new_password": "Новый пароль",
-    "reset_min_chars": "Минимум 6 символов",
+    "reset_min_chars": "Минимум 8 символов, A-z, цифра, спецсимвол",
     "reset_confirm": "Подтвердите пароль",
     "reset_repeat": "Повторите пароль",
     "reset_min_error": "Пароль должен содержать минимум 6 символов",
@@ -1448,7 +1544,7 @@
     "placeholder_login": "Например: doctor_ivanov",
     "label_password": "Пароль",
     "label_password_new": "Новый пароль (опционально)",
-    "placeholder_password": "Минимум 6 символов",
+    "placeholder_password": "Минимум 8 символов, A-z, цифра, спецсимвол",
     "placeholder_password_new": "Оставьте пустым, если не менять",
     "hint_password": "Текущий пароль не отображается. Чтобы изменить, введите новый.",
     "label_confirm": "Подтверждение пароля",
@@ -1508,7 +1604,64 @@
     "label_active": "Профиль активен",
     "upload_photo": "Загрузить фото",
     "remove_photo": "Удалить фото",
-    "exp_years": "{{count}} лет"
+    "exp_years": "{{count}} лет",
+    "schedule_title": "График приёма",
+    "schedule_subtitle": "Настройте повторяющуюся неделю или отдельные даты приёма",
+    "schedule_type_label": "Тип графика",
+    "schedule_type_recurring": "Постоянный график",
+    "schedule_type_recurring_hint": "Повторяется каждую неделю",
+    "schedule_type_one_time": "Разовые даты",
+    "schedule_type_one_time_hint": "Только выбранные календарные дни",
+    "schedule_time_mode_label": "Время работы",
+    "schedule_time_same": "Одинаковое для всех дней",
+    "schedule_time_individual": "Каждый день отдельно",
+    "schedule_days_label": "Дни приёма",
+    "schedule_hours_label": "Интервалы приёма",
+    "schedule_table_day": "День недели",
+    "schedule_table_hours": "Рабочее время",
+    "schedule_day_off": "Выходной",
+    "schedule_dates_title": "Даты приёма",
+    "schedule_dates_hint": "Добавьте одну или несколько конкретных дат и укажите время для каждой",
+    "schedule_add_date": "Добавить дату",
+    "schedule_add_first_date": "Добавить первую дату приёма",
+    "schedule_date_label": "Дата",
+    "schedule_remove_date": "Удалить дату",
+    "schedule_copy_previous": "Скопировать время предыдущей даты",
+    "schedule_add_interval": "Добавить интервал",
+    "schedule_remove_interval": "Удалить интервал",
+    "schedule_interval_start_aria": "Начало интервала {{number}}",
+    "schedule_interval_end_aria": "Конец интервала {{number}}",
+    "schedule_day_1": "Понедельник",
+    "schedule_day_2": "Вторник",
+    "schedule_day_3": "Среда",
+    "schedule_day_4": "Четверг",
+    "schedule_day_5": "Пятница",
+    "schedule_day_6": "Суббота",
+    "schedule_day_7": "Воскресенье",
+    "schedule_day_1_short": "Пн",
+    "schedule_day_2_short": "Вт",
+    "schedule_day_3_short": "Ср",
+    "schedule_day_4_short": "Чт",
+    "schedule_day_5_short": "Пт",
+    "schedule_day_6_short": "Сб",
+    "schedule_day_7_short": "Вс",
+    "vacation_title": "Отпуск и нерабочие дни",
+    "vacation_hint": "В эти дни запись к врачу закрыта, даже если они есть в графике",
+    "vacation_add": "Добавить отпуск",
+    "vacation_remove": "Удалить период",
+    "vacation_save": "Сохранить период",
+    "vacation_pick_start": "Выберите первый день",
+    "vacation_pick_end": "Выберите последний день",
+    "vacation_days_one": "{{count}} день",
+    "vacation_days_few": "{{count}} дня",
+    "vacation_days_many": "{{count}} дней",
+    "vacation_days_other": "{{count}} дня",
+    "vacation_now": "идёт сейчас",
+    "err_schedule_invalid_vacation": "У периода отпуска не указаны даты",
+    "err_schedule_no_days": "Выберите хотя бы один день приёма",
+    "err_schedule_no_dates": "Добавьте хотя бы одну дату приёма",
+    "err_schedule_invalid_date": "Укажите корректную дату приёма",
+    "err_schedule_duplicate_date": "Одна и та же дата указана несколько раз"
   },
   "admin_spec": {
     "title": "Специализации",
@@ -1650,7 +1803,11 @@
     "err_short_password": "Пароль должен быть не менее 6 символов",
     "err_password_mismatch": "Пароли не совпадают",
     "err_save": "Не удалось создать пользователя",
-    "err_save_msg": "Ошибка: {{message}}"
+    "err_save_msg": "Ошибка: {{message}}",
+    "role_coordinator": "Координатор",
+    "role_doctor_locked": "Роль врача связана с его карточкой — она меняется в разделе «Врачи».",
+    "role_self_locked": "Свою роль администратора изменить нельзя.",
+    "role_change_warning": "После смены роли пользователь будет разлогинен и войдёт уже в новый кабинет."
   },
   "admin_content": {
     "title": "Контент лендинга MedTour",
@@ -1779,7 +1936,14 @@
     "chat_history": "История сообщений",
     "no_chat_history": "Во время консультации сообщений не было",
     "participant": "Участник консультации",
-    "consultation_documents": "Документы консультации"
+    "consultation_documents": "Документы консультации",
+    "saved_conclusions": "Сохранённые заключения",
+    "conclusion_saved_at": "Сохранено и отправлено пациенту · {{date}}",
+    "new_conclusion": "Новое заключение",
+    "nothing_to_save": "Добавьте текст или файл заключения",
+    "delete_conclusion": "Удалить заключение",
+    "delete_conclusion_confirm": "Удалить это заключение? Пациент перестанет его видеть.",
+    "conclusion_deleted": "Заключение удалено"
   },
   "case_detail": {
     "toast_doc_choose": "Выберите файл",
@@ -2264,7 +2428,9 @@
     "no_doctor_conversations_hint": "Здесь будут консультации и переписка с врачами",
     "start_manager_chat": "Написать менеджеру",
     "today": "Сегодня",
-    "yesterday": "Вчера"
+    "yesterday": "Вчера",
+    "unread_count": "Непрочитанных сообщений: {{count}}",
+    "attach_file": "Прикрепить файл"
   },
   "onboarding": {
     "title": "Заявка успешно создана!",
@@ -2328,5 +2494,122 @@
         "desc": "Где общаться с менеджером и получать обновления по заявке."
       }
     }
+  },
+  "password_policy": {
+    "required": "Введите пароль",
+    "too_short": "Пароль должен содержать минимум 8 символов",
+    "too_long": "Пароль слишком длинный (максимум 72 символа)",
+    "whitespace_edges": "Пароль не должен начинаться или заканчиваться пробелом",
+    "needs_uppercase": "Добавьте хотя бы одну заглавную букву",
+    "needs_lowercase": "Добавьте хотя бы одну строчную букву",
+    "needs_digit": "Добавьте хотя бы одну цифру",
+    "needs_special": "Добавьте хотя бы один спецсимвол (например, ! @ # $ %)",
+    "hint": "Минимум 8 символов: заглавная и строчная буквы, цифра и спецсимвол."
+  },
+  "preparation": {
+    "documents_uploaded_one": "{{count}} документ пациента в кейсе",
+    "documents_uploaded_few": "{{count}} документа пациента в кейсе",
+    "documents_uploaded_many": "{{count}} документов пациента в кейсе",
+    "documents_uploaded_other": "{{count}} документа пациента в кейсе",
+    "documents_missing": "Документы пациента не загружены"
+  },
+  "seo": {
+    "home_title": "Лечение в Казахстане — MedTour ННМЦ",
+    "home_description": "Лечение в Национальном научном медицинском центре в Астане: онлайн-консультации врачей, персональный менеджер, цены в долларах, помощь с визой и поездкой.",
+    "doctors_title": "Врачи — MedTour",
+    "doctors_description": "Специалисты Национального научного медицинского центра в Астане: опыт, специализации и онлайн-консультации.",
+    "doctor_title": "{{name}} — {{specialization}} | MedTour",
+    "doctor_description": "{{name}}, {{specialization}} в Национальном научном медицинском центре в Астане. Онлайн-консультация через MedTour.",
+    "prices_title": "Цены на лечение в Казахстане — MedTour",
+    "prices_description": "Прейскурант Национального научного медицинского центра: консультации, диагностика, операции и стационар — в долларах США.",
+    "tourism_title": "Поездка на лечение в Казахстан — MedTour",
+    "tourism_description": "Астана и Казахстан для пациентов и сопровождающих: что посмотреть, где жить и как мы помогаем с поездкой.",
+    "blog_title": "Блог — MedTour",
+    "blog_description": "Статьи о лечении в Казахстане, подготовке к поездке и восстановлении.",
+    "treatment_title": "{{department}} в Казахстане — MedTour",
+    "treatment_description": "{{short}}. Лечение в Национальном научном медицинском центре в Астане при поддержке MedTour.",
+    "privacy_title": "Политика конфиденциальности — MedTour",
+    "privacy_description": "Как MedTour обрабатывает и защищает персональные и медицинские данные пациентов.",
+    "terms_title": "Условия использования — MedTour",
+    "terms_description": "Условия использования платформы MedTour.",
+    "not_found_title": "Страница не найдена — MedTour",
+    "not_found_text": "Такой страницы нет или она переехала.",
+    "not_found_home": "На главную"
+  },
+  "admin_analytics": {
+    "period_7": "7 дней",
+    "period_30": "30 дней",
+    "period_90": "90 дней",
+    "stat_visitors": "Посетители",
+    "stat_visitors_hint": "уникальные браузеры",
+    "stat_sessions": "Визиты",
+    "stat_sessions_hint": "сессии, 30 мин без активности",
+    "stat_pageviews": "Просмотры страниц",
+    "stat_signups": "Регистрации",
+    "stat_bookings": "Записи",
+    "daily_title": "Посетители по дням",
+    "daily_tooltip_visitors": "посетителей",
+    "daily_tooltip_sessions": "визитов",
+    "daily_tooltip_pageviews": "просмотров",
+    "daily_table": "Таблица по дням",
+    "col_date": "Дата",
+    "col_visitors": "Посетители",
+    "col_sessions": "Визиты",
+    "col_pageviews": "Просмотры",
+    "col_signups": "Регистрации",
+    "col_bookings": "Записи",
+    "col_views": "Просмотры",
+    "col_channel": "Канал",
+    "col_source": "Источник",
+    "col_campaign": "Кампания",
+    "col_page": "Страница",
+    "col_device": "Устройство",
+    "col_os": "Система",
+    "channels_title": "Откуда приходят",
+    "sources_title": "Источники подробно",
+    "campaigns_title": "Рекламные кампании (UTM)",
+    "pages_title": "Популярные страницы",
+    "devices_title": "Устройства",
+    "os_title": "Операционные системы",
+    "funnel_title": "Воронка до консультации",
+    "funnel_hint": "Уникальные посетители на каждом шаге и доля от зашедших на сайт",
+    "channel_meta_ads": "Реклама Instagram / Facebook",
+    "channel_campaign": "Другие UTM-кампании",
+    "channel_search_ads": "Поисковая реклама",
+    "channel_social": "Соцсети и мессенджеры",
+    "channel_search": "Поисковики",
+    "channel_referral": "Переходы с сайтов",
+    "channel_direct": "Прямые заходы",
+    "funnel_visited": "Зашли на сайт",
+    "funnel_booking_complete": "Записались на консультацию",
+    "device_mobile": "Телефон",
+    "device_tablet": "Планшет",
+    "device_desktop": "Компьютер",
+    "page_doctor": "Врач: {{name}}",
+    "page_home": "Главная",
+    "page_doctors": "Каталог врачей",
+    "page_login": "Вход",
+    "page_register": "Регистрация",
+    "page_privacy": "Политика конфиденциальности",
+    "page_terms": "Условия",
+    "empty": "За этот период визитов пока нет",
+    "no_campaigns": "Переходов по UTM-ссылкам пока нет.",
+    "utm_title": "Как размечать рекламу",
+    "utm_text": "Добавляйте к ссылке в объявлении метки — тогда визиты и записи попадут в таблицу кампаний:",
+    "utm_note": "Переходы из Instagram и Facebook без меток тоже распознаются по параметру fbclid, но без названия кампании.",
+    "load_error": "Не удалось загрузить аналитику",
+    "retry": "Повторить",
+    "staff_note": "Визиты сотрудников (админы, менеджеры, координаторы, врачи) не учитываются.",
+    "page_prices": "Цены",
+    "page_tourism": "Туризм",
+    "page_blog": "Блог",
+    "page_treatment": "Направление: {{name}}",
+    "stat_leads": "Заявки",
+    "stat_leads_hint": "Посетители, создавшие кейс",
+    "stat_bookings_rate": "{{rate}} посетителей",
+    "col_leads": "Заявки",
+    "funnel_interested": "Смотрели направления, врачей или цены",
+    "funnel_sign_up": "Зарегистрировались",
+    "funnel_case_created": "Создали заявку (кейс)"
   }
 }

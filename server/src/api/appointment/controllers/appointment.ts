@@ -12,16 +12,13 @@ import {
   userCanAccessMedicalCase,
 } from '../../../utils/medtour-access';
 import { normalizeCaseStatus } from '../../../utils/medical-case-workflow';
+import { isFileAttachable } from '../../../utils/file-attach';
+import { checkAppointmentSlot } from '../../../utils/doctor-schedule';
+import { withPreparation } from '../../../utils/appointment-preparation';
 
 // Kazakhstan is UTC+5 with no DST (fixed offset, IANA: Asia/Almaty)
 const KZ_OFFSET_MS = 5 * 60 * 60 * 1000;
-const KZ_OFFSET_MIN = 5 * 60;
 const APPOINTMENT_SLOT_UID = 'api::appointment-slot.appointment-slot' as any;
-
-function timeToMinutes(value: string): number {
-  const [hours, minutes] = value.split(':').map(Number);
-  return hours * 60 + minutes;
-}
 
 function formatKzDateTime(value: string | Date): string {
   return new Date(value).toLocaleString('ru-RU', {
@@ -310,8 +307,10 @@ export default factories.createCoreController('api::appointment.appointment', ()
           sort,
           populate,
         });
+        // The doctor sees whether the patient has put documents into the case.
+        const prepared = await withPreparation(strapi, data);
         return {
-          data: data.map((appointment: any) => redactAppointmentForRole(appointment, role)),
+          data: prepared.map((appointment: any) => redactAppointmentForRole(appointment, role)),
           meta: { pagination: { page: 1, pageSize: data.length, pageCount: 1, total: data.length } },
         };
       } else if (['manager', 'coordinator'].includes(role)) {
@@ -324,8 +323,9 @@ export default factories.createCoreController('api::appointment.appointment', ()
           sort,
           populate,
         });
+        const prepared = await withPreparation(strapi, data);
         return {
-          data: data.map((appointment: any) => redactAppointmentForRole(appointment, role)),
+          data: prepared.map((appointment: any) => redactAppointmentForRole(appointment, role)),
           meta: { pagination: { page: 1, pageSize: data.length, pageCount: 1, total: data.length } },
         };
       } else {
@@ -407,7 +407,30 @@ export default factories.createCoreController('api::appointment.appointment', ()
     const body = (ctx.request.body as any)?.data || ctx.request.body || {};
     const linkedCaseRef = body.medical_case || body.medicalCase;
 
-    if (isPatient && !linkedCaseRef) {
+    // The signaling server books paid consultations with a server API token on
+    // behalf of a patient. The token is trusted, the booking it carries is not:
+    // previously it bypassed every rule below, so any signed-in account (even a
+    // doctor) could book any doctor, any time, into someone else's case. Such a
+    // booking now goes through exactly the same checks as a patient's own call.
+    let onBehalfPatient: any = null;
+    if (isApiToken && body.patient !== undefined && body.patient !== null) {
+      const patientRef = body.patient;
+      onBehalfPatient = await strapi.query('plugin::users-permissions.user').findOne({
+        where: typeof patientRef === 'number' || /^\d+$/.test(String(patientRef))
+          ? { id: Number(patientRef) }
+          : { documentId: String(patientRef) },
+        populate: { role: true },
+      });
+      if (!onBehalfPatient) return ctx.badRequest('Patient not found');
+      if (getUserRole(onBehalfPatient) !== 'patient') {
+        return ctx.forbidden('Only patients can book through the payment gateway');
+      }
+    }
+    // Patients book for themselves; managers, coordinators and admins book for them.
+    const bookingPatient = isPatient ? user : onBehalfPatient;
+    const actsAsPatient = Boolean(bookingPatient);
+
+    if (actsAsPatient && !linkedCaseRef) {
       return ctx.forbidden('Patients can only book consultation time for an assigned MedTour case.');
     }
 
@@ -436,7 +459,8 @@ export default factories.createCoreController('api::appointment.appointment', ()
       return ctx.badRequest('roomId is required and must be a valid string');
     }
     if (linkedCaseRef) {
-      if (!isApiToken && !(await userCanAccessMedicalCase(strapi, user, linkedCaseRef))) {
+      const caseActor = isApiToken ? onBehalfPatient : user;
+      if (caseActor && !(await userCanAccessMedicalCase(strapi, caseActor, linkedCaseRef))) {
         return ctx.forbidden('Medical case is not available for this appointment');
       }
       // In Strapi v5, relations in published documents require the related document
@@ -447,46 +471,11 @@ export default factories.createCoreController('api::appointment.appointment', ()
       await ensureMedicalCasePublished(strapi, caseDocId);
     }
 
-    // --- Working hours validation (skip for admin and staff) ---
-    if (!isAdmin && !isStaff) {
-      const drRef = body.doctor;
-      const drForHours: any = typeof drRef === 'number'
-        ? await strapi.query('api::doctor.doctor').findOne({ where: { id: drRef } })
-        : await strapi.query('api::doctor.doctor').findOne({ where: { documentId: drRef } });
-
-      if (drForHours) {
-        // Check working day (workingDays = "1,2,3,4,5", Mon=1 Sun=7 per ISO)
-        // Используем казахстанское время (UTC+5) для определения дня недели
-        const kzDate = new Date(parsedDate.getTime() + KZ_OFFSET_MS);
-        const isoDay = kzDate.getUTCDay() === 0 ? 7 : kzDate.getUTCDay();
-        const workingDays = (drForHours.workingDays || '1,2,3,4,5')
-          .split(',').map((d: string) => parseInt(d.trim(), 10));
-        if (!workingDays.includes(isoDay)) {
-          return ctx.badRequest('Doctor does not work on the selected day');
-        }
-
-        // Check working hours — times stored as "HH:MM"
-        // Используем UTC+5 (Астана/Алматы) для сравнения с рабочими часами врача
-        const apptMinutes = (parsedDate.getUTCHours() * 60 + parsedDate.getUTCMinutes() + KZ_OFFSET_MIN) % 1440;
-        const workStart = timeToMinutes(drForHours.workStartTime || '09:00');
-        const workEnd   = timeToMinutes(drForHours.workEndTime   || '18:00');
-        const breakStart = timeToMinutes(drForHours.breakStart    || '13:00');
-        const breakEnd   = timeToMinutes(drForHours.breakEnd      || '14:00');
-
-        if (apptMinutes < workStart || apptMinutes >= workEnd) {
-          return ctx.badRequest('Appointment time is outside doctor working hours');
-        }
-        if (apptMinutes >= breakStart && apptMinutes < breakEnd) {
-          return ctx.badRequest('Appointment time falls during doctor break time');
-        }
-      }
-    }
-
     // --- Resolve patient documentId ---
     let patientDocId: string | undefined;
-    if (!isAdmin && !isStaff) {
-      // Force current user as patient
-      patientDocId = user.documentId;
+    if (bookingPatient) {
+      // A patient always books for themselves
+      patientDocId = bookingPatient.documentId;
     } else if (body.patient) {
       if (typeof body.patient === 'number') {
         const found = await strapi.query('plugin::users-permissions.user').findOne({ where: { id: body.patient } });
@@ -514,29 +503,22 @@ export default factories.createCoreController('api::appointment.appointment', ()
       return ctx.badRequest('Doctor not found');
     }
 
-    // Accept only canonical doctor slots. Besides protecting the schedule from
-    // malformed direct API calls, this guarantees that the unique DB lock below
-    // represents the complete consultation interval rather than just a timestamp.
+    // Accept only canonical doctor slots: inside a working interval of that day
+    // (vacations remove the whole day) and on the slot grid of the interval.
+    // Besides protecting the schedule from malformed direct API calls, this
+    // guarantees that the unique DB lock below represents the complete
+    // consultation interval rather than just a timestamp. Staff may book
+    // outside the schedule, but still on the grid.
     const doctorSlotMinutes = Number(doctorRecord.slotDuration) || 30;
-    const appointmentMinutesKz = (
-      parsedDate.getUTCHours() * 60
-      + parsedDate.getUTCMinutes()
-      + KZ_OFFSET_MIN
-    ) % 1440;
-    const doctorWorkStart = timeToMinutes(doctorRecord.workStartTime || '09:00');
-    const slotOffset = ((appointmentMinutesKz - doctorWorkStart) % doctorSlotMinutes + doctorSlotMinutes) % doctorSlotMinutes;
-    if (
-      !Number.isInteger(doctorSlotMinutes)
-      || doctorSlotMinutes < 5
-      || doctorSlotMinutes > 240
-      || parsedDate.getUTCSeconds() !== 0
-      || parsedDate.getUTCMilliseconds() !== 0
-      || slotOffset !== 0
-    ) {
+    const slotCheck = checkAppointmentSlot(doctorRecord, parsedDate, { allowOutsideSchedule: !actsAsPatient });
+    if (slotCheck === 'outside_schedule') {
+      return ctx.badRequest('Appointment time is outside doctor working hours');
+    }
+    if (slotCheck === 'misaligned') {
       return ctx.badRequest('Appointment time must match an available doctor time slot');
     }
 
-    if (isPatient) {
+    if (actsAsPatient) {
       const caseDocId = typeof linkedCaseRef === 'string' ? linkedCaseRef : String(linkedCaseRef);
       const medicalCase = await strapi.documents('api::medical-case.medical-case' as any).findOne({
         documentId: caseDocId,
@@ -586,6 +568,11 @@ export default factories.createCoreController('api::appointment.appointment', ()
     const requestedPaymentStatus = isFreeConsultation ? 'paid' : (body.paymentStatus || 'pending');
 
     if (!ALLOWED_STATUSES.includes(requestedStatus)) {
+      return ctx.badRequest('Invalid status value');
+    }
+    // A patient's booking starts pending/confirmed; only staff may record a
+    // consultation that is already running or finished.
+    if (actsAsPatient && !['pending', 'confirmed'].includes(requestedStatus)) {
       return ctx.badRequest('Invalid status value');
     }
     if (!ALLOWED_PAYMENT_STATUSES.includes(requestedPaymentStatus)) {
@@ -840,52 +827,19 @@ export default factories.createCoreController('api::appointment.appointment', ()
     const conclusionTitle = String(body.conclusionTitle || 'Medical conclusion').slice(0, 200);
     const doctorDecisionNotes = String(body.doctorDecisionNotes || '').slice(0, 10000);
     const conclusionFileId = body.conclusionFileId || undefined;
-    const existingConclusions: any[] = await strapi.documents('api::medical-document.medical-document' as any).findMany({
-      filters: {
-        appointment: { documentId },
-        type: 'certificate',
-      },
-      sort: ['createdAt:asc'],
-      limit: 1,
-      populate: ['file', 'medical_case'],
-    });
-    const existingConclusion = existingConclusions[0];
-
     if (conclusionFileId) {
-      const uploadFile = await strapi.query('plugin::upload.file').findOne({
-        where: { id: conclusionFileId },
-      });
-      if (!uploadFile) return ctx.badRequest('Conclusion file not found');
-
-      // A new upload is not linked yet. Once linked, only this same conclusion
-      // may reuse it; otherwise a guessed upload id could copy another
-      // patient's private file into the current case.
-      const linkedDocuments: any[] = await strapi.documents('api::medical-document.medical-document' as any).findMany({
-        filters: { file: { id: conclusionFileId } } as any,
-        fields: ['id', 'documentId'],
-        limit: 10,
-      });
-      if (linkedDocuments.some(doc => doc.documentId !== existingConclusion?.documentId)) {
-        return ctx.forbidden('Conclusion file is already linked to another document');
-      }
+      // Only the doctor's own fresh upload may be attached; otherwise a guessed
+      // upload id could copy another patient's private file into the case.
+      const attachable = await isFileAttachable(Number(conclusionFileId), { userId: user.id });
+      if (!attachable) return ctx.forbidden('Conclusion file is not available');
     }
 
     const result = await strapi.db.transaction(async () => {
-      let conclusion = existingConclusion;
-      if (existingConclusion) {
-        conclusion = await strapi.documents('api::medical-document.medical-document' as any).update({
-          documentId: existingConclusion.documentId,
-          data: {
-            description: conclusionText,
-            ...(conclusionFileId ? { file: conclusionFileId } : {}),
-            ...(!existingConclusion.medical_case && appointment.medical_case?.documentId
-              ? { medical_case: appointment.medical_case.documentId }
-              : {}),
-          } as any,
-          status: 'published',
-          populate: ['file', 'doctor', 'appointment', 'medical_case'],
-        });
-      } else if (conclusionText.trim() || conclusionFileId) {
+      // Every save with text or a file is its own conclusion record. It used to
+      // overwrite a single conclusion, so the doctor could not tell what had
+      // reached the patient, and an earlier conclusion silently disappeared.
+      let conclusion: any = null;
+      if (conclusionText.trim() || conclusionFileId) {
         conclusion = await strapi.documents('api::medical-document.medical-document' as any).create({
           data: {
             title: conclusionTitle,
@@ -939,6 +893,81 @@ export default factories.createCoreController('api::appointment.appointment', ()
     }));
 
     return { data: result };
+  },
+
+  /**
+   * DELETE /appointments/:id/conclusions/:conclusionId
+   * The appointment's doctor removes one of their own conclusions, within the
+   * same 48-hour window in which conclusions can be written. Nobody else
+   * (shared-with doctors, patients, staff) can delete through this route.
+   */
+  async deleteConclusion(ctx) {
+    const user = await getAuthenticatedUser(strapi, ctx);
+    if (!user) return ctx.forbidden('Not authenticated');
+
+    const documentId = String(ctx.params.id || '');
+    const appointment: any = await strapi.documents('api::appointment.appointment').findOne({
+      documentId,
+      populate: {
+        doctor: {
+          fields: ['id', 'documentId', 'consultationDuration'],
+          populate: { users_permissions_user: { fields: ['id'] } },
+        },
+        medical_case: { fields: ['id', 'documentId'] },
+      },
+    });
+    if (!appointment) return ctx.notFound('Appointment not found');
+    if (!isAppointmentDoctor(appointment.doctor, user.id)) {
+      return ctx.forbidden('Only the assigned doctor can delete a conclusion');
+    }
+
+    const consultationDuration = Number(appointment.doctor?.consultationDuration) || 30;
+    const consultationEnd = new Date(appointment.dateTime).getTime() + (consultationDuration + 5) * 60 * 1000;
+    if (Date.now() > consultationEnd + 48 * 60 * 60 * 1000) {
+      return ctx.forbidden('The consultation output editing window has expired');
+    }
+
+    const conclusion: any = await strapi.documents('api::medical-document.medical-document' as any).findOne({
+      documentId: String(ctx.params.conclusionId || ''),
+      populate: {
+        appointment: { fields: ['documentId'] },
+        doctor: { fields: ['documentId'] },
+      },
+    });
+    if (
+      !conclusion
+      || conclusion.type !== 'certificate'
+      || conclusion.appointment?.documentId !== documentId
+      || conclusion.doctor?.documentId !== appointment.doctor?.documentId
+    ) {
+      return ctx.notFound('Conclusion not found');
+    }
+
+    await strapi.documents('api::medical-document.medical-document' as any).delete({
+      documentId: conclusion.documentId,
+    });
+
+    if (appointment.medical_case?.documentId) {
+      await strapi.documents('api::case-event.case-event' as any).create({
+        data: {
+          medical_case: appointment.medical_case.documentId,
+          actor: user.documentId || user.id,
+          eventType: 'DOCTOR_FEEDBACK_UPLOADED',
+          message: 'Doctor deleted a consultation conclusion',
+          metadata: { appointmentId: documentId, deletedConclusionDocumentId: conclusion.documentId },
+        },
+      });
+    }
+
+    strapi.log.info(JSON.stringify({
+      audit: 'CONSULTATION_CONCLUSION_DELETED',
+      appointmentId: documentId,
+      conclusionId: conclusion.documentId,
+      doctorUserId: user.id,
+      ts: new Date().toISOString(),
+    }));
+
+    ctx.status = 204;
   },
 
   async update(ctx) {

@@ -26,5 +26,12 @@ export default {
       info: { apiName: 'appointment', type: 'content-api' },
       config: { auth: false, policies: [] },
     },
+    {
+      method: 'DELETE',
+      path: '/appointments/:id/conclusions/:conclusionId',
+      handler: 'appointment.deleteConclusion',
+      info: { apiName: 'appointment', type: 'content-api' },
+      config: { auth: false, policies: [] },
+    },
   ],
 };

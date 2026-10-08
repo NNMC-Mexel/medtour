@@ -15,6 +15,7 @@ import {
   mergeTreatmentDepartments,
   treatmentUi,
 } from '../data/treatmentDepartments'
+import useSeo from '../components/seo/useSeo'
 
 const icons = { Activity, Brain, Heart, HeartPulse, ScanLine, Stethoscope, Syringe, Venus }
 const accents = {
@@ -47,6 +48,13 @@ export default function TreatmentDepartmentPage() {
   const language = ['ru', 'en', 'kk'].includes(i18n.language) ? i18n.language : 'ru'
   const ui = treatmentUi[language]
   const localized = localizeDepartment(department, language)
+  useSeo({
+    title: localized ? i18n.t('seo.treatment_title', { department: localized.displayTitle }) : i18n.t('seo.not_found_title'),
+    description: localized ? i18n.t('seo.treatment_description', { short: localized.displayShort }) : i18n.t('seo.not_found_text'),
+    path: `/treatments/${slug}`,
+    // Пока CMS не ответила, неизвестный slug ещё может оказаться направлением.
+    noindex: !localized && cmsDepartments !== null,
+  })
   const [doctors, setDoctors] = useState([])
   const [loadingDoctors, setLoadingDoctors] = useState(true)
 

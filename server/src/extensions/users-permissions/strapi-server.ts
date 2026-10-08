@@ -17,6 +17,8 @@
  * В B2B-модели врачи создаются только администратором клиники через админ-панель.
  */
 import { maskUserPIIForRole } from '../../utils/pii-crypto';
+import { issueUserJwt, revokeUserSessions } from '../../utils/user-session';
+import { rejectWeakPassword } from '../../utils/password-policy';
 
 export default (plugin) => {
   // Сохраняем оригинальную factory-функцию контроллера auth
@@ -25,6 +27,8 @@ export default (plugin) => {
   const originalContentApiRoutes = plugin.routes['content-api'];
 
   const allowedUserRoles = ['patient', 'doctor', 'manager', 'coordinator', 'admin'];
+  // Roles an admin may switch an account to from the users section.
+  const ASSIGNABLE_ROLES = ['patient', 'manager', 'coordinator', 'admin'];
 
   const resolveRoleByType = async (roleType: string) => {
     let role = await strapi
@@ -146,6 +150,7 @@ export default (plugin) => {
     async create(ctx) {
       try {
         const sourceBody = normalizeContentApiBody(ctx.request?.body || {});
+        if (rejectWeakPassword(ctx, sourceBody.password)) return;
         await assignRoleFromUserRole(sourceBody);
         enrichPhoneNormalized(sourceBody);
         ctx.request.body = sourceBody;
@@ -155,6 +160,74 @@ export default (plugin) => {
       }
 
       return originalUserController.create(ctx);
+    },
+
+    // Admin edits of an account (PUT /users/:id): a new password follows the
+    // same policy as self-service registration.
+    async update(ctx) {
+      const sourceBody = normalizeContentApiBody(ctx.request?.body || {});
+      if (sourceBody.password !== undefined && sourceBody.password !== '' && rejectWeakPassword(ctx, sourceBody.password)) return;
+
+      // Role change by an admin. The role is stored twice — the `role` relation
+      // (server permissions) and `userRole` (which cabinet the UI opens) — and
+      // both must point to the same role, or the user sees one cabinet while
+      // the server answers with another's rights.
+      let roleChange: { from: string | null; to: string } | null = null;
+      if (sourceBody.userRole !== undefined || sourceBody.role !== undefined) {
+        const actor = ctx.state?.user;
+        const targetId = Number(ctx.params?.id);
+        const target = await strapi.query('plugin::users-permissions.user').findOne({
+          where: { id: targetId },
+          populate: { role: true },
+        });
+        if (!target) return ctx.notFound('User not found');
+
+        const requestedType = typeof sourceBody.userRole === 'string'
+          ? sourceBody.userRole.toLowerCase()
+          : (await strapi.query('plugin::users-permissions.role').findOne({
+              where: { id: Number(sourceBody.role?.id ?? sourceBody.role) || 0 },
+            }))?.type;
+        if (requestedType === 'doctor' && (target.role?.type || target.userRole) !== 'doctor') {
+          return ctx.badRequest('The doctor role is managed in the doctors section', { code: 'doctor_role_managed_in_doctors' });
+        }
+        if (!requestedType || !ASSIGNABLE_ROLES.includes(requestedType) && requestedType !== 'doctor') {
+          return ctx.badRequest('Unsupported role', { code: 'invalid_role' });
+        }
+        const nextRole = await resolveRoleByType(requestedType);
+        if (!nextRole) return ctx.badRequest('Unsupported role', { code: 'invalid_role' });
+
+        const previous = target.role?.type || target.userRole || null;
+        if (previous !== requestedType) {
+          // A doctor's role comes with a catalogue card; it is managed under "Doctors".
+          if (previous === 'doctor' || requestedType === 'doctor') {
+            return ctx.badRequest('The doctor role is managed in the doctors section', { code: 'doctor_role_managed_in_doctors' });
+          }
+          // An admin demoting themselves can leave the platform without any admin.
+          if (actor?.id === targetId && previous === 'admin') {
+            return ctx.badRequest('You cannot change your own admin role', { code: 'cannot_change_own_admin_role' });
+          }
+          roleChange = { from: previous, to: requestedType };
+        }
+        sourceBody.role = nextRole.id;
+        sourceBody.userRole = requestedType;
+        if (ctx.request.body?.data && typeof ctx.request.body.data === 'object') ctx.request.body.data = sourceBody;
+        else ctx.request.body = sourceBody;
+      }
+
+      await originalUserController.update(ctx);
+
+      if (roleChange && ctx.status < 400) {
+        // An open tab must not keep working in the old cabinet with old rights.
+        await revokeUserSessions(strapi, Number(ctx.params.id));
+        strapi.log.info(JSON.stringify({
+          audit: 'ROLE_CHANGED',
+          userId: Number(ctx.params.id),
+          from: roleChange.from,
+          to: roleChange.to,
+          changedBy: ctx.state?.user?.id,
+          ts: new Date().toISOString(),
+        }));
+      }
     },
 
     async updateMe(ctx) {
@@ -213,14 +286,32 @@ export default (plugin) => {
     // Вызываем оригинальную factory, чтобы получить все методы контроллера
     const originalController = originalAuthFactory(factoryContext);
     const originalRegister = originalController.register;
-    const originalLogin = originalController.login;
+    const originalCallback = originalController.callback;
+    const originalForgotPassword = originalController.forgotPassword;
+    const originalResetPassword = originalController.resetPassword;
+    const originalChangePassword = originalController.changePassword;
+
+    // JWT, выданный штатным контроллером, перевыпускаем так, чтобы его iat не
+    // попал под отметку отзыва (иначе вход сразу после выхода давал бы 401).
+    const reissueJwt = async (ctx) => {
+      const body: any = ctx.response?.body || ctx.body;
+      if (body?.jwt && body?.user?.id) {
+        body.jwt = await issueUserJwt(strapi, body.user.id);
+      }
+    };
 
     return {
       ...originalController,
 
       // Логин по телефону: если identifier выглядит как номер телефона —
-      // ищем пользователя по полю phone и подставляем его email
-      async login(ctx) {
+      // ищем пользователя по полю phone и подставляем его email.
+      // POST /auth/local маршрутизируется в auth.callback, а не в auth.login:
+      // раньше эта логика висела на login и никогда не вызывалась.
+      async callback(ctx) {
+        if ((ctx.params?.provider || 'local') !== 'local') {
+          return originalCallback(ctx);
+        }
+
         const requestBody = ctx.request?.body || {};
         const sourceBody =
           requestBody?.data && typeof requestBody.data === 'object'
@@ -289,7 +380,46 @@ export default (plugin) => {
           }
         }
 
-        return originalLogin(ctx);
+        await originalCallback(ctx);
+        await reissueJwt(ctx);
+      },
+
+      // Сбой почты не должен давать 500: иначе ответ для существующего email
+      // отличается от ответа для несуществующего и раскрывает наличие аккаунта.
+      async forgotPassword(ctx) {
+        try {
+          await originalForgotPassword(ctx);
+        } catch (error) {
+          const status = (error as any)?.status;
+          if (status && status < 500) throw error;
+          const msg = error instanceof Error ? error.message : String(error);
+          strapi.log.error(`[auth.forgotPassword] reset email failed: ${msg}`);
+          ctx.status = 200;
+          ctx.body = { ok: true };
+        }
+      },
+
+      // Сброс пароля по ссылке из письма обрывает все прежние сессии.
+      async resetPassword(ctx) {
+        if (rejectWeakPassword(ctx, normalizeContentApiBody(ctx.request?.body || {}).password)) return;
+        await originalResetPassword(ctx);
+        const userId = (ctx.response?.body as any)?.user?.id;
+        if (userId) {
+          await revokeUserSessions(strapi, userId);
+          await reissueJwt(ctx);
+        }
+      },
+
+      // Смена пароля обрывает прежние сессии: иначе украденный токен
+      // переживает смену скомпрометированного пароля.
+      async changePassword(ctx) {
+        if (rejectWeakPassword(ctx, normalizeContentApiBody(ctx.request?.body || {}).password)) return;
+        await originalChangePassword(ctx);
+        const userId = ctx.state?.user?.id;
+        if (userId && (ctx.response?.body as any)?.jwt) {
+          await revokeUserSessions(strapi, userId);
+          await reissueJwt(ctx);
+        }
       },
 
       async register(ctx) {
@@ -299,6 +429,7 @@ export default (plugin) => {
         const sourceBody = normalizeContentApiBody(requestBody);
 
         const { userRole: rawRole, fullName, phone, country, language, timezone, iin, doctorData, ...cleanBody } = sourceBody;
+        if (rejectWeakPassword(ctx, cleanBody.password)) return;
 
         // MedTour security: public registration is only for patients.
         // Staff and partner doctors must be created/verified by an admin.

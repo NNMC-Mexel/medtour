@@ -64,7 +64,8 @@
     "cam_on": "Turn on camera",
     "cam_off": "Turn off camera",
     "leave_call": "Leave call",
-    "next": "Next"
+    "next": "Next",
+    "previous": "Previous"
   },
   "pricing": {
     "badge": "Price list",
@@ -122,7 +123,10 @@
     "login_as_patient": "Sign in as Patient",
     "login_as_doctor": "Sign in as Doctor",
     "patient_cabinet": "Patient Dashboard",
-    "doctor_cabinet": "Doctor Dashboard"
+    "doctor_cabinet": "Doctor Dashboard",
+    "open_profile": "Open profile",
+    "account_menu": "Account menu",
+    "admin_analytics": "Analytics"
   },
   "auth": {
     "login": {
@@ -152,7 +156,9 @@
       "stats_quality": "Quality",
       "stats_doctors": "Doctors",
       "stats_consultations": "Consultations",
-      "stats_rating": "Rating"
+      "stats_rating": "Rating",
+      "show_password": "Show password",
+      "hide_password": "Hide password"
     },
     "register": {
       "title": "Sign Up",
@@ -444,7 +450,9 @@
       "/coordinator/doctors_sub": "Partner clinic doctors",
       "/coordinator/documents": "Documents",
       "/coordinator/documents_sub": "Case documents",
-      "default": "Page"
+      "default": "Page",
+      "/admin/analytics": "Analytics",
+      "/admin/analytics_sub": "Visits, ads and the funnel to a consultation"
     }
   },
   "patient": {
@@ -797,7 +805,7 @@
     "password_new": "New password",
     "password_confirm": "Repeat new password",
     "password_save": "Change password",
-    "password_hint": "Minimum 6 characters.",
+    "password_hint": "At least 8 characters with an uppercase letter, a lowercase letter, a digit and a special character.",
     "password_current_required": "Enter your current password",
     "password_min": "New password must be at least 6 characters",
     "password_same": "New password must be different from the current password",
@@ -1013,7 +1021,18 @@
     "min_60": "60 minutes",
     "save_error_no_profile": "Doctor profile not found",
     "save_success": "Settings saved!",
-    "save_error": "Error saving settings"
+    "save_error": "Error saving settings",
+    "conflicts_title": "The new schedule affects existing appointments: {{count}}",
+    "conflicts_more": "…and {{count}} more",
+    "conflicts_question": "These appointments will not be cancelled automatically — they will stay outside working hours. Save the schedule?",
+    "err_interval_empty": "Add at least one working interval",
+    "err_interval_invalid": "Check interval start and end times",
+    "err_interval_overlap": "Intervals must not overlap or be adjacent",
+    "err_interval_no_space": "Not enough time for a new interval",
+    "vacation_day": "Vacation",
+    "vacation_until": "On vacation until {{date}}",
+    "day_off": "Day off",
+    "interval_label": "Interval {{number}}"
   },
   "patients": {
     "title": "My Patients",
@@ -1186,7 +1205,84 @@
     "review_placeholder": "Write a review (optional)...",
     "submit": "Submit",
     "media_error": "Could not access camera and microphone",
-    "complete_error": "Could not complete the consultation on the server. The call was closed — please check its status in your schedule."
+    "complete_error": "Could not complete the consultation on the server. The call was closed — please check its status in your schedule.",
+    "media": {
+      "gate_title": "No camera or microphone found",
+      "gate_desc": "We couldn't reach either device yet. Here's what you can try:",
+      "retry_devices": "Check again",
+      "join_without": "Join without camera and microphone",
+      "join_without_hint": "You'll still see and hear the doctor, and you can reply in the consultation chat.",
+      "microphone_unavailable": "Microphone unavailable",
+      "camera_unavailable": "Camera unavailable",
+      "notice_no_camera": {
+        "title": "You're in the call without a camera"
+      },
+      "notice_no_microphone": {
+        "title": "You're in the call without a microphone"
+      },
+      "notice_none": {
+        "title": "You joined without a camera or microphone",
+        "hint": "You can see and hear the doctor — reply in the consultation chat."
+      },
+      "common": {
+        "unsupported": {
+          "title": "This browser can't start video calls",
+          "hint": "Open the consultation in an up-to-date Chrome, Safari or Firefox: in-app browsers inside messengers block the camera and microphone."
+        },
+        "insecure": {
+          "title": "The connection isn't secure",
+          "hint": "The camera and microphone only work over https. Please open the consultation link again."
+        }
+      },
+      "microphone": {
+        "denied": {
+          "title": "Microphone access is blocked",
+          "hint": "Click the lock icon to the left of the address bar, allow the microphone, then press “Check again”."
+        },
+        "not_found": {
+          "title": "No microphone found",
+          "hint": "Plug in a headset or microphone and press “Check again”. You can also continue without one and type in the chat."
+        },
+        "busy": {
+          "title": "Another app is using the microphone",
+          "hint": "Close Zoom, Teams, Skype or another tab with a call, then press “Check again”."
+        },
+        "other": {
+          "title": "Couldn't turn on the microphone",
+          "hint": "Check that the device is connected and press “Check again”. If that doesn't help, restart the browser."
+        }
+      },
+      "camera": {
+        "denied": {
+          "title": "Camera access is blocked",
+          "hint": "Click the lock icon to the left of the address bar, allow the camera, then press “Check again”."
+        },
+        "not_found": {
+          "title": "No camera found",
+          "hint": "Connect a camera and press “Check again”. The consultation also works by voice — the doctor will hear you."
+        },
+        "busy": {
+          "title": "Another app is using the camera",
+          "hint": "Close Zoom, Teams, Skype or another tab with a call, then press “Check again”."
+        },
+        "other": {
+          "title": "Couldn't turn on the camera",
+          "hint": "Check that the camera is connected and press “Check again”. If that doesn't help, restart the browser."
+        }
+      }
+    },
+    "unread_messages": "New chat messages: {{n}}",
+    "new_messages_short": "in chat",
+    "room_time_left": "{{time}} left",
+    "room_time_left_hint": "The consultation is booked for {{minutes}} min; the room stays open until {{until}}",
+    "leave_sheet_title_doctor": "End the appointment?",
+    "leave_sheet_desc_doctor": "End the consultation if the appointment is over. If you just need to step away, leave without ending — you can return from your schedule.",
+    "leave_sheet_title_patient": "Leave the consultation?",
+    "leave_sheet_desc_patient": "You can come back from “My appointments” while the appointment time lasts.",
+    "leave_sheet_complete": "End consultation",
+    "leave_sheet_leave_only": "Leave without ending",
+    "leave_sheet_leave": "Leave",
+    "leave_sheet_stay": "Stay"
   },
   "appointment_detail": {
     "back": "Back",
@@ -1283,7 +1379,7 @@
     "reset_done_desc": "You can now log in with your new password.",
     "reset_login": "Log in",
     "reset_new_password": "New password",
-    "reset_min_chars": "At least 6 characters",
+    "reset_min_chars": "8+ characters, A-z, digit, symbol",
     "reset_confirm": "Confirm password",
     "reset_repeat": "Repeat password",
     "reset_min_error": "Password must be at least 6 characters",
@@ -1448,7 +1544,7 @@
     "placeholder_login": "E.g.: doctor_ivanov",
     "label_password": "Password",
     "label_password_new": "New password (optional)",
-    "placeholder_password": "Minimum 6 characters",
+    "placeholder_password": "8+ characters, A-z, digit, symbol",
     "placeholder_password_new": "Leave blank to keep current",
     "hint_password": "Current password is not shown. Enter a new one to change it.",
     "label_confirm": "Confirm password",
@@ -1508,7 +1604,64 @@
     "label_active": "Profile is active",
     "upload_photo": "Upload photo",
     "remove_photo": "Remove photo",
-    "exp_years": "{{count}} years"
+    "exp_years": "{{count}} years",
+    "schedule_title": "Consultation schedule",
+    "schedule_subtitle": "Set up a repeating week or specific consultation dates",
+    "schedule_type_label": "Schedule type",
+    "schedule_type_recurring": "Recurring schedule",
+    "schedule_type_recurring_hint": "Repeats every week",
+    "schedule_type_one_time": "One-time dates",
+    "schedule_type_one_time_hint": "Only on selected calendar dates",
+    "schedule_time_mode_label": "Working hours",
+    "schedule_time_same": "Same for all days",
+    "schedule_time_individual": "Set each day separately",
+    "schedule_days_label": "Consultation days",
+    "schedule_hours_label": "Consultation intervals",
+    "schedule_table_day": "Weekday",
+    "schedule_table_hours": "Working hours",
+    "schedule_day_off": "Day off",
+    "schedule_dates_title": "Consultation dates",
+    "schedule_dates_hint": "Add one or more specific dates and set hours for each",
+    "schedule_add_date": "Add date",
+    "schedule_add_first_date": "Add the first consultation date",
+    "schedule_date_label": "Date",
+    "schedule_remove_date": "Remove date",
+    "schedule_copy_previous": "Copy hours from previous date",
+    "schedule_add_interval": "Add interval",
+    "schedule_remove_interval": "Remove interval",
+    "schedule_interval_start_aria": "Start of interval {{number}}",
+    "schedule_interval_end_aria": "End of interval {{number}}",
+    "schedule_day_1": "Monday",
+    "schedule_day_2": "Tuesday",
+    "schedule_day_3": "Wednesday",
+    "schedule_day_4": "Thursday",
+    "schedule_day_5": "Friday",
+    "schedule_day_6": "Saturday",
+    "schedule_day_7": "Sunday",
+    "schedule_day_1_short": "Mon",
+    "schedule_day_2_short": "Tue",
+    "schedule_day_3_short": "Wed",
+    "schedule_day_4_short": "Thu",
+    "schedule_day_5_short": "Fri",
+    "schedule_day_6_short": "Sat",
+    "schedule_day_7_short": "Sun",
+    "vacation_title": "Vacation and days off",
+    "vacation_hint": "Booking is closed on these days, even if they are in the schedule",
+    "vacation_add": "Add vacation",
+    "vacation_remove": "Remove period",
+    "vacation_save": "Save period",
+    "vacation_pick_start": "Choose the first day",
+    "vacation_pick_end": "Choose the last day",
+    "vacation_days_one": "{{count}} day",
+    "vacation_days_other": "{{count}} days",
+    "vacation_now": "in progress",
+    "err_schedule_invalid_vacation": "A vacation period has no dates",
+    "err_schedule_no_days": "Select at least one consultation day",
+    "err_schedule_no_dates": "Add at least one consultation date",
+    "err_schedule_invalid_date": "Enter a valid consultation date",
+    "err_schedule_duplicate_date": "The same date is listed more than once",
+    "vacation_days_few": "{{count}} days",
+    "vacation_days_many": "{{count}} days"
   },
   "admin_spec": {
     "title": "Specializations",
@@ -1650,7 +1803,11 @@
     "err_short_password": "Password must be at least 6 characters",
     "err_password_mismatch": "Passwords do not match",
     "err_save": "Failed to create user",
-    "err_save_msg": "Error: {{message}}"
+    "err_save_msg": "Error: {{message}}",
+    "role_coordinator": "Coordinator",
+    "role_doctor_locked": "A doctor's role comes with their profile card — change it in the Doctors section.",
+    "role_self_locked": "You cannot change your own admin role.",
+    "role_change_warning": "After the role change the user is signed out and will sign in to the new cabinet."
   },
   "admin_content": {
     "title": "MedTour Landing Content",
@@ -1779,7 +1936,14 @@
     "chat_history": "Message history",
     "no_chat_history": "No messages were sent during the consultation",
     "participant": "Consultation participant",
-    "consultation_documents": "Consultation documents"
+    "consultation_documents": "Consultation documents",
+    "saved_conclusions": "Saved conclusions",
+    "conclusion_saved_at": "Saved and sent to the patient · {{date}}",
+    "new_conclusion": "New conclusion",
+    "nothing_to_save": "Add the conclusion text or a file",
+    "delete_conclusion": "Delete conclusion",
+    "delete_conclusion_confirm": "Delete this conclusion? The patient will no longer see it.",
+    "conclusion_deleted": "Conclusion deleted"
   },
   "case_detail": {
     "toast_doc_choose": "Choose a file first",
@@ -2264,7 +2428,9 @@
     "no_doctor_conversations_hint": "Doctor consultations and medical chats will appear here",
     "start_manager_chat": "Message a manager",
     "today": "Today",
-    "yesterday": "Yesterday"
+    "yesterday": "Yesterday",
+    "unread_count": "Unread messages: {{count}}",
+    "attach_file": "Attach a file"
   },
   "onboarding": {
     "title": "Case successfully created!",
@@ -2328,5 +2494,122 @@
         "desc": "Where to talk to your manager and receive case updates."
       }
     }
+  },
+  "password_policy": {
+    "required": "Enter a password",
+    "too_short": "Password must be at least 8 characters long",
+    "too_long": "Password is too long (72 characters maximum)",
+    "whitespace_edges": "Password must not start or end with a space",
+    "needs_uppercase": "Add at least one uppercase letter",
+    "needs_lowercase": "Add at least one lowercase letter",
+    "needs_digit": "Add at least one digit",
+    "needs_special": "Add at least one special character (e.g. ! @ # $ %)",
+    "hint": "At least 8 characters with an uppercase letter, a lowercase letter, a digit and a special character."
+  },
+  "preparation": {
+    "documents_uploaded_one": "{{count}} patient document in the case",
+    "documents_uploaded_few": "{{count}} patient documents in the case",
+    "documents_uploaded_many": "{{count}} patient documents in the case",
+    "documents_uploaded_other": "{{count}} patient documents in the case",
+    "documents_missing": "No patient documents yet"
+  },
+  "seo": {
+    "home_title": "Medical treatment in Kazakhstan — MedTour by NNMC",
+    "home_description": "Treatment at the National Scientific Medical Center in Astana: online consultations with doctors, a personal case manager, prices in US dollars, visa and travel support.",
+    "doctors_title": "Doctors — MedTour",
+    "doctors_description": "Specialists of the National Scientific Medical Center in Astana: experience, specializations and online consultations.",
+    "doctor_title": "{{name}} — {{specialization}} | MedTour",
+    "doctor_description": "{{name}}, {{specialization}} at the National Scientific Medical Center in Astana. Get an online consultation through MedTour.",
+    "prices_title": "Prices for treatment in Kazakhstan — MedTour",
+    "prices_description": "Price list of the National Scientific Medical Center: consultations, diagnostics, surgery and inpatient care, in US dollars.",
+    "tourism_title": "Travelling to Kazakhstan for treatment — MedTour",
+    "tourism_description": "Astana and Kazakhstan for patients and their companions: what to see, where to stay and how we help with the trip.",
+    "blog_title": "Blog — MedTour",
+    "blog_description": "Articles about treatment in Kazakhstan, preparing for the trip and recovery.",
+    "treatment_title": "{{department}} in Kazakhstan — MedTour",
+    "treatment_description": "{{short}}. Treatment at the National Scientific Medical Center in Astana with MedTour support.",
+    "privacy_title": "Privacy policy — MedTour",
+    "privacy_description": "How MedTour processes and protects patients' personal and medical data.",
+    "terms_title": "Terms of use — MedTour",
+    "terms_description": "Terms of using the MedTour platform.",
+    "not_found_title": "Page not found — MedTour",
+    "not_found_text": "This page does not exist or has been moved.",
+    "not_found_home": "Go to the home page"
+  },
+  "admin_analytics": {
+    "period_7": "7 days",
+    "period_30": "30 days",
+    "period_90": "90 days",
+    "stat_visitors": "Visitors",
+    "stat_visitors_hint": "unique browsers",
+    "stat_sessions": "Visits",
+    "stat_sessions_hint": "sessions, 30 min of inactivity",
+    "stat_pageviews": "Page views",
+    "stat_signups": "Sign-ups",
+    "stat_bookings": "Bookings",
+    "daily_title": "Visitors per day",
+    "daily_tooltip_visitors": "visitors",
+    "daily_tooltip_sessions": "visits",
+    "daily_tooltip_pageviews": "page views",
+    "daily_table": "Daily table",
+    "col_date": "Date",
+    "col_visitors": "Visitors",
+    "col_sessions": "Visits",
+    "col_pageviews": "Page views",
+    "col_signups": "Sign-ups",
+    "col_bookings": "Bookings",
+    "col_views": "Views",
+    "col_channel": "Channel",
+    "col_source": "Source",
+    "col_campaign": "Campaign",
+    "col_page": "Page",
+    "col_device": "Device",
+    "col_os": "OS",
+    "channels_title": "Where visitors come from",
+    "sources_title": "Sources in detail",
+    "campaigns_title": "Ad campaigns (UTM)",
+    "pages_title": "Top pages",
+    "devices_title": "Devices",
+    "os_title": "Operating systems",
+    "funnel_title": "Funnel to a consultation",
+    "funnel_hint": "Unique visitors at each step and share of all site visitors",
+    "channel_meta_ads": "Instagram / Facebook ads",
+    "channel_campaign": "Other UTM campaigns",
+    "channel_search_ads": "Search ads",
+    "channel_social": "Social and messengers",
+    "channel_search": "Search engines",
+    "channel_referral": "Referring sites",
+    "channel_direct": "Direct",
+    "funnel_visited": "Visited the site",
+    "funnel_booking_complete": "Booked a consultation",
+    "device_mobile": "Phone",
+    "device_tablet": "Tablet",
+    "device_desktop": "Desktop",
+    "page_doctor": "Doctor: {{name}}",
+    "page_home": "Home",
+    "page_doctors": "Doctor catalog",
+    "page_login": "Sign in",
+    "page_register": "Registration",
+    "page_privacy": "Privacy policy",
+    "page_terms": "Terms",
+    "empty": "No visits in this period yet",
+    "no_campaigns": "No visits from UTM links yet.",
+    "utm_title": "How to tag ads",
+    "utm_text": "Add these parameters to the ad link so visits and bookings show up in the campaign table:",
+    "utm_note": "Instagram and Facebook clicks without tags are still recognised by fbclid, but without a campaign name.",
+    "load_error": "Could not load analytics",
+    "retry": "Retry",
+    "staff_note": "Visits by staff (admins, managers, coordinators, doctors) are not counted.",
+    "page_prices": "Prices",
+    "page_tourism": "Tourism",
+    "page_blog": "Blog",
+    "page_treatment": "Treatment: {{name}}",
+    "stat_leads": "Requests",
+    "stat_leads_hint": "Visitors who created a case",
+    "stat_bookings_rate": "{{rate}} of visitors",
+    "col_leads": "Requests",
+    "funnel_interested": "Viewed treatments, doctors or prices",
+    "funnel_sign_up": "Signed up",
+    "funnel_case_created": "Created a request (case)"
   }
 }

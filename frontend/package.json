@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender-seo.mjs",
+    "build:app": "vite build",
+    "test": "node --test src/utils/*.test.js",
     "lint": "eslint .",
     "i18n:check": "node scripts/check-i18n.mjs",
     "i18n:treatments": "node scripts/check-treatment-locales.mjs",

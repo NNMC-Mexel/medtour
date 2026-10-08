@@ -1,49 +1,8 @@
 import { create } from 'zustand'
 import { notificationsAPI, normalizeResponse } from '../services/api'
+import { playBeep } from '../utils/audioCues'
 
 const POLL_INTERVAL_MS = 30000
-
-let audioCtx = null
-let audioUnlocked = false
-
-const unlockAudio = () => {
-  if (audioUnlocked) return
-  try {
-    const Ctor = window.AudioContext || window.webkitAudioContext
-    if (!Ctor) return
-    audioCtx = new Ctor()
-    if (audioCtx.state === 'suspended') audioCtx.resume()
-    audioUnlocked = true
-  } catch {
-    /* no audio support — ignore */
-  }
-}
-
-if (typeof window !== 'undefined') {
-  const handler = () => {
-    unlockAudio()
-    window.removeEventListener('pointerdown', handler)
-    window.removeEventListener('keydown', handler)
-  }
-  window.addEventListener('pointerdown', handler, { once: true })
-  window.addEventListener('keydown', handler, { once: true })
-}
-
-const playBeep = () => {
-  if (!audioCtx || audioCtx.state === 'suspended') return
-  const now = audioCtx.currentTime
-  const osc = audioCtx.createOscillator()
-  const gain = audioCtx.createGain()
-  osc.type = 'sine'
-  osc.frequency.setValueAtTime(880, now)
-  osc.frequency.exponentialRampToValueAtTime(1175, now + 0.12)
-  gain.gain.setValueAtTime(0, now)
-  gain.gain.linearRampToValueAtTime(0.18, now + 0.01)
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35)
-  osc.connect(gain).connect(audioCtx.destination)
-  osc.start(now)
-  osc.stop(now + 0.4)
-}
 
 const useNotificationStore = create((set, get) => ({
   notifications: [],

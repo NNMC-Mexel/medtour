@@ -48,7 +48,6 @@ function AppointmentDetail() {
   // Post-consultation notes state (doctors only)
   const [diagnosisText, setDiagnosisText] = useState('')
   const [diagnosisFile, setDiagnosisFile] = useState(null)
-  const [existingDocIds, setExistingDocIds] = useState({ certificate: null })
   const [isSavingDiagnosis, setIsSavingDiagnosis] = useState(false)
   const [diagnosisSaved, setDiagnosisSaved] = useState(false)
   const [isUploadingFile, setIsUploadingFile] = useState(false)
@@ -92,18 +91,6 @@ function AppointmentDetail() {
     }
   }, [appointment, isDoctor, navigate])
 
-  // Preload existing documents into notes fields
-  useEffect(() => {
-    if (!documents.length) return
-    const cert = documents.find(d => d.type === 'certificate')
-
-    if (cert) {
-      setDiagnosisText(cert.description || '')
-      setExistingDocIds(prev => ({ ...prev, certificate: cert.documentId || cert.id }))
-      if (cert.file) setDiagnosisFile(cert.file)
-    }
-  }, [documents])
-
   const backPath = isDoctor ? '/doctor' : '/patient/appointments'
 
   const openAttachment = async (media) => {
@@ -137,26 +124,26 @@ function AppointmentDetail() {
     const appointmentRef = appointment.documentId || appointment.id
     const patientRef = appointment.patient?.documentId || appointment.patient?.id
     const doctorRef = appointment.doctor?.documentId || appointment.doctor?.id
+    if (!diagnosisText.trim() && !diagnosisFile?.id) {
+      setIsSavingDiagnosis(false)
+      return
+    }
     try {
-      if (existingDocIds.certificate) {
-        await documentsAPI.update(existingDocIds.certificate, {
-          description: diagnosisText || '',
-          ...(diagnosisFile?.id && { file: diagnosisFile.id }),
-        })
-      } else {
-        const res = await documentsAPI.create({
-          title: t('video.doc_conclusion'),
-          type: 'certificate',
-          description: diagnosisText || '',
-          ...(diagnosisFile?.id && { file: diagnosisFile.id }),
-          appointment: appointmentRef,
-          ...(caseId && { medical_case: caseId }),
-          user: patientRef,
-          doctor: doctorRef,
-        })
-        const newDoc = res.data?.data
-        if (newDoc) setExistingDocIds(prev => ({ ...prev, certificate: newDoc.documentId || newDoc.id }))
-      }
+      // Each save is its own conclusion record (it used to overwrite one).
+      const res = await documentsAPI.create({
+        title: t('video.doc_conclusion'),
+        type: 'certificate',
+        description: diagnosisText || '',
+        ...(diagnosisFile?.id && { file: diagnosisFile.id }),
+        appointment: appointmentRef,
+        ...(caseId && { medical_case: caseId }),
+        user: patientRef,
+        doctor: doctorRef,
+      })
+      const newDoc = res.data?.data
+      if (newDoc) setDocuments(prev => [...prev, newDoc])
+      setDiagnosisText('')
+      setDiagnosisFile(null)
       setDiagnosisSaved(true)
       setTimeout(() => setDiagnosisSaved(false), 2000)
     } catch (err) {

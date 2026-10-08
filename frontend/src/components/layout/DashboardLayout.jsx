@@ -6,6 +6,8 @@ import Sidebar from './Sidebar'
 import Header from './Header'
 import { cn } from '../../utils/helpers'
 import useAuthStore from '../../stores/authStore'
+import useChatStore, { selectTotalUnread } from '../../stores/chatStore'
+import UnreadBadge from './UnreadBadge'
 import PatientChatWidget from '../chat/PatientChatWidget'
 import { PATIENT_BOTTOM_NAV_ITEMS } from '../../utils/constants'
 import { medicalCasesAPI, normalizeResponse } from '../../services/api'
@@ -89,6 +91,25 @@ function DashboardLayout({ navItems }) {
   const { t } = useTranslation()
   const location = useLocation()
   const { user } = useAuthStore()
+  const chatUnread = useChatStore(selectTotalUnread)
+
+  // Отметка непрочитанных на «Сообщениях» нужна во всём кабинете, а не только
+  // на странице чата: подтягиваем счётчики при входе, при возврате на вкладку
+  // (сокет мог уснуть) и раз в минуту как подстраховку.
+  useEffect(() => {
+    if (!user?.id) return undefined
+    const refresh = () => useChatStore.getState().refreshConversations()
+    refresh()
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    const timer = setInterval(refresh, 60000)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      clearInterval(timer)
+    }
+  }, [user?.id])
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [patientCases, setPatientCases] = useState(null)
   const [patientNavReady, setPatientNavReady] = useState(false)
@@ -161,7 +182,7 @@ function DashboardLayout({ navItems }) {
   }
 
   return (
-    <div className="min-h-[var(--app-height)] bg-gradient-to-br from-slate-50 via-teal-50/30 to-sky-50/30">
+    <div className="cabinet-shell min-h-(--app-height) bg-gradient-to-br from-slate-50 via-teal-50/30 to-sky-50/30">
       {/* Sidebar */}
       <div
         className={cn(
@@ -172,7 +193,9 @@ function DashboardLayout({ navItems }) {
       />
       <div
         className={cn(
-          'fixed left-0 top-0 h-[var(--app-height)] z-50 transition-transform duration-300 lg:translate-x-0',
+          // inset-y-0, а не высота из переменной: высота меню не должна
+          // зависеть от клавиатуры (после неё меню оставалось сжатым).
+          'fixed inset-y-0 left-0 z-50 transition-transform duration-300 lg:translate-x-0',
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
         onTouchStart={(e) => { sidebarTouchStartX.current = e.touches[0].clientX }}
@@ -220,7 +243,10 @@ function DashboardLayout({ navItems }) {
                       isActive ? 'text-teal-700' : 'text-slate-500'
                     )}
                   >
-                    <Icon className="h-5 w-5" />
+                    <span className="relative">
+                      <Icon className="h-5 w-5" />
+                      {item.path.endsWith('/chat') && <UnreadBadge count={chatUnread} />}
+                    </span>
                     <span className="max-w-full truncate">{t(item.label)}</span>
                   </NavLink>
                 )

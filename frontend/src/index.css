@@ -49,6 +49,9 @@
 @layer base {
   :root {
     --app-height: 100dvh;
+    /* Видимая область над клавиатурой; main.jsx обновляет их по visualViewport. */
+    --vv-height: var(--app-height);
+    --vv-top: 0px;
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-right: env(safe-area-inset-right, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -73,6 +76,66 @@
   #root {
     min-height: 100%;
     min-height: var(--app-height);
+  }
+
+  /* Кабинет: у элементов сетки по умолчанию min-width: auto, и длинная подпись
+     в селекте, имя файла или таблица растягивали колонку — на телефоне форма
+     или карточка уезжала за край экрана. Только внутри кабинета, чтобы не
+     затрагивать лендинг. Утилиты min-w-* по-прежнему перекрывают правило. */
+  .cabinet-shell .grid > * {
+    min-width: 0;
+  }
+
+  /* Корень кабинета не прокручивается вбок. clip, в отличие от hidden, не
+     создаёт контейнер прокрутки, и sticky-шапка и нижняя полоса таблиц
+     остаются прилипшими к окну. Старый Safari clip не знает — там hidden. */
+  .cabinet-shell {
+    overflow-x: hidden;
+  }
+  @supports (overflow: clip) {
+    .cabinet-shell {
+      overflow-x: clip;
+    }
+  }
+
+  /* HScroll: у широкой таблицы полосы прокрутки сверху и снизу
+     (components/ui/HScroll). Собственную полосу содержимого прячем — её роль
+     играют эти две; они толще обычных, чтобы в них было легко попасть мышью. */
+  .hscroll-content {
+    scrollbar-width: none;
+  }
+  .hscroll-content::-webkit-scrollbar {
+    display: none;
+  }
+  .hscroll-bar {
+    scrollbar-width: auto;
+    scrollbar-color: #94a3b8 #f1f5f9;
+  }
+  .hscroll-bar::-webkit-scrollbar {
+    height: 12px;
+  }
+  .hscroll-bar::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border: 2px solid #f1f5f9;
+  }
+  .hscroll-bar::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+
+  /* Поле ввода чата: над полоской «домой», пока клавиатура закрыта, и вплотную
+     к клавиатуре, когда открыта. */
+  .chat-composer {
+    padding-bottom: max(0.5rem, calc(var(--safe-bottom) + 0.25rem));
+  }
+
+  :root[data-keyboard-open] .chat-composer {
+    padding-bottom: 0.5rem;
+  }
+
+  @media (min-width: 640px) {
+    .chat-composer {
+      padding-bottom: 1rem;
+    }
   }
 
   h1, h2, h3, h4, h5, h6 {

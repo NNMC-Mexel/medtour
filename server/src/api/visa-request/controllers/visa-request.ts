@@ -1,5 +1,6 @@
 import { factories } from '@strapi/strapi';
 import { getMedicalCaseAccessFilter, getUserRole, isAdminUser, userCanAccessMedicalCase } from '../../../utils/medtour-access';
+import { areFilesAttachable, getRowIdsForDocument } from '../../../utils/file-attach';
 
 const UID = 'api::visa-request.visa-request' as any;
 const WRITER_ROLES = ['manager', 'admin'];
@@ -71,6 +72,9 @@ export default factories.createCoreController(UID, () => ({
     const body = (ctx.request.body as any)?.data || ctx.request.body || {};
     if (!body.medical_case) return ctx.badRequest('medical_case is required');
     if (!(await userCanAccessMedicalCase(strapi, user, body.medical_case))) return ctx.forbidden('Forbidden');
+    if (body.invitationLetter && !isAdminUser(user) && !(await areFilesAttachable(body.invitationLetter, { userId: user.id }))) {
+      return ctx.forbidden('This file is not available');
+    }
 
     const item = await strapi.documents(UID).create({
       data: pickAllowedFields(body),
@@ -94,6 +98,14 @@ export default factories.createCoreController(UID, () => ({
     const body = (ctx.request.body as any)?.data || ctx.request.body || {};
     const data = pickAllowedFields(body);
     delete (data as any).medical_case;
+    if ((data as any).invitationLetter && !isAdminUser(user)) {
+      const attachable = await areFilesAttachable((data as any).invitationLetter, {
+        userId: user.id,
+        ownRelatedType: UID,
+        ownRelatedIds: await getRowIdsForDocument(UID, ctx.params.id),
+      });
+      if (!attachable) return ctx.forbidden('This file is not available');
+    }
 
     const item = await strapi.documents(UID).update({
       documentId: ctx.params.id,

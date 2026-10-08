@@ -3,6 +3,7 @@
  */
 import { factories } from '@strapi/strapi';
 import { getUserRole, isAdminUser, userCanAccessMedicalCase } from '../../../utils/medtour-access';
+import { areFilesAttachable } from '../../../utils/file-attach';
 
 const UID = 'api::message.message' as any;
 const CONVERSATION_UID = 'api::conversation.conversation' as any;
@@ -132,6 +133,11 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     if (!(await canAccessConversation(strapi, user, conversation))) return ctx.forbidden('Access denied');
 
     const attachments = body.attachments !== undefined ? asArray(body.attachments).filter(Boolean) : undefined;
+    // An attachment becomes readable by every conversation member, so only a
+    // fresh upload by the sender may be attached (see utils/file-attach).
+    if (attachments?.length && !isAdminUser(user) && !(await areFilesAttachable(attachments, { userId: user.id }))) {
+      return ctx.forbidden('Attachment is not available');
+    }
     const messageType = body.messageType || (attachments?.length ? 'file' : 'text');
     const now = new Date().toISOString();
     const content = String(body.content || '').trim() || (attachments?.length ? 'Attachment' : '');

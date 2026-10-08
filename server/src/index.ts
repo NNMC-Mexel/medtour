@@ -2,6 +2,19 @@ import type { Core } from '@strapi/strapi';
 import { decryptUserPII, encryptUserPII, isPiiEncryptionEnabled } from './utils/pii-crypto';
 import { importPriceCatalog } from './utils/price-catalog-import';
 
+// Все запросы сводки аналитики фильтруют по дню, а таблица растёт с каждым
+// визитом. Strapi индексы по полям schema.json не создаёт — ставим сами.
+// IF NOT EXISTS одинаково работает в SQLite и PostgreSQL.
+async function ensureAnalyticsIndexes(strapi: Core.Strapi) {
+  try {
+    await strapi.db.connection.raw(
+      'create index if not exists analytics_events_day_idx on analytics_events (day, kind)',
+    );
+  } catch (error: any) {
+    strapi.log.warn(`[bootstrap] analytics index was not created: ${error?.message}`);
+  }
+}
+
 const defaultSpecializations = [
   { name: 'Терапевт', description: 'Врач общей практики', icon: 'stethoscope', sortOrder: 1 },
   { name: 'Кардиолог', description: 'Специалист по сердечно-сосудистой системе', icon: 'heart', sortOrder: 2 },
@@ -112,6 +125,8 @@ const medTourDoctorPermissions = [
 
 const medTourStaffPermissions = [
   ...medTourReadPermissions,
+  // Managers/coordinators fine-tune doctors' schedules (schedule fields only).
+  'api::doctor.doctor.updateSchedule',
   'api::price-request.price-request.find',
   'api::price-request.price-request.findOne',
   'api::price-request.price-request.update',
@@ -233,6 +248,7 @@ const roleDefinitions = {
       'api::doctor.doctor.find',
       'api::doctor.doctor.findOne',
       'api::doctor.doctor.update',
+      'api::doctor.doctor.updateSchedule',
       ...medTourDoctorPermissions,
       // Specializations — чтение
       'api::specialization.specialization.find',
@@ -378,6 +394,7 @@ const roleDefinitions = {
       'api::doctor.doctor.findOne',
       'api::doctor.doctor.create',
       'api::doctor.doctor.update',
+      'api::doctor.doctor.updateSchedule',
       'api::doctor.doctor.delete',
       ...medTourStaffPermissions,
       ...medTourLogisticsWriterPermissions,
@@ -397,6 +414,8 @@ const roleDefinitions = {
       'api::guide-video.guide-video.create',
       'api::guide-video.guide-video.update',
       'api::guide-video.guide-video.delete',
+      // Аналитика посещений — только сводка в админке
+      'api::analytics-event.analytics-event.summary',
       // Appointments — полный CRUD
       'api::appointment.appointment.find',
       'api::appointment.appointment.findOne',
@@ -874,6 +893,7 @@ export default {
   },
 
   async bootstrap({ strapi }: { strapi: Core.Strapi }) {
+    await ensureAnalyticsIndexes(strapi);
     // Strapi validates `unique` attributes at the application layer but does not
     // reliably create a physical unique index on every supported database. The
     // DB constraint is required to prevent two app instances booking one slot.

@@ -8,6 +8,7 @@ import useChatStore from '../../stores/chatStore'
 import useAuthStore from '../../stores/authStore'
 import { getMediaUrl, appointmentsAPI, conversationsAPI, medicalCasesAPI, normalizeResponse, openMediaInNewTab } from '../../services/api'
 import AuthenticatedImage from '../ui/AuthenticatedImage'
+import useChatThread, { CHAT_THREAD_HEADER_CLASS, CHAT_THREAD_PANE_CLASS } from '../../hooks/useChatThread'
 
 const ACTIVE_CASE_STATUSES = new Set([
   'NEW_LEAD',
@@ -73,7 +74,7 @@ function ChatComponent({ userRole = 'patient' }) {
   const [activeTab, setActiveTab] = useState('managers')
   const [isSending, setIsSending] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
-  const messagesEndRef = useRef(null)
+  const messageInputRef = useRef(null)
   const fileInputRef = useRef(null)
   const typingTimeoutRef = useRef(null)
 
@@ -189,13 +190,12 @@ function ChatComponent({ userRole = 'patient' }) {
     }
   }, [user?.id, userRole])
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+  // Лента держится у последнего сообщения; на телефоне открытый диалог —
+  // полноэкранный экран над клавиатурой, как в мессенджерах.
+  const { listRef, onListScroll } = useChatThread({
+    isOpen: Boolean(currentConversation || selectedConsultation),
+    messages,
+  })
 
   const handleSelectConversation = (conv) => {
     setSelectedConsultation(null)
@@ -217,6 +217,8 @@ function ChatComponent({ userRole = 'patient' }) {
       await sendMessage(conversationId, newMessage.trim(), user.id)
       setNewMessage('')
       sendTyping(conversationId, false)
+      // Клавиатура остаётся открытой для следующего сообщения.
+      messageInputRef.current?.focus()
     } catch (error) {
       console.error('Error sending message:', error)
     } finally {
@@ -515,11 +517,14 @@ function ChatComponent({ userRole = 'patient' }) {
       {/* Chat Area */}
       {selectedConsultation ? (
         /* Read-only consultation chat history */
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className={CHAT_THREAD_PANE_CLASS}>
           {/* Header */}
-          <div className="p-4 border-b border-slate-100 flex items-center gap-3">
+          <div className={cn('p-4 border-b border-slate-100 flex items-center gap-3', CHAT_THREAD_HEADER_CLASS)}>
             <button
+              type="button"
               onClick={() => setSelectedConsultation(null)}
+              aria-label={t('common.back')}
+              title={t('common.back')}
               className="md:hidden p-2 hover:bg-slate-100 rounded-lg"
             >
               ←
@@ -544,7 +549,7 @@ function ChatComponent({ userRole = 'patient' }) {
           </div>
 
           {/* Messages (read-only) */}
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-4">
+          <div ref={listRef} onScroll={onListScroll} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-4">
             {selectedConsultation.chatLog.map((msg, idx) => {
               const currentUserName = user?.fullName || user?.username || ''
               const isMe = msg.senderName === currentUserName
@@ -582,12 +587,15 @@ function ChatComponent({ userRole = 'patient' }) {
           </div>
         </div>
       ) : currentConversation ? (
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className={CHAT_THREAD_PANE_CLASS}>
           {/* Chat Header */}
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className={cn('p-4 border-b border-slate-100 flex items-center justify-between gap-2', CHAT_THREAD_HEADER_CLASS)}>
+            <div className="flex min-w-0 items-center gap-3">
               <button
+                type="button"
                 onClick={() => setCurrentConversation(null)}
+                aria-label={t('common.back')}
+                title={t('common.back')}
                 className="md:hidden p-2 hover:bg-slate-100 rounded-lg"
               >
                 ←
@@ -653,7 +661,7 @@ function ChatComponent({ userRole = 'patient' }) {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-4">
+          <div ref={listRef} onScroll={onListScroll} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-4">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
@@ -735,17 +743,18 @@ function ChatComponent({ userRole = 'patient' }) {
               if (names.length === 0) return null
               return <p className="text-xs text-slate-500 px-1">{names.join(', ')} typing...</p>
             })()}
-            <div ref={messagesEndRef} />
           </div>
 
           {/* Message Input */}
-          <form onSubmit={handleSendMessage} className="p-3 sm:p-4 border-t border-slate-100 safe-bottom sm:pb-4">
+          <form onSubmit={handleSendMessage} className="chat-composer px-3 pt-3 sm:px-4 sm:pt-4 border-t border-slate-100">
             <div className="flex items-center gap-2">
               <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="hidden sm:inline-flex p-2 hover:bg-slate-100 rounded-lg text-slate-500"
+                aria-label={t('chat.attach_file')}
+                title={t('chat.attach_file')}
+                className="inline-flex shrink-0 p-2 hover:bg-slate-100 rounded-lg text-slate-500"
                 disabled={isUploading}
               >
                 <Paperclip className="w-5 h-5" />
@@ -759,11 +768,14 @@ function ChatComponent({ userRole = 'patient' }) {
                 <Image className="w-5 h-5" />
               </button>
               <input
+                ref={messageInputRef}
                 type="text"
                 value={newMessage}
                 onChange={handleMessageChange}
                 placeholder={t('chat.message_placeholder')}
-                className="flex-1 px-4 py-3 bg-slate-100 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                enterKeyHint="send"
+                // 16 px на телефоне: при меньшем шрифте iOS увеличивает страницу при фокусе.
+                className="min-w-0 flex-1 px-4 py-3 bg-slate-100 border-0 rounded-xl text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
               <button type="button" className="hidden sm:inline-flex p-2 hover:bg-slate-100 rounded-lg text-slate-500">
                 <Smile className="w-5 h-5" />

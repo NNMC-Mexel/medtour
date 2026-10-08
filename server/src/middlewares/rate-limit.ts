@@ -7,13 +7,21 @@
  */
 
 type RateLimitRule = { max: number; windowMs: number }
-type PrefixRateLimitRule = RateLimitRule & { prefix: string }
+type PrefixRateLimitRule = RateLimitRule & { prefix: string; method?: string }
 
 // Exact-path limits (highest priority).
 const DEFAULT_LIMITS: Record<string, RateLimitRule> = {
   '/api/auth/local':            { max: 10, windowMs: 15 * 60 * 1000 },
   '/api/auth/local/register':   { max: 5,  windowMs: 60 * 60 * 1000 },
   '/api/auth/forgot-password':  { max: 5,  windowMs: 60 * 60 * 1000 },
+  // Подбор токена сброса/подтверждения — такой же перебор, как подбор пароля.
+  '/api/auth/reset-password':          { max: 10, windowMs: 60 * 60 * 1000 },
+  '/api/auth/email-confirmation':      { max: 20, windowMs: 60 * 60 * 1000 },
+  // Рассылка писем от имени платформы: без лимита это спам-шлюз.
+  '/api/auth/send-email-confirmation': { max: 5,  windowMs: 60 * 60 * 1000 },
+  '/api/auth/change-password':         { max: 10, windowMs: 60 * 60 * 1000 },
+  // Анонимный сбор аналитики: защита от накрутки и забивания таблицы.
+  '/api/analytics/collect':            { max: 300, windowMs: 5 * 60 * 1000 },
 }
 
 // Prefix limits (matched when no exact rule applies). Keyed by prefix so all
@@ -24,6 +32,10 @@ const DEFAULT_LIMITS: Record<string, RateLimitRule> = {
 const DEFAULT_PREFIX_LIMITS: PrefixRateLimitRule[] = [
   { prefix: '/api/upload',     max: 60,  windowMs: 15 * 60 * 1000 },
   { prefix: '/api/file-proxy', max: 300, windowMs: 60 * 1000 },
+  // Записи-«флудеры»: сообщения, бронирования и документы создаются только POST.
+  { prefix: '/api/messages',          method: 'POST', max: 300, windowMs: 5 * 60 * 1000 },
+  { prefix: '/api/appointments',      method: 'POST', max: 60,  windowMs: 60 * 60 * 1000 },
+  { prefix: '/api/medical-documents', method: 'POST', max: 120, windowMs: 60 * 60 * 1000 },
 ]
 
 const store = new Map<string, { count: number; resetAt: number }>()
@@ -62,10 +74,11 @@ export default (config = {}, { strapi }) => {
     let bucket = path
 
     if (!limit) {
-      const prefixRule = prefixLimits.find((rule) => path.startsWith(rule.prefix))
+      const prefixRule = prefixLimits.find((rule) =>
+        path.startsWith(rule.prefix) && (!rule.method || rule.method === ctx.method))
       if (prefixRule) {
         limit = { max: prefixRule.max, windowMs: prefixRule.windowMs }
-        bucket = prefixRule.prefix
+        bucket = prefixRule.method ? `${prefixRule.method} ${prefixRule.prefix}` : prefixRule.prefix
       }
     }
 

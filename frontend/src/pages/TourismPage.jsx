@@ -25,6 +25,7 @@ import {
 import Button from '../components/ui/Button'
 import { tourismPageCopy, tourismRegions, tourismTypes } from '../data/kazakhstanTourism'
 import { cn } from '../utils/helpers'
+import useSeo from '../components/seo/useSeo'
 
 const typeIcons = {
   city: Building2,
@@ -67,6 +68,7 @@ function localize(value, lang) {
 
 function TourismPage() {
   const { i18n } = useTranslation()
+  useSeo({ title: i18n.t('seo.tourism_title'), description: i18n.t('seo.tourism_description'), path: '/tourism' })
   const lang = i18n.language?.split('-')?.[0] || 'ru'
   const copy = tourismPageCopy[lang] || tourismPageCopy.ru
   const [selectedType, setSelectedType] = useState('all')

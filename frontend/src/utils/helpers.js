@@ -2,6 +2,8 @@ import { format, formatDistanceToNow, isToday, isTomorrow, isYesterday, parseISO
 import { ru } from 'date-fns/locale/ru'
 import { enUS } from 'date-fns/locale/en-US'
 import { kk } from 'date-fns/locale/kk'
+import { getDoctorIntervalsForDate, timeToMinutes } from './schedule'
+import { getKazakhstanCalendarToday, getKazakhstanMinutesNow } from './kazakhstanTime'
 
 const getDateLocale = (lang) => {
   if (lang === 'en') return enUS
@@ -150,44 +152,32 @@ export const isValidIIN = (iin) => {
   return /^\d{12}$/.test(iin)
 }
 
-// Check if doctor is currently within working hours
+// Политика паролей — зеркало серверной (server/src/utils/password-policy.ts).
+// Клиентская проверка только для UX: сервер проверяет сам.
+export const PASSWORD_MIN_LENGTH = 8
+
+// i18n-ключ первого нарушенного правила или null, если пароль подходит.
+export const getPasswordError = (password) => {
+  const value = String(password || '')
+  if (!value) return 'password_policy.required'
+  if (value.length < PASSWORD_MIN_LENGTH) return 'password_policy.too_short'
+  if (new TextEncoder().encode(value).length > 72) return 'password_policy.too_long'
+  if (value !== value.trim()) return 'password_policy.whitespace_edges'
+  if (!/\p{Lu}/u.test(value)) return 'password_policy.needs_uppercase'
+  if (!/\p{Ll}/u.test(value)) return 'password_policy.needs_lowercase'
+  if (!/\d/.test(value)) return 'password_policy.needs_digit'
+  if (!/[^\p{L}\p{N}]/u.test(value)) return 'password_policy.needs_special'
+  return null
+}
+
+// Принимает ли врач сейчас: по его графику (интервалы, отпуск) и по времени
+// клиники в Казахстане, а не по часам устройства посетителя.
 export const isDoctorOnline = (doctor) => {
   if (doctor.isActive === false) return false
-
-  const now = new Date()
-  const currentDay = now.getDay() // 0=Sun, 1=Mon, ...
-
-  // Check working days
-  if (doctor.workingDays) {
-    const days = typeof doctor.workingDays === 'string'
-      ? doctor.workingDays.split(',').map(Number).filter(n => !isNaN(n))
-      : doctor.workingDays
-    if (!days.includes(currentDay)) return false
-  }
-
-  // Check working hours
-  const startTime = doctor.workStartTime
-  const endTime = doctor.workEndTime
-  if (startTime && endTime) {
-    const [sh, sm] = startTime.split(':').map(Number)
-    const [eh, em] = endTime.split(':').map(Number)
-    const currentMinutes = now.getHours() * 60 + now.getMinutes()
-    const startMinutes = sh * 60 + sm
-    const endMinutes = eh * 60 + em
-    if (currentMinutes < startMinutes || currentMinutes >= endMinutes) return false
-  }
-
-  // Check break time
-  const breakStart = doctor.breakStart
-  const breakEnd = doctor.breakEnd
-  if (breakStart && breakEnd) {
-    const [bsh, bsm] = breakStart.split(':').map(Number)
-    const [beh, bem] = breakEnd.split(':').map(Number)
-    const currentMinutes = now.getHours() * 60 + now.getMinutes()
-    const breakStartMinutes = bsh * 60 + bsm
-    const breakEndMinutes = beh * 60 + bem
-    if (currentMinutes >= breakStartMinutes && currentMinutes < breakEndMinutes) return false
-  }
-
-  return true
+  const minutes = getKazakhstanMinutesNow()
+  return getDoctorIntervalsForDate(doctor, getKazakhstanCalendarToday()).some((interval) => {
+    const start = timeToMinutes(interval.start)
+    const end = timeToMinutes(interval.end)
+    return start !== null && end !== null && minutes >= start && minutes < end
+  })
 }

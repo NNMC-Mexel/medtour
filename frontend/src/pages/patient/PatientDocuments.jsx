@@ -379,11 +379,11 @@ function PatientDocuments() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
+          <CardContent className="flex items-center gap-3 sm:gap-4">
+            <div className="w-12 h-12 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center">
               <FileText className="w-6 h-6 text-slate-600" />
             </div>
-            <div>
+            <div className="min-w-0 break-words">
               <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
               <p className="text-sm text-slate-500">{t('documents.stat_total')}</p>
             </div>
@@ -391,11 +391,11 @@ function PatientDocuments() {
         </Card>
         {Object.entries(documentTypes).slice(0, 3).map(([key, config]) => (
           <Card key={key}>
-            <CardContent className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-xl ${config.color} flex items-center justify-center`}>
+            <CardContent className="flex items-center gap-3 sm:gap-4">
+              <div className={`w-12 h-12 shrink-0 rounded-xl ${config.color} flex items-center justify-center`}>
                 <config.icon className="w-6 h-6" />
               </div>
-              <div>
+              <div className="min-w-0 break-words">
                 <p className="text-2xl font-bold text-slate-900">{stats[key] || 0}</p>
                 <p className="text-sm text-slate-500">{config.label}</p>
               </div>
