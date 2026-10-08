@@ -246,8 +246,15 @@ sudo ufw allow 49152:65535/udp
   таймер продолжает.
 - Админ → «Аналитика»: визит из инкогнито с `?utm_source=test` виден.
 - `GET /api/turn-credentials` с токеном → `200` (если задан секрет), без токена → `401`.
-- Поисковикам: добавить `https://medtour.nnmc.kz/sitemap.xml` в Яндекс Вебмастер
-  и Google Search Console.
+- Поисковики: файлы подтверждения уже в `frontend/public`
+  (`googlee3e15205bb36212e.html`, `yandex_e02ed575db9e24bc.html`). После
+  выкатки нажать «Подтвердить» в Google Search Console и Яндекс Вебмастере,
+  затем добавить `https://medtour.nnmc.kz/sitemap.xml`.
+- Яндекс Метрика: во фронтенде `VITE_YANDEX_METRIKA_ID=113573334` (переменная
+  сборки — после изменения нужна пересборка). Счётчик грузится только на
+  публичных страницах, Вебвизор и карта кликов выключены. Цели в Метрике —
+  тип «JavaScript-событие» с идентификаторами `sign_up`, `case_created`,
+  `price_request`, `booking_complete`.
 
 ## Pre-deploy verification
 
