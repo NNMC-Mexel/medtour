@@ -184,7 +184,7 @@ function AdminPriceList() {
     }
     const conversionRequested = form.priceKZT !== '' && (!editingItem || Number(form.priceKZT) !== Number(editingItem.priceKZT) || form.recalculate)
     if (conversionRequested && (!rate || Number(form.priceKZT) < 0 || !Number.isFinite(Number(form.priceKZT)))) {
-      toast.warning(rateError ? 'Курс НБРК недоступен' : t('admin_price.err_price'))
+      toast.warning(rateError ? t('admin_price.rate_unavailable') : t('admin_price.err_price'))
       return
     }
 
@@ -448,14 +448,14 @@ function AdminPriceList() {
 
           <div className='grid gap-4 md:grid-cols-4'>
             <Input
-              label='Цена от экономиста (KZT)'
+              label={t('admin_price.label_price_kzt')}
               type='number'
               min='0'
               step='0.01'
               value={form.priceKZT}
               onChange={(e) => setFormValue('priceKZT', e.target.value)}
             />
-            <Input label='Цена для пациента (USD)' type='number' min='0' step='0.01' value={conversionPreview && rate ? (Number(form.priceKZT) / rate.kztPerUsd).toFixed(2) : form.price} onChange={(e) => setFormValue('price', e.target.value)} disabled={form.priceKZT !== ''} />
+            <Input label={t('admin_price.label_price_usd')} type='number' min='0' step='0.01' value={conversionPreview && rate ? (Number(form.priceKZT) / rate.kztPerUsd).toFixed(2) : form.price} onChange={(e) => setFormValue('price', e.target.value)} disabled={form.priceKZT !== ''} />
             <Input
               label={t('admin_price.label_unit')}
               value={activeTranslation.unit || ''}
@@ -471,10 +471,10 @@ function AdminPriceList() {
             />
           </div>
           <div className='rounded-xl bg-teal-50 px-4 py-3 text-sm text-teal-900'>
-            {rate ? `Курс НБРК на ${rate.date}: $1 = ${rate.kztPerUsd} KZT. Сумма USD показана до сохранения.` : rateError ? 'Курс НБРК недоступен. Сохранение цены в KZT временно невозможно.' : 'Загрузка официального курса НБРК…'}
-            {editingItem && form.priceKZT !== '' && !conversionPreview && rate && <button type='button' className='ml-2 font-semibold underline' onClick={() => setFormValue('recalculate', true)}>Пересчитать по текущему курсу: {formatPrice(Number(form.priceKZT) / rate.kztPerUsd, 'USD')}</button>}
+            {rate ? t('admin_price.rate_info', { date: rate.date, rate: rate.kztPerUsd }) : rateError ? t('admin_price.rate_error') : t('admin_price.rate_loading')}
+            {editingItem && form.priceKZT !== '' && !conversionPreview && rate && <button type='button' className='ml-2 font-semibold underline' onClick={() => setFormValue('recalculate', true)}>{t('admin_price.recalculate')} {formatPrice(Number(form.priceKZT) / rate.kztPerUsd, 'USD')}</button>}
           </div>
-          <Select label='Раздел прайса' value={form.section} onChange={(e) => setFormValue('section', e.target.value)} options={[{ value: 'checkup', label: 'Check-up и пакеты' }, { value: 'analysis', label: 'Анализы' }, { value: 'service', label: 'Другие услуги' }]} />
+          <Select label={t('admin_price.label_section')} value={form.section} onChange={(e) => setFormValue('section', e.target.value)} options={[{ value: 'checkup', label: t('admin_price.section_checkup') }, { value: 'analysis', label: t('admin_price.section_analysis') }, { value: 'service', label: t('admin_price.section_service') }]} />
 
           <div className='grid gap-4 md:grid-cols-2'>
             <Input

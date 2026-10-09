@@ -2,7 +2,7 @@ import { Star, Clock, ThumbsUp } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getMediaUrl } from '../../services/api'
-import { cn, getInitials, isDoctorOnline, getSpecName, getDoctorField } from '../../utils/helpers'
+import { cn, getInitials, isDoctorOnline, getDoctorSpecLabel, getDoctorField } from '../../utils/helpers'
 
 const colors = [
   'bg-gradient-to-br from-teal-400 to-teal-600',
@@ -29,7 +29,7 @@ function DoctorCard({ doctor, basePath = '' }) {
   const rating = Math.min(doctor.rating || 0, 5)
   const reviewsCount = doctor.reviewsCount || 0
   const experience = doctor.experience || 0
-  const specialization = getSpecName(doctor.specialization, i18n.language) || t('common.specialist')
+  const specialization = getDoctorSpecLabel(doctor, i18n.language) || t('common.specialist')
   const isOnline = isDoctorOnline(doctor)
 
   const recommendPercent = reviewsCount > 0 ? Math.min(95 + Math.floor(rating), 100) : null
@@ -174,7 +174,7 @@ export function DoctorCardMini({ doctor, onClick }) {
   const colorIndex = displayName ? displayName.charCodeAt(0) % colors.length : 0
   const bgColor = colors[colorIndex]
   const rating = Math.min(doctor.rating || 0, 5)
-  const specialization = getSpecName(doctor.specialization, i18n.language) || t('common.specialist')
+  const specialization = getDoctorSpecLabel(doctor, i18n.language) || t('common.specialist')
 
   return (
     <div

@@ -142,6 +142,10 @@ function DoctorDashboard() {
                 return <Badge variant='warning'>{t('appointment.status_pending')}</Badge>;
             case "cancelled":
                 return <Badge variant='danger'>{t('appointment.status_cancelled')}</Badge>;
+            case "in_progress":
+                return <Badge variant='info'>{t('appointment.status_in_progress')}</Badge>;
+            case "no_show":
+                return <Badge variant='warning'>{t('appointment.status_no_show')}</Badge>;
             default:
                 return null;
         }

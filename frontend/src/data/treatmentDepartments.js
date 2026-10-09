@@ -562,8 +562,12 @@ export function doctorBelongsToTreatmentDepartment(doctor, department) {
     return doctor.treatmentDepartments.includes(department.slug)
   }
 
-  const specialization = doctor.specialization || {}
-  const names = [specialization.name, specialization.nameEn, specialization.nameKk]
+  const specializations = Array.isArray(doctor.specializations) && doctor.specializations.length > 0
+    ? doctor.specializations
+    : [doctor.specialization]
+  const names = specializations
+    .filter((specialization) => specialization && typeof specialization === 'object')
+    .flatMap((specialization) => [specialization.name, specialization.nameEn, specialization.nameKk])
     .map(normalizeMatchValue)
     .filter(Boolean)
   const matches = [...(department.specialtyMatches || []), ...(specialtyAliases[department.slug] || [])]

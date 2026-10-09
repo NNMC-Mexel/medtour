@@ -62,6 +62,7 @@ const AdminGuideVideos = lazy(() => import('./pages/admin/AdminGuideVideos'))
 const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'))
 const AdminContent = lazy(() => import('./pages/admin/AdminContent'))
 const AdminTreatmentDepartments = lazy(() => import('./pages/admin/AdminTreatmentDepartments'))
+const AdminTourism = lazy(() => import('./pages/admin/AdminTourism'))
 const StaffDashboard = lazy(() => import('./pages/staff/StaffDashboard'))
 const StaffPriceRequests = lazy(() => import('./pages/staff/StaffPriceRequests'))
 const TreatmentDepartmentPage = lazy(() => import('./pages/TreatmentDepartmentPage'))
@@ -275,6 +276,7 @@ function App() {
           <Route path="appointments" element={<AdminAppointments />} />
           <Route path="specializations" element={<AdminSpecializations />} />
           <Route path="treatment-departments" element={<AdminTreatmentDepartments />} />
+          <Route path="tourism" element={<AdminTourism />} />
           <Route path="prices" element={<AdminPriceList />} />
           <Route path="price-requests" element={<StaffPriceRequests />} />
           <Route path="guide-videos" element={<AdminGuideVideos />} />

@@ -65,7 +65,11 @@
     "cam_off": "Turn off camera",
     "leave_call": "Leave call",
     "next": "Next",
-    "previous": "Previous"
+    "previous": "Previous",
+    "remove_filter": "Remove filter",
+    "select_no_results": "Nothing found",
+    "select_search": "Search...",
+    "select_selected_count": "Selected: {{count}}"
   },
   "pricing": {
     "badge": "Price list",
@@ -126,7 +130,8 @@
     "doctor_cabinet": "Doctor Dashboard",
     "open_profile": "Open profile",
     "account_menu": "Account menu",
-    "admin_analytics": "Analytics"
+    "admin_analytics": "Analytics",
+    "admin_tourism": "Tourism"
   },
   "auth": {
     "login": {
@@ -432,8 +437,8 @@
       "/admin/treatment-departments_sub": "Treatment direction pages",
       "/admin/guide-videos": "Guide Videos",
       "/admin/guide-videos_sub": "Manage patient training materials",
-      "/admin/settings": "Settings",
-      "/admin/settings_sub": "System settings",
+      "/admin/settings": "Site content",
+      "/admin/settings_sub": "Appearance, copy, contacts and SEO",
       "/manager": "Medical Cases",
       "/manager_sub": "Your assigned patient cases",
       "/manager/cases": "Medical Cases",
@@ -452,7 +457,9 @@
       "/coordinator/documents_sub": "Case documents",
       "default": "Page",
       "/admin/analytics": "Analytics",
-      "/admin/analytics_sub": "Visits, ads and the funnel to a consultation"
+      "/admin/analytics_sub": "Visits, ads and the funnel to a consultation",
+      "/admin/tourism": "Tourism",
+      "/admin/tourism_sub": "Places and travel routes"
     }
   },
   "patient": {
@@ -1032,7 +1039,8 @@
     "vacation_day": "Vacation",
     "vacation_until": "On vacation until {{date}}",
     "day_off": "Day off",
-    "interval_label": "Interval {{number}}"
+    "interval_label": "Interval {{number}}",
+    "status_no_show": "No-show"
   },
   "patients": {
     "title": "My Patients",
@@ -1073,7 +1081,8 @@
     "doctype_xray": "X-ray",
     "doctype_ultrasound": "Ultrasound",
     "doctype_other": "Examination plan",
-    "doc_fallback": "Document"
+    "doc_fallback": "Document",
+    "status_no_show": "No-show"
   },
   "payment": {
     "creating_title": "Payment successful!",
@@ -1330,7 +1339,8 @@
     "private_decision_more_docs": "Additional documents required",
     "private_notes_placeholder": "Write a note for the manager: whether the patient should be invited to Kazakhstan, key risks, and what the commission should discuss...",
     "window_available": "{{hours}} h. remaining to add notes",
-    "window_expired_detail": "The {{hours}}-hour window after consultation has expired"
+    "window_expired_detail": "The {{hours}}-hour window after consultation has expired",
+    "status_no_show": "No-show"
   },
   "payment_failure": {
     "title": "Payment declined",
@@ -1443,7 +1453,8 @@
     "stat_total_cases": "Medical cases",
     "stat_active_cases": "Active cases",
     "stat_sla_overdue": "SLA overdue",
-    "cases_link": "All cases →"
+    "cases_link": "All cases →",
+    "status_no_show": "No-show"
   },
   "admin_apt": {
     "title": "Appointments",
@@ -1515,7 +1526,9 @@
     "details_btn": "Details",
     "open_room_icon": "Open room",
     "unknown_patient": "Unknown",
-    "change_status_desc": "Change status of {{patient}}'s appointment with {{doctor}}?"
+    "change_status_desc": "Change status of {{patient}}'s appointment with {{doctor}}?",
+    "status_no_show": "No-show",
+    "filter_no_show": "No-show"
   },
   "admin_doc": {
     "title": "Doctors",
@@ -1661,7 +1674,16 @@
     "err_schedule_invalid_date": "Enter a valid consultation date",
     "err_schedule_duplicate_date": "The same date is listed more than once",
     "vacation_days_few": "{{count}} days",
-    "vacation_days_many": "{{count}} days"
+    "vacation_days_many": "{{count}} days",
+    "adjust_photo": "Adjust crop",
+    "adjust_photo_hint": "Click the photo to change its zoom and position",
+    "click_photo_hint": "Select an image, then adjust its zoom and position",
+    "hint_specs": "You can pick several — the first one becomes primary",
+    "label_specs": "Specializations",
+    "placeholder_specs": "Select specializations",
+    "replace_photo": "Replace photo",
+    "spec_no_results": "No specializations found",
+    "spec_search_placeholder": "Search specialization..."
   },
   "admin_spec": {
     "title": "Specializations",
@@ -1685,7 +1707,7 @@
     "placeholder_desc": "Brief specialization description",
     "label_order": "Order",
     "hint_order": "Order can be changed by dragging in the list",
-    "label_icon": "Icon (slug)",
+    "label_icon": "Icon",
     "placeholder_icon": "E.g.: heart",
     "hint_icon": "Text icon key",
     "err_save_order": "Failed to save specialization order",
@@ -1696,7 +1718,10 @@
     "drag_disabled": "Drag mode is disabled during search.",
     "add_btn": "Add specialization",
     "not_found": "No specializations found",
-    "confirm_delete": "Delete specialization \"{{name}}\"?"
+    "confirm_delete": "Delete specialization \"{{name}}\"?",
+    "icon_auto": "By name",
+    "icon_hint": "“By name” lets the site pick the icon from the specialization name.",
+    "icon_legacy_hint": "An old key “{{key}}” is stored, so the site picks the icon by name. Choose an icon to set it explicitly."
   },
   "admin_price": {
     "title": "Price List",
@@ -1745,7 +1770,18 @@
     "created": "Price created",
     "deleted": "Price deleted",
     "not_found": "No price items found",
-    "confirm_delete": "Delete price \"{{title}}\"?"
+    "confirm_delete": "Delete price \"{{title}}\"?",
+    "rate_unavailable": "The NBK exchange rate is unavailable",
+    "label_price_kzt": "Economist's price (KZT)",
+    "label_price_usd": "Patient price (USD)",
+    "rate_info": "NBK rate on {{date}}: $1 = {{rate}} KZT. The USD amount is shown before saving.",
+    "rate_error": "The NBK rate is unavailable. Saving a KZT price is temporarily impossible.",
+    "rate_loading": "Loading the official NBK rate…",
+    "recalculate": "Recalculate at the current rate:",
+    "label_section": "Price list section",
+    "section_checkup": "Check-ups and packages",
+    "section_analysis": "Lab tests",
+    "section_service": "Other services"
   },
   "admin_users": {
     "title": "Users",
@@ -1878,7 +1914,12 @@
   "image_crop": {
     "title": "Crop Photo",
     "description": "Select the area that will be displayed on the card",
-    "rotate": "Rotate"
+    "rotate": "Rotate",
+    "apply": "Apply",
+    "error": "The photo could not be processed. Please select the file again.",
+    "move_hint": "Drag the photo inside the frame",
+    "reset": "Reset",
+    "zoom": "Zoom"
   },
   "case_next_step": {
     "NEW_LEAD": "Your case has been received. Our team will contact you shortly to verify your details.",
@@ -2193,7 +2234,19 @@
     "tourism_status_declined": "Declined",
     "tourism_status_booked": "Booked",
     "tourism_status_completed": "Completed",
-    "tourism_status_cancelled": "Cancelled"
+    "tourism_status_cancelled": "Cancelled",
+    "logistics_not_started": "Not started",
+    "logistics_docs_requested": "Documents requested",
+    "logistics_docs_received": "Documents received",
+    "logistics_invitation_preparing": "Preparing invitation",
+    "logistics_invitation_sent": "Invitation sent",
+    "logistics_submitted": "Submitted",
+    "logistics_not_required": "Not required",
+    "logistics_draft": "Draft",
+    "logistics_offered": "Offered",
+    "logistics_accepted": "Accepted",
+    "logistics_declined": "Declined",
+    "logistics_booked": "Booked"
   },
   "staff": {
     "manager_title": "Manager workspace",
@@ -2611,5 +2664,11 @@
     "funnel_interested": "Viewed treatments, doctors or prices",
     "funnel_sign_up": "Signed up",
     "funnel_case_created": "Created a request (case)"
+  },
+  "admin_i18n": {
+    "tabs_label": "Content language",
+    "fallback_hint": "Empty fields are shown in Russian on the site.",
+    "missing": "Untranslated fields: {{count}}",
+    "complete": "Translation complete"
   }
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -23,7 +23,8 @@ import {
   Waves,
 } from 'lucide-react'
 import Button from '../components/ui/Button'
-import { tourismPageCopy, tourismRegions, tourismTypes } from '../data/kazakhstanTourism'
+import { localizeTourismRegion, resolveTourismImage, resolveTourismRegions, tourismPageCopy, tourismTypes } from '../data/kazakhstanTourism'
+import { contentAPI, normalizeResponse } from '../services/api'
 import { cn } from '../utils/helpers'
 import useSeo from '../components/seo/useSeo'
 
@@ -72,16 +73,36 @@ function TourismPage() {
   const lang = i18n.language?.split('-')?.[0] || 'ru'
   const copy = tourismPageCopy[lang] || tourismPageCopy.ru
   const [selectedType, setSelectedType] = useState('all')
+  const [storedRegions, setStoredRegions] = useState(null)
 
-  const typeOptions = useMemo(() => {
-    const usedTypes = new Set(tourismRegions.flatMap((region) => region.types))
-    return Object.keys(tourismTypes).filter((type) => usedTypes.has(type))
+  useEffect(() => {
+    let active = true
+    contentAPI.getGlobal()
+      .then((response) => {
+        if (!active) return
+        const { data } = normalizeResponse(response) || {}
+        setStoredRegions(data?.tourismRegions || null)
+      })
+      .catch(() => {})
+    return () => { active = false }
   }, [])
 
+  const regions = useMemo(
+    () => resolveTourismRegions(storedRegions)
+      .filter((region) => region.isActive !== false)
+      .map((region) => localizeTourismRegion(region, lang)),
+    [lang, storedRegions],
+  )
+
+  const typeOptions = useMemo(() => {
+    const usedTypes = new Set(regions.flatMap((region) => region.types))
+    return Object.keys(tourismTypes).filter((type) => usedTypes.has(type))
+  }, [regions])
+
   const filteredRegions = useMemo(() => {
-    if (selectedType === 'all') return tourismRegions
-    return tourismRegions.filter((region) => region.types.includes(selectedType))
-  }, [selectedType])
+    if (selectedType === 'all') return regions
+    return regions.filter((region) => region.types.includes(selectedType))
+  }, [regions, selectedType])
 
   return (
     <div className='bg-white text-slate-900'>
@@ -190,14 +211,14 @@ function TourismPage() {
       <section className='bg-[#f4f7fb] py-20'>
         <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
           <div className='max-w-3xl'>
-            <span className='text-xs font-bold uppercase tracking-[.18em] text-[#ff6b55]'>{lang === 'en' ? 'Routes from the tour package' : lang === 'kk' ? 'Турпакет бағыттары' : 'Маршруты из турпакета'}</span>
-            <h2 className='mt-4 text-3xl font-semibold tracking-[-.03em] text-[#101b3f] sm:text-4xl'>{lang === 'en' ? 'Two ways to discover nature from Astana' : lang === 'kk' ? 'Астанадан табиғатқа екі бағыт' : 'Два способа открыть природу из Астаны'}</h2>
+            <span className='text-xs font-bold uppercase tracking-[.18em] text-mt-coral'>{lang === 'en' ? 'Routes from the tour package' : lang === 'kk' ? 'Турпакет бағыттары' : 'Маршруты из турпакета'}</span>
+            <h2 className='mt-4 text-3xl font-semibold tracking-[-.03em] text-mt-ink sm:text-4xl'>{lang === 'en' ? 'Two ways to discover nature from Astana' : lang === 'kk' ? 'Астанадан табиғатқа екі бағыт' : 'Два способа открыть природу из Астаны'}</h2>
             <p className='mt-4 text-lg leading-8 text-[#626b82]'>{lang === 'en' ? 'The program includes the core logistics and can be adjusted to the patient’s condition and doctor’s guidance.' : lang === 'kk' ? 'Бағдарлама негізгі логистиканы қамтиды және дәрігер ұсынысына қарай бейімделеді.' : 'В программу входит основная логистика; темп и состав маршрута можно адаптировать под состояние пациента и рекомендации врача.'}</p>
           </div>
           <div className='mt-10 grid gap-6 lg:grid-cols-2'>
             {signatureTours.map((tour) => <article key={tour.id} className='group overflow-hidden rounded-[2rem] border border-[#dfe3ec] bg-white shadow-sm'>
               <div className='h-72 overflow-hidden'><img src={tour.image} alt={localize(tour.name, lang)} loading='lazy' className='h-full w-full object-cover transition duration-700 group-hover:scale-105' /></div>
-              <div className='p-7 sm:p-8'><div className='text-xs font-bold uppercase tracking-[.14em] text-[#3157d5]'>{localize(tour.label, lang)}</div><h3 className='mt-3 text-2xl font-semibold text-[#101b3f]'>{localize(tour.name, lang)}</h3><p className='mt-4 leading-7 text-[#626b82]'>{localize(tour.text, lang)}</p><div className='mt-6 flex flex-wrap gap-2'>{localize(tour.highlights, lang).map((item) => <span key={item} className='inline-flex items-center gap-2 rounded-full bg-[#edf2f9] px-3 py-2 text-xs font-medium text-[#39435f]'><Check className='h-3.5 w-3.5 text-[#ff6b55]' />{item}</span>)}</div></div>
+              <div className='p-7 sm:p-8'><div className='text-xs font-bold uppercase tracking-[.14em] text-mt-blue'>{localize(tour.label, lang)}</div><h3 className='mt-3 text-2xl font-semibold text-mt-ink'>{localize(tour.name, lang)}</h3><p className='mt-4 leading-7 text-[#626b82]'>{localize(tour.text, lang)}</p><div className='mt-6 flex flex-wrap gap-2'>{localize(tour.highlights, lang).map((item) => <span key={item} className='inline-flex items-center gap-2 rounded-full bg-[#edf2f9] px-3 py-2 text-xs font-medium text-[#39435f]'><Check className='h-3.5 w-3.5 text-mt-coral' />{item}</span>)}</div></div>
             </article>)}
           </div>
         </div>
@@ -299,17 +320,19 @@ function TourismPage() {
               >
                 <div className='relative h-44 overflow-hidden bg-slate-200'>
                   <img
-                    src={region.image}
-                    alt={localize(region.name, lang)}
+                    src={resolveTourismImage(region.image)}
+                    alt={region.name}
                     loading='lazy'
                     className='h-full w-full object-cover transition-transform duration-500 group-hover:scale-105'
                   />
                   <div className='absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent' />
                   <div className='absolute bottom-0 left-0 right-0 p-5 text-white'>
-                    <h3 className='text-2xl font-semibold'>{localize(region.name, lang)}</h3>
-                    <p className='mt-1 text-sm text-white/75'>
-                      {copy.centerLabel}: {localize(region.center, lang)}
-                    </p>
+                    <h3 className='text-2xl font-semibold'>{region.name}</h3>
+                    {region.center && (
+                      <p className='mt-1 text-sm text-white/75'>
+                        {copy.centerLabel}: {region.center}
+                      </p>
+                    )}
                   </div>
                   <div className='absolute right-5 top-5 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-white/90 text-teal-700 shadow-sm backdrop-blur'>
                     <MapPinned className='h-5 w-5' />
@@ -325,19 +348,19 @@ function TourismPage() {
                     ))}
                   </div>
 
-                  <p className='mt-4 flex-1 leading-7 text-slate-600'>{localize(region.summary, lang)}</p>
+                  <p className='mt-4 flex-1 leading-7 text-slate-600'>{region.summary}</p>
 
-                  <div className='mt-5 border-t border-slate-100 pt-4'>
+                  {region.highlights.length > 0 && <div className='mt-5 border-t border-slate-100 pt-4'>
                     <div className='text-sm font-semibold text-slate-900'>{copy.highlightsLabel}</div>
                     <ul className='mt-3 space-y-2'>
                       {region.highlights.map((item) => (
                         <li key={item} className='flex gap-2 text-sm leading-6 text-slate-600'>
                           <span className='mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-teal-500' />
-                          {localize(item, lang)}
+                          {item}
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  </div>}
                 </div>
               </article>
             ))}

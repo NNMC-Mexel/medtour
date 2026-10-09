@@ -238,8 +238,11 @@ export default function AdminTreatmentDepartments() {
     Promise.allSettled([contentAPI.getGlobal(), doctorsAPI.getAll({ includeInactive: true })])
       .then(([globalResult, doctorsResult]) => {
         if (!active) return
-        if (globalResult.status === 'rejected') throw globalResult.reason
-        const { data } = normalizeResponse(globalResult.value)
+        // 404 — записи Global ещё нет: показываем отделения по умолчанию,
+        // первое сохранение её создаст.
+        const globalMissing = globalResult.status === 'rejected' && globalResult.reason?.response?.status === 404
+        if (globalResult.status === 'rejected' && !globalMissing) throw globalResult.reason
+        const { data } = globalMissing ? { data: null } : normalizeResponse(globalResult.value)
         const { data: doctorData } = doctorsResult.status === 'fulfilled'
           ? normalizeResponse(doctorsResult.value)
           : { data: [] }
@@ -393,7 +396,8 @@ export default function AdminTreatmentDepartments() {
       toast.success(copy.saved)
     } catch (error) {
       console.error('Error saving treatment departments:', error)
-      toast.error(copy.saveError)
+      const reason = error?.response?.data?.error?.message
+      toast.error(reason ? `${copy.saveError}: ${reason}` : copy.saveError)
     } finally {
       setIsSaving(false)
     }

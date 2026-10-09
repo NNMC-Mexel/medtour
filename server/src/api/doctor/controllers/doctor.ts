@@ -14,6 +14,17 @@ import {
   scheduleActuallyChanges,
   validateScheduleConfigInput,
 } from '../../../utils/doctor-schedule';
+import { syncSpecializationPayload, withSpecializationList } from '../../../utils/doctor-specializations';
+
+// Врачи, сохранённые до появления списка специальностей, отдаются со списком
+// из основной — фронтенд читает только `specializations`.
+const withSpecializationLists = (response: any) => {
+  if (!response || typeof response !== 'object') return response;
+  const { data } = response;
+  if (Array.isArray(data)) return { ...response, data: data.map(withSpecializationList) };
+  if (data && typeof data === 'object') return { ...response, data: withSpecializationList(data) };
+  return response;
+};
 
 // Fields only admin may change
 const ADMIN_ONLY_FIELDS = [
@@ -115,7 +126,7 @@ export default factories.createCoreController('api::doctor.doctor', ({ strapi })
       };
     }
 
-    return await super.find(ctx);
+    return withSpecializationLists(await super.find(ctx));
   },
 
   async findOne(ctx) {
@@ -130,7 +141,7 @@ export default factories.createCoreController('api::doctor.doctor', ({ strapi })
       return ctx.notFound('Doctor not found');
     }
 
-    return response;
+    return withSpecializationLists(response);
   },
 
   async create(ctx) {
@@ -144,6 +155,7 @@ export default factories.createCoreController('api::doctor.doctor', ({ strapi })
     if ('treatmentDepartments' in body && !hasValidTreatmentDepartments(body.treatmentDepartments)) {
       return ctx.badRequest('Treatment department assignments are invalid');
     }
+    syncSpecializationPayload(body);
 
     return await super.create(ctx);
   },
@@ -194,6 +206,7 @@ export default factories.createCoreController('api::doctor.doctor', ({ strapi })
       }
     }
 
+    syncSpecializationPayload(getRequestData(ctx));
     if (await rejectScheduleChange(strapi, ctx, getRequestData(ctx))) return;
 
     return await super.update(ctx);

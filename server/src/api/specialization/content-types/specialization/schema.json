@@ -50,6 +50,9 @@
     "sortOrder": {
       "type": "integer",
       "default": 0
+    },
+    "i18n": {
+      "type": "json"
     }
   }
 }

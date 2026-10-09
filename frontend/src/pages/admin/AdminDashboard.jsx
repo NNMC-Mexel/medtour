@@ -112,6 +112,8 @@ function AdminDashboard() {
       confirmed: { variant: 'primary', label: t('admin.status_confirmed_short') },
       completed: { variant: 'success', label: t('admin.status_completed') },
       cancelled: { variant: 'danger', label: t('admin.status_cancelled') },
+      in_progress: { variant: 'info', label: t('appointment.status_in_progress') },
+      no_show: { variant: 'warning', label: t('admin.status_no_show') },
     }
     const config = variants[status] || { variant: 'default', label: status }
     return <Badge variant={config.variant}>{config.label}</Badge>

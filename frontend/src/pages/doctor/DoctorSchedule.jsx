@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { SHOW_DOCTOR_PRICES } from "../../utils/constants";
 import { useTranslation } from "react-i18next";
 import {
     ChevronLeft,
@@ -357,7 +358,9 @@ function DoctorSchedule() {
 
                                                                 return (
                                                                     <>
-                                                                        {isPast && appointmentStatus !== 'cancelled' ? (
+                                                                        {appointmentStatus === 'no_show' ? (
+                                                                            <Badge variant='warning'>{t('schedule.status_no_show')}</Badge>
+                                                                        ) : isPast && appointmentStatus !== 'cancelled' ? (
                                                                             <Badge variant='success'>{t('schedule.status_completed')}</Badge>
                                                                         ) : (
                                                                             <Badge
@@ -447,6 +450,8 @@ function DoctorSchedule() {
                                     }
                                 </span>
                             </div>
+                            {/* Консультации в MedTour бесплатные — доход не показываем. */}
+                            {SHOW_DOCTOR_PRICES && (
                             <div className='flex items-center justify-between p-3 bg-teal-50 rounded-xl'>
                                 <span className='text-teal-700'>
                                     {t('schedule.potential_income')}
@@ -463,6 +468,7 @@ function DoctorSchedule() {
                                     ₸
                                 </span>
                             </div>
+                            )}
                         </CardContent>
                     </Card>
 

@@ -111,6 +111,7 @@ export const ADMIN_NAV_ITEMS = [
   { path: '/admin/chat', label: 'nav.chat', icon: 'message-circle' },
   { path: '/admin/specializations', label: 'nav.admin_specializations', icon: 'tags' },
   { path: '/admin/treatment-departments', label: 'nav.admin_treatments', icon: 'activity' },
+  { path: '/admin/tourism', label: 'nav.admin_tourism', icon: 'map-pinned' },
   { path: '/admin/prices', label: 'nav.admin_prices', icon: 'receipt-text' },
   { path: '/admin/price-requests', label: 'nav.price_requests', icon: 'shopping-cart' },
   { path: '/admin/guide-videos', label: 'nav.admin_guide_videos', icon: 'circle-help' },

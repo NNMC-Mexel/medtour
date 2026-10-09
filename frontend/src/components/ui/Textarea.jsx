@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { forwardRef, useId } from 'react'
 import { cn } from '../../utils/helpers'
 
 const Textarea = forwardRef(({
@@ -9,16 +9,20 @@ const Textarea = forwardRef(({
   containerClassName,
   ...props
 }, ref) => {
+  // Подпись связана с полем: клик по ней ставит фокус, скринридер читает её.
+  const autoId = useId()
+  const inputId = props.id || autoId
   return (
     <div className={cn('space-y-1.5', containerClassName)}>
       {label && (
-        <label className="block text-sm font-medium text-slate-700">
+        <label htmlFor={inputId} className="block text-sm font-medium text-slate-700">
           {label}
           {props.required && <span className="text-rose-500 ml-0.5">*</span>}
         </label>
       )}
       
       <textarea
+        id={inputId}
         ref={ref}
         className={cn(
           'w-full px-4 py-3 rounded-xl border bg-white transition-all duration-200 resize-none',

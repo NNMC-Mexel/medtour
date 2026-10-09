@@ -187,7 +187,11 @@ export default (plugin) => {
           : (await strapi.query('plugin::users-permissions.role').findOne({
               where: { id: Number(sourceBody.role?.id ?? sourceBody.role) || 0 },
             }))?.type;
-        if (requestedType === 'doctor' && (target.role?.type || target.userRole) !== 'doctor') {
+        // Старые аккаунты врачей хранят userRole 'doctor' при связи с ролью
+        // authenticated. Это врач: раздел «Врачи» сохраняет его карточку вместе
+        // с аккаунтом и заодно чинит связь роли (role = doctor ниже).
+        const isDoctorAccount = target.userRole === 'doctor' || target.role?.type === 'doctor';
+        if (requestedType === 'doctor' && !isDoctorAccount) {
           return ctx.badRequest('The doctor role is managed in the doctors section', { code: 'doctor_role_managed_in_doctors' });
         }
         if (!requestedType || !ASSIGNABLE_ROLES.includes(requestedType) && requestedType !== 'doctor') {
@@ -196,7 +200,7 @@ export default (plugin) => {
         const nextRole = await resolveRoleByType(requestedType);
         if (!nextRole) return ctx.badRequest('Unsupported role', { code: 'invalid_role' });
 
-        const previous = target.role?.type || target.userRole || null;
+        const previous = isDoctorAccount ? 'doctor' : target.role?.type || target.userRole || null;
         if (previous !== requestedType) {
           // A doctor's role comes with a catalogue card; it is managed under "Doctors".
           if (previous === 'doctor' || requestedType === 'doctor') {

@@ -26,7 +26,7 @@ import Avatar from "../components/ui/Avatar";
 import Badge from "../components/ui/Badge";
 import { useTranslation } from "react-i18next";
 import api, { normalizeResponse, getMediaUrl } from "../services/api";
-import { formatDate, isDoctorOnline, getSpecName, getDoctorField } from "../utils/helpers";
+import { formatDate, isDoctorOnline, getDoctorSpecLabel, getDoctorField } from "../utils/helpers";
 import { useUsdRate, formatKztAsUsd } from '../hooks/useUsdRate';
 import { SHOW_DOCTOR_PRICES } from "../utils/constants";
 import {
@@ -64,7 +64,7 @@ function DoctorProfilePage() {
     const [isLoading, setIsLoading] = useState(true);
     const seoName = doctor ? (getDoctorField(doctor, 'fullName', i18n.language) || doctor.fullName) : '';
     const seoSpecialization = doctor
-        ? (getSpecName(doctor.specialization, i18n.language) || t('doctor_public.specialist'))
+        ? (getDoctorSpecLabel(doctor, i18n.language) || t('doctor_public.specialist'))
         : '';
     // Несуществующий врач не должен попадать в индекс.
     useSeo({
@@ -123,7 +123,7 @@ function DoctorProfilePage() {
         );
     }
 
-    const specialization = getSpecName(doctor.specialization, i18n.language)
+    const specialization = getDoctorSpecLabel(doctor, i18n.language)
         || t('doctor_public.specialist');
     const scheduleSummary = getScheduleSummary(doctor);
     const doctorDisplayName = getDoctorField(doctor, 'fullName', i18n.language) || doctor.fullName

@@ -1076,14 +1076,14 @@ export interface ApiDoctorDoctor extends Struct.CollectionTypeSchema {
     photo: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
     position: Schema.Attribute.String;
     price: Schema.Attribute.Integer &
-      Schema.Attribute.Required &
       Schema.Attribute.SetMinMax<
         {
           max: 10000000;
           min: 0;
         },
         number
-      >;
+      > &
+      Schema.Attribute.DefaultTo<0>;
     publishedAt: Schema.Attribute.DateTime;
     rating: Schema.Attribute.Integer &
       Schema.Attribute.SetMinMax<
@@ -1100,6 +1100,10 @@ export interface ApiDoctorDoctor extends Struct.CollectionTypeSchema {
     slotDuration: Schema.Attribute.Integer;
     specialization: Schema.Attribute.Relation<
       'manyToOne',
+      'api::specialization.specialization'
+    >;
+    specializations: Schema.Attribute.Relation<
+      'manyToMany',
       'api::specialization.specialization'
     >;
     time_slots: Schema.Attribute.Relation<
@@ -1222,6 +1226,7 @@ export interface ApiGlobalGlobal extends Struct.SingleTypeSchema {
     publishedAt: Schema.Attribute.DateTime;
     siteDescription: Schema.Attribute.Text & Schema.Attribute.Required;
     siteName: Schema.Attribute.String & Schema.Attribute.Required;
+    tourismRegions: Schema.Attribute.JSON;
     treatmentDepartments: Schema.Attribute.JSON;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -1768,6 +1773,7 @@ export interface ApiSpecializationSpecialization
       Schema.Attribute.Private;
     description: Schema.Attribute.Text;
     doctors: Schema.Attribute.Relation<'oneToMany', 'api::doctor.doctor'>;
+    i18n: Schema.Attribute.JSON;
     icon: Schema.Attribute.String;
     image: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;

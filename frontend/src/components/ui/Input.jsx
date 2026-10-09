@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { forwardRef, useId } from 'react'
 import { cn } from '../../utils/helpers'
 
 const Input = forwardRef(({
@@ -11,10 +11,13 @@ const Input = forwardRef(({
   containerClassName,
   ...props
 }, ref) => {
+  // Подпись связана с полем: клик по ней ставит фокус, скринридер читает её.
+  const autoId = useId()
+  const inputId = props.id || autoId
   return (
     <div className={cn('space-y-1.5', containerClassName)}>
       {label && (
-        <label className="block text-sm font-medium text-slate-700">
+        <label htmlFor={inputId} className="block text-sm font-medium text-slate-700">
           {label}
           {props.required && <span className="text-rose-500 ml-0.5">*</span>}
         </label>
@@ -28,6 +31,7 @@ const Input = forwardRef(({
         )}
         
         <input
+          id={inputId}
           ref={ref}
           className={cn(
             'w-full px-4 py-2.5 rounded-xl border bg-white transition-all duration-200',

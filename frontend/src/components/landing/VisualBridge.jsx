@@ -30,12 +30,12 @@ function VisualBridge({ lang }) {
           const Icon = icons[index]
           return (
             <div key={title} className='flex items-start gap-4 border-b border-[#e5eaf2] p-6 md:border-b-0 md:border-r lg:p-7'>
-              <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#e7f7f4] text-[#087f72]'><Icon className='h-5 w-5' /></span>
-              <span><strong className='block text-sm text-[#111d3f]'>{title}</strong><span className='mt-1 block text-xs leading-5 text-[#667089]'>{text}</span></span>
+              <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-mt-mint text-mt-accent-strong'><Icon className='h-5 w-5' /></span>
+              <span><strong className='block text-sm text-mt-ink'>{title}</strong><span className='mt-1 block text-xs leading-5 text-[#667089]'>{text}</span></span>
             </div>
           )
         })}
-        <a href='#process' aria-label='Scroll to patient journey' className='hidden w-20 items-center justify-center text-[#0a9a87] transition hover:bg-[#e7f7f4] md:flex'><ArrowDown className='h-6 w-6' /></a>
+        <a href='#process' aria-label='Scroll to patient journey' className='hidden w-20 items-center justify-center text-mt-accent transition hover:bg-mt-mint md:flex'><ArrowDown className='h-6 w-6' /></a>
       </Reveal>
     </div>
   )

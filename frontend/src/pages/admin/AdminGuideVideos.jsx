@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Eye, Loader2, Pencil, Plus, Search, Trash2, Upload, Video } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -27,13 +28,199 @@ const languageOptions = [
   { value: 'kk', label: 'Қазақша' },
 ]
 
-const iconOptions = [
-  { value: 'play', label: 'Старт' },
-  { value: 'upload', label: 'Загрузка' },
-  { value: 'video', label: 'Видео' },
-  { value: 'chat', label: 'Чат' },
-  { value: 'document', label: 'Документ' },
-]
+const iconOptions = ['play', 'upload', 'video', 'chat', 'document'].map((value) => ({ value }))
+
+const COPY = {
+  "ru": {
+    "loadError": "Не удалось загрузить видео обучения",
+    "videoUploaded": "Видео загружено",
+    "videoUploadError": "Не удалось загрузить видео",
+    "posterUploaded": "Обложка загружена",
+    "posterUploadError": "Не удалось загрузить обложку",
+    "titleRequired": "Введите название видео",
+    "sourceRequired": "Добавьте ссылку на видео или загрузите файл",
+    "saved": "Видео сохранено",
+    "saveError": "Не удалось сохранить видео",
+    "deleted": "Видео удалено",
+    "deleteError": "Не удалось удалить видео",
+    "title": "Видео обучения",
+    "subtitle": "Настройка видео для пациентской вкладки «Обучение».",
+    "search": "Поиск по названию",
+    "colSource": "Источник",
+    "colStatus": "Статус",
+    "colOrder": "Порядок",
+    "colActions": "Действия",
+    "sourceLink": "Ссылка",
+    "sourceFile": "Файл",
+    "sourceLocales": "По языкам",
+    "active": "Активно",
+    "hidden": "Скрыто",
+    "open": "Открыть видео",
+    "edit": "Редактировать",
+    "delete": "Удалить",
+    "editTitle": "Редактировать видео",
+    "addTitle": "Добавить видео",
+    "name": "Название",
+    "namePlaceholder": "Например: Как создать медицинскую заявку",
+    "description": "Описание",
+    "descriptionPlaceholder": "Короткое описание видео для пациента",
+    "videoLink": "Ссылка на видео",
+    "videoLinkPlaceholder": "https://... или /guide/start.mp4",
+    "videoFile": "Файл видео",
+    "uploadVideo": "Загрузить MP4/WebM/MOV",
+    "poster": "Обложка",
+    "uploadImage": "Загрузить изображение",
+    "localeVersions": "Версии по языкам сайта",
+    "localizedName": "Локализованное название",
+    "localizedDescription": "Локализованное описание",
+    "localizedLinkPlaceholder": "https://... или /guide/start-ru.mp4",
+    "icon": "Иконка",
+    "showToPatients": "Показывать пациентам",
+    "colVideo": "Видео",
+    "icons": {
+      "play": "Старт",
+      "upload": "Загрузка",
+      "video": "Видео",
+      "chat": "Чат",
+      "document": "Документ"
+    },
+    "confirmDelete": "Удалить видео «{title}»?",
+    "listTitle": "Список видео",
+    "empty": "Видео пока не добавлены",
+    "localeCount": "языковая версия",
+    "cancel": "Отмена",
+    "save": "Сохранить",
+    "removeVideo": "Убрать загруженное видео",
+    "removePoster": "Убрать обложку",
+    "localeHint": "Эти поля показываются пациенту вместо основного видео, когда выбран соответствующий язык."
+  },
+  "en": {
+    "loadError": "Failed to load guide videos",
+    "videoUploaded": "Video uploaded",
+    "videoUploadError": "Failed to upload video",
+    "posterUploaded": "Cover uploaded",
+    "posterUploadError": "Failed to upload cover",
+    "titleRequired": "Enter the video title",
+    "sourceRequired": "Add a video link or upload a file",
+    "saved": "Video saved",
+    "saveError": "Failed to save video",
+    "deleted": "Video deleted",
+    "deleteError": "Failed to delete video",
+    "title": "Guide videos",
+    "subtitle": "Videos shown on the patient “Guide” tab.",
+    "search": "Search by title",
+    "colSource": "Source",
+    "colStatus": "Status",
+    "colOrder": "Order",
+    "colActions": "Actions",
+    "sourceLink": "Link",
+    "sourceFile": "File",
+    "sourceLocales": "Per language",
+    "active": "Active",
+    "hidden": "Hidden",
+    "open": "Open video",
+    "edit": "Edit",
+    "delete": "Delete",
+    "editTitle": "Edit video",
+    "addTitle": "Add video",
+    "name": "Title",
+    "namePlaceholder": "For example: How to create a medical case",
+    "description": "Description",
+    "descriptionPlaceholder": "Short description for the patient",
+    "videoLink": "Video link",
+    "videoLinkPlaceholder": "https://... or /guide/start.mp4",
+    "videoFile": "Video file",
+    "uploadVideo": "Upload MP4/WebM/MOV",
+    "poster": "Cover",
+    "uploadImage": "Upload image",
+    "localeVersions": "Versions per site language",
+    "localizedName": "Localized title",
+    "localizedDescription": "Localized description",
+    "localizedLinkPlaceholder": "https://... or /guide/start-en.mp4",
+    "icon": "Icon",
+    "showToPatients": "Show to patients",
+    "colVideo": "Video",
+    "icons": {
+      "play": "Start",
+      "upload": "Upload",
+      "video": "Video",
+      "chat": "Chat",
+      "document": "Document"
+    },
+    "confirmDelete": "Delete video “{title}”?",
+    "listTitle": "Videos",
+    "empty": "No videos yet",
+    "localeCount": "language versions",
+    "cancel": "Cancel",
+    "save": "Save",
+    "removeVideo": "Remove uploaded video",
+    "removePoster": "Remove cover",
+    "localeHint": "These fields replace the main video for patients using the matching language."
+  },
+  "kk": {
+    "loadError": "Оқыту видеоларын жүктеу мүмкін болмады",
+    "videoUploaded": "Видео жүктелді",
+    "videoUploadError": "Видеоны жүктеу мүмкін болмады",
+    "posterUploaded": "Мұқаба жүктелді",
+    "posterUploadError": "Мұқабаны жүктеу мүмкін болмады",
+    "titleRequired": "Видео атауын енгізіңіз",
+    "sourceRequired": "Видео сілтемесін қосыңыз немесе файл жүктеңіз",
+    "saved": "Видео сақталды",
+    "saveError": "Видеоны сақтау мүмкін болмады",
+    "deleted": "Видео жойылды",
+    "deleteError": "Видеоны жою мүмкін болмады",
+    "title": "Оқыту видеолары",
+    "subtitle": "Пациенттің «Оқыту» қойындысына арналған видеолар.",
+    "search": "Атауы бойынша іздеу",
+    "colSource": "Дереккөз",
+    "colStatus": "Күйі",
+    "colOrder": "Реті",
+    "colActions": "Әрекеттер",
+    "sourceLink": "Сілтеме",
+    "sourceFile": "Файл",
+    "sourceLocales": "Тілдер бойынша",
+    "active": "Белсенді",
+    "hidden": "Жасырын",
+    "open": "Видеоны ашу",
+    "edit": "Өңдеу",
+    "delete": "Жою",
+    "editTitle": "Видеоны өңдеу",
+    "addTitle": "Видео қосу",
+    "name": "Атауы",
+    "namePlaceholder": "Мысалы: Медициналық өтінімді қалай жасау керек",
+    "description": "Сипаттама",
+    "descriptionPlaceholder": "Пациентке арналған қысқа сипаттама",
+    "videoLink": "Видео сілтемесі",
+    "videoLinkPlaceholder": "https://... немесе /guide/start.mp4",
+    "videoFile": "Видео файлы",
+    "uploadVideo": "MP4/WebM/MOV жүктеу",
+    "poster": "Мұқаба",
+    "uploadImage": "Сурет жүктеу",
+    "localeVersions": "Сайт тілдері бойынша нұсқалар",
+    "localizedName": "Аударылған атауы",
+    "localizedDescription": "Аударылған сипаттама",
+    "localizedLinkPlaceholder": "https://... немесе /guide/start-kk.mp4",
+    "icon": "Белгіше",
+    "showToPatients": "Пациенттерге көрсету",
+    "colVideo": "Видео",
+    "icons": {
+      "play": "Бастау",
+      "upload": "Жүктеу",
+      "video": "Видео",
+      "chat": "Чат",
+      "document": "Құжат"
+    },
+    "confirmDelete": "«{title}» видеосын жою керек пе?",
+    "listTitle": "Видеолар тізімі",
+    "empty": "Әзірге видео қосылмаған",
+    "localeCount": "тілдік нұсқа",
+    "cancel": "Болдырмау",
+    "save": "Сақтау",
+    "removeVideo": "Жүктелген видеоны алып тастау",
+    "removePoster": "Мұқабаны алып тастау",
+    "localeHint": "Бұл өрістер тиісті тіл таңдалғанда пациентке негізгі видеоның орнына көрсетіледі."
+  }
+}
 
 function createEmptyLocale() {
   return {
@@ -84,6 +271,8 @@ function getVideoSource(entry) {
 }
 
 function AdminGuideVideos() {
+  const { i18n } = useTranslation()
+  const copy = COPY[['ru', 'en', 'kk'].includes(i18n.language) ? i18n.language : 'ru']
   const toast = useToast()
   const [items, setItems] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -104,11 +293,11 @@ function AdminGuideVideos() {
       setItems(sortVideos(data || []))
     } catch (error) {
       console.error('Error loading guide videos:', error)
-      toast.error('Не удалось загрузить видео обучения')
+      toast.error(copy.loadError)
     } finally {
       setIsLoading(false)
     }
-  }, [toast])
+  }, [copy.loadError, toast])
 
   useEffect(() => {
     loadData()
@@ -186,9 +375,9 @@ function AdminGuideVideos() {
         setFormValue('videoFile', uploaded)
         setFormValue('videoUrl', '')
       }
-      toast.success('Видео загружено')
+      toast.success(copy.videoUploaded)
     } catch (error) {
-      toast.error(error.message || 'Не удалось загрузить видео')
+      toast.error(error.message || copy.videoUploadError)
     } finally {
       setUploadingVideoTarget(null)
       event.target.value = ''
@@ -207,9 +396,9 @@ function AdminGuideVideos() {
       } else {
         setFormValue('poster', uploaded)
       }
-      toast.success('Обложка загружена')
+      toast.success(copy.posterUploaded)
     } catch (error) {
-      toast.error(error.message || 'Не удалось загрузить обложку')
+      toast.error(error.message || copy.posterUploadError)
     } finally {
       setUploadingPosterTarget(null)
       event.target.value = ''
@@ -218,13 +407,13 @@ function AdminGuideVideos() {
 
   const handleSave = async () => {
     if (!form.title.trim()) {
-      toast.warning('Введите название видео')
+      toast.warning(copy.titleRequired)
       return
     }
     const hasDefaultVideo = hasVideoSource(form)
     const hasLocalizedVideo = Object.values(form.i18n || {}).some(hasVideoSource)
     if (!hasDefaultVideo && !hasLocalizedVideo) {
-      toast.warning('Добавьте ссылку на видео или загрузите файл')
+      toast.warning(copy.sourceRequired)
       return
     }
 
@@ -259,28 +448,28 @@ function AdminGuideVideos() {
       } else {
         await guideVideosAPI.create(payload)
       }
-      toast.success('Видео сохранено')
+      toast.success(copy.saved)
       setIsModalOpen(false)
       await loadData()
     } catch (error) {
       console.error('Error saving guide video:', error)
-      toast.error('Не удалось сохранить видео')
+      toast.error(copy.saveError)
     } finally {
       setIsSaving(false)
     }
   }
 
   const handleDelete = async (item) => {
-    const confirmed = window.confirm(`Удалить видео "${item.title}"?`)
+    const confirmed = window.confirm(copy.confirmDelete.replace('{title}', item.title || ''))
     if (!confirmed) return
 
     try {
       await guideVideosAPI.delete(item.documentId || item.id)
-      toast.success('Видео удалено')
+      toast.success(copy.deleted)
       await loadData()
     } catch (error) {
       console.error('Error deleting guide video:', error)
-      toast.error('Не удалось удалить видео')
+      toast.error(copy.deleteError)
     }
   }
 
@@ -291,11 +480,11 @@ function AdminGuideVideos() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Видео обучения</h1>
-          <p className="text-slate-600">Настройка видео для пациентской вкладки «Обучение».</p>
+          <h1 className="text-2xl font-bold text-slate-900">{copy.title}</h1>
+          <p className="text-slate-600">{copy.subtitle}</p>
         </div>
         <Button leftIcon={<Plus className="w-4 h-4" />} onClick={openCreateModal}>
-          Добавить видео
+          {copy.addTitle}
         </Button>
       </div>
 
@@ -305,14 +494,14 @@ function AdminGuideVideos() {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Поиск по названию"
+          placeholder={copy.search}
           className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
         />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Список видео ({filteredItems.length})</CardTitle>
+          <CardTitle>{copy.listTitle} ({filteredItems.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -322,18 +511,18 @@ function AdminGuideVideos() {
           ) : filteredItems.length === 0 ? (
             <div className="py-12 text-center text-slate-500">
               <Video className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-              Видео пока не добавлены
+              {copy.empty}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100">
-                    <th className="px-4 py-3 text-left font-medium text-slate-500">Видео</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-500">Источник</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-500">Статус</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-500">Порядок</th>
-                    <th className="px-4 py-3 text-right font-medium text-slate-500">Действия</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-500">{copy.colVideo}</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-500">{copy.colSource}</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-500">{copy.colStatus}</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-500">{copy.colOrder}</th>
+                    <th className="px-4 py-3 text-right font-medium text-slate-500">{copy.colActions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -341,7 +530,7 @@ function AdminGuideVideos() {
                     const localizedVideoCount = Object.values(item.i18n || {}).filter(hasVideoSource).length
                     const firstLocalizedVideo = Object.values(item.i18n || {}).map(getVideoSource).find(Boolean)
                     const videoSrc = item.videoUrl || getMediaUrl(item.videoFile) || firstLocalizedVideo
-                    const sourceLabel = item.videoUrl ? 'Ссылка' : item.videoFile ? 'Файл' : localizedVideoCount ? 'По языкам' : '-'
+                    const sourceLabel = item.videoUrl ? copy.sourceLink : item.videoFile ? copy.sourceFile : localizedVideoCount ? copy.sourceLocales : '-'
                     return (
                       <tr key={item.documentId || item.id} className="border-b border-slate-50">
                         <td className="px-4 py-4">
@@ -354,7 +543,7 @@ function AdminGuideVideos() {
                           <div>{sourceLabel}</div>
                           {localizedVideoCount > 0 && (
                             <div className="text-xs text-slate-400 mt-1">
-                              {localizedVideoCount} языковая версия
+                              {localizedVideoCount} {copy.localeCount}
                             </div>
                           )}
                         </td>
@@ -364,7 +553,7 @@ function AdminGuideVideos() {
                               ? 'bg-emerald-50 text-emerald-700'
                               : 'bg-slate-100 text-slate-500'
                           }`}>
-                            {item.isActive !== false ? 'Активно' : 'Скрыто'}
+                            {item.isActive !== false ? copy.active : copy.hidden}
                           </span>
                         </td>
                         <td className="px-4 py-4 text-slate-600">{item.sortOrder || 0}</td>
@@ -376,7 +565,7 @@ function AdminGuideVideos() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="p-2 rounded-lg text-slate-500 hover:text-teal-600 hover:bg-teal-50"
-                                aria-label="Открыть видео"
+                                aria-label={copy.open}
                               >
                                 <Eye className="w-4 h-4" />
                               </a>
@@ -384,14 +573,14 @@ function AdminGuideVideos() {
                             <button
                               onClick={() => openEditModal(item)}
                               className="p-2 rounded-lg text-slate-500 hover:text-teal-600 hover:bg-teal-50"
-                              aria-label="Редактировать"
+                              aria-label={copy.edit}
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleDelete(item)}
                               className="p-2 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50"
-                              aria-label="Удалить"
+                              aria-label={copy.delete}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -410,51 +599,51 @@ function AdminGuideVideos() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingItem ? 'Редактировать видео' : 'Добавить видео'}
+        title={editingItem ? copy.editTitle : copy.addTitle}
         size="lg"
         footer={
           <>
             <Button variant="secondary" onClick={() => setIsModalOpen(false)} disabled={isSaving}>
-              Отмена
+              {copy.cancel}
             </Button>
             <Button onClick={handleSave} isLoading={isSaving}>
-              Сохранить
+              {copy.save}
             </Button>
           </>
         }
       >
         <div className="space-y-5">
           <Input
-            label="Название"
+            label={copy.name}
             value={form.title}
             onChange={(e) => setFormValue('title', e.target.value)}
-            placeholder="Например: Как создать медицинскую заявку"
+            placeholder={copy.namePlaceholder}
             required
           />
           <Textarea
-            label="Описание"
+            label={copy.description}
             value={form.description}
             onChange={(e) => setFormValue('description', e.target.value)}
-            placeholder="Короткое описание видео для пациента"
+            placeholder={copy.descriptionPlaceholder}
             rows={3}
           />
           <Input
-            label="Ссылка на видео"
+            label={copy.videoLink}
             value={form.videoUrl}
             onChange={(e) => {
               setFormValue('videoUrl', e.target.value)
               if (e.target.value.trim()) setFormValue('videoFile', null)
             }}
-            placeholder="https://... или /guide/start.mp4"
+            placeholder={copy.videoLinkPlaceholder}
           />
 
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-700">Файл видео</label>
+              <label className="block text-sm font-medium text-slate-700">{copy.videoFile}</label>
               <label className="flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-teal-400 hover:bg-teal-50/40">
                 {uploadingVideoTarget === 'default' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                 <span className="text-sm text-slate-600">
-                  {getFileLabel(form.videoFile, 'Загрузить MP4/WebM/MOV')}
+                  {getFileLabel(form.videoFile, copy.uploadVideo)}
                 </span>
                 <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={(e) => handleVideoUpload(e)} />
               </label>
@@ -464,16 +653,16 @@ function AdminGuideVideos() {
                   onClick={() => setFormValue('videoFile', null)}
                   className="text-sm text-rose-600 hover:text-rose-700"
                 >
-                  Убрать загруженное видео
+                  {copy.removeVideo}
                 </button>
               )}
             </div>
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-700">Обложка</label>
+              <label className="block text-sm font-medium text-slate-700">{copy.poster}</label>
               <label className="flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-teal-400 hover:bg-teal-50/40">
                 {uploadingPosterTarget === 'default' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                 <span className="text-sm text-slate-600">
-                  {getFileLabel(form.poster, 'Загрузить изображение')}
+                  {getFileLabel(form.poster, copy.uploadImage)}
                 </span>
                 <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => handlePosterUpload(e)} />
               </label>
@@ -483,7 +672,7 @@ function AdminGuideVideos() {
                   onClick={() => setFormValue('poster', null)}
                   className="text-sm text-rose-600 hover:text-rose-700"
                 >
-                  Убрать обложку
+                  {copy.removePoster}
                 </button>
               )}
             </div>
@@ -491,9 +680,9 @@ function AdminGuideVideos() {
 
           <div className="border border-slate-200 rounded-xl p-4 space-y-4">
             <div>
-              <h3 className="font-semibold text-slate-900">Версии по языкам сайта</h3>
+              <h3 className="font-semibold text-slate-900">{copy.localeVersions}</h3>
               <p className="text-sm text-slate-500 mt-1">
-                Эти поля показываются пациенту вместо основного видео, когда выбран соответствующий язык.
+                {copy.localeHint}
               </p>
             </div>
 
@@ -515,37 +704,37 @@ function AdminGuideVideos() {
             </div>
 
             <Input
-              label={`Название (${activeLanguageLabel})`}
+              label={`${copy.name} (${activeLanguageLabel})`}
               value={activeLocale.title || ''}
               onChange={(e) => setLocaleValue(activeLanguage, 'title', e.target.value)}
-              placeholder="Локализованное название"
+              placeholder={copy.localizedName}
             />
             <Textarea
-              label={`Описание (${activeLanguageLabel})`}
+              label={`${copy.description} (${activeLanguageLabel})`}
               value={activeLocale.description || ''}
               onChange={(e) => setLocaleValue(activeLanguage, 'description', e.target.value)}
-              placeholder="Локализованное описание"
+              placeholder={copy.localizedDescription}
               rows={3}
             />
             <Input
-              label={`Ссылка на видео (${activeLanguageLabel})`}
+              label={`${copy.videoLink} (${activeLanguageLabel})`}
               value={activeLocale.videoUrl || ''}
               onChange={(e) => {
                 setLocaleValue(activeLanguage, 'videoUrl', e.target.value)
                 if (e.target.value.trim()) setLocaleValue(activeLanguage, 'videoFile', null)
               }}
-              placeholder="https://... или /guide/start-ru.mp4"
+              placeholder={copy.localizedLinkPlaceholder}
             />
 
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-slate-700">
-                  Файл видео ({activeLanguageLabel})
+                  {copy.videoFile} ({activeLanguageLabel})
                 </label>
                 <label className="flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-teal-400 hover:bg-teal-50/40">
                   {uploadingVideoTarget === activeLanguage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                   <span className="text-sm text-slate-600">
-                    {getFileLabel(activeLocale.videoFile, 'Загрузить MP4/WebM/MOV')}
+                    {getFileLabel(activeLocale.videoFile, copy.uploadVideo)}
                   </span>
                   <input
                     type="file"
@@ -560,19 +749,19 @@ function AdminGuideVideos() {
                     onClick={() => setLocaleValue(activeLanguage, 'videoFile', null)}
                     className="text-sm text-rose-600 hover:text-rose-700"
                   >
-                    Убрать загруженное видео
+                    {copy.removeVideo}
                   </button>
                 )}
               </div>
 
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-slate-700">
-                  Обложка ({activeLanguageLabel})
+                  {copy.poster} ({activeLanguageLabel})
                 </label>
                 <label className="flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-teal-400 hover:bg-teal-50/40">
                   {uploadingPosterTarget === activeLanguage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                   <span className="text-sm text-slate-600">
-                    {getFileLabel(activeLocale.poster, 'Загрузить изображение')}
+                    {getFileLabel(activeLocale.poster, copy.uploadImage)}
                   </span>
                   <input
                     type="file"
@@ -587,7 +776,7 @@ function AdminGuideVideos() {
                     onClick={() => setLocaleValue(activeLanguage, 'poster', null)}
                     className="text-sm text-rose-600 hover:text-rose-700"
                   >
-                    Убрать обложку
+                    {copy.removePoster}
                   </button>
                 )}
               </div>
@@ -596,13 +785,13 @@ function AdminGuideVideos() {
 
           <div className="grid md:grid-cols-3 gap-4">
             <Select
-              label="Иконка"
+              label={copy.icon}
               value={form.icon}
               onChange={(e) => setFormValue('icon', e.target.value)}
-              options={iconOptions}
+              options={iconOptions.map((option) => ({ ...option, label: copy.icons[option.value] }))}
             />
             <Input
-              label="Порядок"
+              label={copy.colOrder}
               type="number"
               value={form.sortOrder}
               onChange={(e) => setFormValue('sortOrder', e.target.value)}
@@ -614,7 +803,7 @@ function AdminGuideVideos() {
                 onChange={(e) => setFormValue('isActive', e.target.checked)}
                 className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
               />
-              <span className="text-sm text-slate-700">Показывать пациентам</span>
+              <span className="text-sm text-slate-700">{copy.showToPatients}</span>
             </label>
           </div>
         </div>

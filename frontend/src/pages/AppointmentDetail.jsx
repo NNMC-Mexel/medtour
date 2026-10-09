@@ -229,6 +229,8 @@ function AppointmentDetail() {
     pending: { label: t('appointment_detail.status_pending'), variant: 'default' },
     cancelled: { label: t('appointment_detail.status_cancelled'), variant: 'danger' },
     completed: { label: t('appointment_detail.status_completed'), variant: 'success' },
+    in_progress: { label: t('appointment.status_in_progress'), variant: 'info' },
+    no_show: { label: t('appointment_detail.status_no_show'), variant: 'warning' },
   }
 
   const status = statusMap[appointment.status || appointment.statuse] || statusMap.pending
