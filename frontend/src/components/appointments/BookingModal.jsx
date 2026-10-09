@@ -24,7 +24,7 @@ import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 import Avatar from "../ui/Avatar";
 import Badge from "../ui/Badge";
-import { cn, getSpecName, getDoctorField } from "../../utils/helpers";
+import { cn, getDoctorSpecLabel, getDoctorField } from "../../utils/helpers";
 import { useUsdRate, formatKztAsUsd } from '../../hooks/useUsdRate';
 import { getMediaUrl, getBookedSlots, getSignalingUrl, medicalCasesAPI, normalizeResponse } from "../../services/api";
 import useAppointmentStore from "../../stores/appointmentStore";
@@ -270,7 +270,7 @@ function BookingModal({ isOpen, onClose, doctor }) {
     };
 
     const doctorName = getDoctorField(doctor, 'fullName', i18n.language) || doctor?.fullName || doctor?.name || t('booking.doctor_fallback');
-    const doctorSpecialization = getSpecName(doctor?.specialization, i18n.language)
+    const doctorSpecialization = getDoctorSpecLabel(doctor, i18n.language)
         || t('booking.specialist_fallback');
     const doctorPrice = doctor?.price || 0;
     const displayPrice = formatKztAsUsd(doctorPrice, usdRate);

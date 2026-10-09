@@ -1,3 +1,5 @@
+import { getMediaUrl } from '../services/api'
+
 export const tourismPageCopy = {
   ru: {
     heroBadge: 'Туризм в Казахстане',
@@ -158,185 +160,145 @@ export const tourismTypes = {
   space: { ru: 'Космос', en: 'Space', kk: 'Ғарыш' },
 }
 
+// Места и регионы для страницы «Туризм». Админ правит их в разделе
+// «Туризм» (Global.tourismRegions); этот список — значения по умолчанию и
+// запасной вариант, пока в CMS ничего не сохранено.
+const region = (id, image, types, ru, en, kk) => ({
+  id,
+  image,
+  types,
+  isActive: true,
+  content: {
+    ru: { name: ru[0], center: ru[1], summary: ru[2], highlights: ru[3] },
+    en: { name: en[0], center: en[1], summary: en[2], highlights: en[3] },
+    kk: { name: kk[0], center: kk[1], summary: kk[2], highlights: kk[3] },
+  },
+})
+
 export const tourismRegions = [
-  {
-    id: 'astana',
-    name: 'Астана',
-    center: 'Астана',
-    image: '/tourism/astana.jpg',
-    types: ['city', 'culture'],
-    summary: 'Столица с современной архитектурой, музеями, набережной, театрами и удобной базой для коротких экскурсий.',
-    highlights: ['Байтерек и бульвар Нуржол', 'Национальный музей', 'EXPO и современная архитектура'],
-  },
-  {
-    id: 'almaty-city',
-    name: 'Алматы',
-    center: 'Алматы',
-    image: '/tourism/almaty.jpg',
-    types: ['city', 'mountains', 'gastronomy'],
-    summary: 'Самый удобный город для сочетания городской культуры, ресторанов, горных маршрутов и однодневных поездок.',
-    highlights: ['Кок-Тобе и Медеу', 'Шымбулак', 'Музеи, рынки и гастрономия'],
-  },
-  {
-    id: 'shymkent',
-    name: 'Шымкент',
-    center: 'Шымкент',
-    image: '/tourism/turkistan.jpg',
-    types: ['city', 'culture', 'gastronomy'],
-    summary: 'Южный мегаполис с теплым климатом, базарами, кухней и быстрым доступом к Туркестану и природным маршрутам.',
-    highlights: ['Старый город и цитадель', 'Южная кухня', 'Маршруты в Сайрам-Угам'],
-  },
-  {
-    id: 'akmola',
-    name: 'Акмолинская область',
-    center: 'Кокшетау',
-    image: '/tourism/burabay.jpg',
-    types: ['nature', 'wellness', 'eco'],
-    summary: 'Курортная зона Бурабай, озера, сосновые леса и санаторный отдых рядом со столицей.',
-    highlights: ['Бурабай и Щучье', 'Окжетпес', 'Зеренда и лесные озера'],
-  },
-  {
-    id: 'aktobe',
-    name: 'Актюбинская область',
-    center: 'Актобе',
-    image: '/tourism/baikonur.jpg',
-    types: ['nature', 'adventure', 'history'],
-    summary: 'Западные степи, меловые плато, речные долины и маршруты для тех, кто любит редкие природные ландшафты.',
-    highlights: ['Мугалжарские горы', 'Каргалинское водохранилище', 'Степные экспедиции'],
-  },
-  {
-    id: 'almaty-region',
-    name: 'Алматинская область',
-    center: 'Конаев',
-    image: '/tourism/charyn.jpg',
-    types: ['nature', 'mountains', 'adventure', 'beach'],
-    summary: 'Один из самых сильных туристических регионов: каньоны, озера, горы, пляжный отдых и фотомаршруты.',
-    highlights: ['Чарынский каньон', 'Кольсай и Каинды', 'Капчагайское водохранилище'],
-  },
-  {
-    id: 'atyrau',
-    name: 'Атырауская область',
-    center: 'Атырау',
-    image: '/tourism/mangystau.jpg',
-    types: ['nature', 'history', 'eco'],
-    summary: 'Каспийский регион, дельта Урала, степные ландшафты и символическая граница Европы и Азии.',
-    highlights: ['Мост Европа-Азия', 'Дельта реки Урал', 'Сарайшык'],
-  },
-  {
-    id: 'east-kazakhstan',
-    name: 'Восточно-Казахстанская область',
-    center: 'Усть-Каменогорск',
-    image: '/tourism/altai.jpg',
-    types: ['mountains', 'nature', 'eco', 'adventure'],
-    summary: 'Алтай, горные озера, леса, мараловодческие хозяйства и насыщенные природные маршруты.',
-    highlights: ['Риддер и Западный Алтай', 'Бухтарминское водохранилище', 'Катон-Карагай'],
-  },
-  {
-    id: 'zhambyl',
-    name: 'Жамбылская область',
-    center: 'Тараз',
-    image: '/tourism/turkistan.jpg',
-    types: ['history', 'culture', 'nature'],
-    summary: 'Один из центров древней истории: Тараз, мавзолеи, археология и природные ущелья.',
-    highlights: ['Древний Тараз', 'Мавзолеи Айша-Биби и Бабаджа-Хатун', 'Аксу-Жабаглы рядом с регионом'],
-  },
-  {
-    id: 'zhetysu',
-    name: 'Область Жетысу',
-    center: 'Талдыкорган',
-    image: '/tourism/charyn.jpg',
-    types: ['nature', 'mountains', 'eco', 'adventure'],
-    summary: 'Семиречье с горными долинами, озером Алаколь, Джунгарским Алатау и мягкими природными маршрутами.',
-    highlights: ['Алаколь', 'Джунгарский Алатау', 'Водопады и горные ущелья'],
-  },
-  {
-    id: 'west-kazakhstan',
-    name: 'Западно-Казахстанская область',
-    center: 'Уральск',
-    image: '/tourism/baikonur.jpg',
-    types: ['history', 'nature', 'culture'],
-    summary: 'Исторический Уральск, река Жайык, купеческая архитектура и спокойные маршруты западной степи.',
-    highlights: ['Старый Уральск', 'Река Жайык', 'Исторические музеи'],
-  },
-  {
-    id: 'karaganda',
-    name: 'Карагандинская область',
-    center: 'Караганда',
-    image: '/tourism/baikonur.jpg',
-    types: ['history', 'nature', 'city'],
-    summary: 'Индустриальная история, КарЛаг, степные озера и путь к природным зонам Центрального Казахстана.',
-    highlights: ['Музей КарЛага', 'Каркаралинск', 'Балхашское направление'],
-  },
-  {
-    id: 'kostanay',
-    name: 'Костанайская область',
-    center: 'Костанай',
-    image: '/tourism/burabay.jpg',
-    types: ['eco', 'nature', 'history'],
-    summary: 'Северные степи, заповедные территории, озера и маршруты для наблюдения за природой.',
-    highlights: ['Наурзумский заповедник', 'Озера и степные ландшафты', 'Костанайская архитектура'],
-  },
-  {
-    id: 'kyzylorda',
-    name: 'Кызылординская область',
-    center: 'Кызылорда',
-    image: '/tourism/baikonur.jpg',
-    types: ['space', 'history', 'adventure'],
-    summary: 'Байконур, Сырдарья, наследие древних городищ и маршруты к Аральскому морю.',
-    highlights: ['Байконур', 'Коркыт Ата', 'Аральское море'],
-  },
-  {
-    id: 'mangystau',
-    name: 'Мангистауская область',
-    center: 'Актау',
-    image: '/tourism/mangystau.jpg',
-    types: ['adventure', 'sacred', 'beach', 'nature'],
-    summary: 'Каспийское море, пустынные каньоны, подземные мечети и один из самых фотогеничных регионов страны.',
-    highlights: ['Бозжыра', 'Шерқала', 'Каспийское побережье и подземные мечети'],
-  },
-  {
-    id: 'pavlodar',
-    name: 'Павлодарская область',
-    center: 'Павлодар',
-    image: '/tourism/bayanaul.webp',
-    types: ['nature', 'wellness', 'history'],
-    summary: 'Баянаул, озера, скальные массивы и спокойный санаторно-природный отдых на северо-востоке.',
-    highlights: ['Баянаульский национальный парк', 'Озеро Жасыбай', 'Павлодарская набережная'],
-  },
-  {
-    id: 'north-kazakhstan',
-    name: 'Северо-Казахстанская область',
-    center: 'Петропавловск',
-    image: '/tourism/burabay.jpg',
-    types: ['nature', 'eco', 'history'],
-    summary: 'Леса, озера, северная архитектура и мягкие маршруты для спокойного отдыха.',
-    highlights: ['Имантау-Шалкарская зона', 'Петропавловск', 'Озерный отдых'],
-  },
-  {
-    id: 'turkistan',
-    name: 'Туркестанская область',
-    center: 'Туркестан',
-    image: '/tourism/turkistan.jpg',
-    types: ['sacred', 'history', 'culture', 'nature'],
-    summary: 'Главное направление сакрального и исторического туризма: мавзолеи, древние города и южные природные парки.',
-    highlights: ['Мавзолей Ходжи Ахмеда Ясави', 'Отрар', 'Сауран и Каратау'],
-  },
-  {
-    id: 'ulytau',
-    name: 'Область Улытау',
-    center: 'Жезказган',
-    image: '/tourism/baikonur.jpg',
-    types: ['history', 'sacred', 'nature'],
-    summary: 'Сердце Великой степи: горы Улытау, мавзолеи, исторические места и маршруты к наследию кочевых государств.',
-    highlights: ['Горы Улытау', 'Жошы хан', 'Алаша хан'],
-  },
-  {
-    id: 'abai',
-    name: 'Область Абай',
-    center: 'Семей',
-    image: '/tourism/altai.jpg',
-    types: ['culture', 'history', 'nature'],
-    summary: 'Литературное наследие Абая, история Семея, Алаш и природные маршруты восточной степи.',
-    highlights: ['Музей Абая', 'Семей и мост через Иртыш', 'Жидебай'],
-  },
-]
+  region('astana', '/tourism/astana.jpg', ['city', 'culture'],
+    ['Астана', 'Астана', 'Столица с современной архитектурой, музеями, набережной, театрами и удобной базой для коротких экскурсий.', ['Байтерек и бульвар Нуржол', 'Национальный музей', 'EXPO и современная архитектура']],
+    ['Astana', 'Astana', 'The capital, with contemporary architecture, museums, a riverside promenade, theatres and a convenient base for short excursions.', ['Baiterek and Nurzhol Boulevard', 'National Museum', 'EXPO and modern architecture']],
+    ['Астана', 'Астана', 'Заманауи сәулеті, музейлері, жағалауы, театрлары бар және қысқа экскурсияларға ыңғайлы елорда.', ['Бәйтерек және Нұржол бульвары', 'Ұлттық музей', 'EXPO және заманауи сәулет']]),
+  region('almaty-city', '/tourism/almaty.jpg', ['city', 'mountains', 'gastronomy'],
+    ['Алматы', 'Алматы', 'Самый удобный город для сочетания городской культуры, ресторанов, горных маршрутов и однодневных поездок.', ['Кок-Тобе и Медеу', 'Шымбулак', 'Музеи, рынки и гастрономия']],
+    ['Almaty', 'Almaty', 'The easiest city for combining urban culture, restaurants, mountain routes and day trips.', ['Kok-Tobe and Medeu', 'Shymbulak', 'Museums, markets and food']],
+    ['Алматы', 'Алматы', 'Қала мәдениетін, мейрамханаларды, тау маршруттарын және бір күндік сапарларды үйлестіруге ең ыңғайлы қала.', ['Көктөбе және Медеу', 'Шымбұлақ', 'Музейлер, базарлар және гастрономия']]),
+  region('shymkent', '/tourism/turkistan.jpg', ['city', 'culture', 'gastronomy'],
+    ['Шымкент', 'Шымкент', 'Южный мегаполис с теплым климатом, базарами, кухней и быстрым доступом к Туркестану и природным маршрутам.', ['Старый город и цитадель', 'Южная кухня', 'Маршруты в Сайрам-Угам']],
+    ['Shymkent', 'Shymkent', 'A southern metropolis with a warm climate, bazaars, great food and quick access to Turkistan and nature routes.', ['Old town and citadel', 'Southern cuisine', 'Routes to Sairam-Ugam']],
+    ['Шымкент', 'Шымкент', 'Жылы климаты, базарлары, асханасы бар және Түркістан мен табиғи маршруттарға жақын оңтүстік мегаполис.', ['Ескі қала және цитадель', 'Оңтүстік асханасы', 'Сайрам-Өгем бағыттары']]),
+  region('akmola', '/tourism/burabay.jpg', ['nature', 'wellness', 'eco'],
+    ['Акмолинская область', 'Кокшетау', 'Курортная зона Бурабай, озера, сосновые леса и санаторный отдых рядом со столицей.', ['Бурабай и Щучье', 'Окжетпес', 'Зеренда и лесные озера']],
+    ['Akmola Region', 'Kokshetau', 'The Burabay resort area, lakes, pine forests and sanatorium stays close to the capital.', ['Burabay and Shchuchye', 'Okzhetpes', 'Zerenda and forest lakes']],
+    ['Ақмола облысы', 'Көкшетау', 'Бурабай курорттық аймағы, көлдер, қарағайлы ормандар және елорда маңындағы шипажай демалысы.', ['Бурабай және Щучье', 'Оқжетпес', 'Зеренді және орман көлдері']]),
+  region('aktobe', '/tourism/baikonur.jpg', ['nature', 'adventure', 'history'],
+    ['Актюбинская область', 'Актобе', 'Западные степи, меловые плато, речные долины и маршруты для тех, кто любит редкие природные ландшафты.', ['Мугалжарские горы', 'Каргалинское водохранилище', 'Степные экспедиции']],
+    ['Aktobe Region', 'Aktobe', 'Western steppes, chalk plateaus, river valleys and routes for lovers of rare landscapes.', ['Mugalzhar Mountains', 'Kargaly Reservoir', 'Steppe expeditions']],
+    ['Ақтөбе облысы', 'Ақтөбе', 'Батыс даласы, бор үстірттері, өзен аңғарлары және сирек табиғат көрінісін сүйетіндерге арналған маршруттар.', ['Мұғалжар таулары', 'Қарғалы су қоймасы', 'Дала экспедициялары']]),
+  region('almaty-region', '/tourism/charyn.jpg', ['nature', 'mountains', 'adventure', 'beach'],
+    ['Алматинская область', 'Конаев', 'Один из самых сильных туристических регионов: каньоны, озера, горы, пляжный отдых и фотомаршруты.', ['Чарынский каньон', 'Кольсай и Каинды', 'Капчагайское водохранилище']],
+    ['Almaty Region', 'Konaev', 'One of the strongest tourism regions: canyons, lakes, mountains, beach holidays and photo routes.', ['Charyn Canyon', 'Kolsai and Kaindy lakes', 'Kapchagay Reservoir']],
+    ['Алматы облысы', 'Қонаев', 'Ең мықты туристік аймақтардың бірі: шатқалдар, көлдер, таулар, жағажай демалысы және фотомаршруттар.', ['Шарын шатқалы', 'Көлсай және Қайыңды', 'Қапшағай су қоймасы']]),
+  region('atyrau', '/tourism/mangystau.jpg', ['nature', 'history', 'eco'],
+    ['Атырауская область', 'Атырау', 'Каспийский регион, дельта Урала, степные ландшафты и символическая граница Европы и Азии.', ['Мост Европа-Азия', 'Дельта реки Урал', 'Сарайшык']],
+    ['Atyrau Region', 'Atyrau', 'The Caspian region with the Ural delta, steppe landscapes and the symbolic border between Europe and Asia.', ['Europe–Asia bridge', 'Ural River delta', 'Saraishyk']],
+    ['Атырау облысы', 'Атырау', 'Каспий өңірі, Жайық атырауы, дала көріністері және Еуропа мен Азияның символдық шекарасы.', ['Еуропа–Азия көпірі', 'Жайық өзенінің атырауы', 'Сарайшық']]),
+  region('east-kazakhstan', '/tourism/altai.jpg', ['mountains', 'nature', 'eco', 'adventure'],
+    ['Восточно-Казахстанская область', 'Усть-Каменогорск', 'Алтай, горные озера, леса, мараловодческие хозяйства и насыщенные природные маршруты.', ['Риддер и Западный Алтай', 'Бухтарминское водохранилище', 'Катон-Карагай']],
+    ['East Kazakhstan Region', 'Oskemen', 'Altai, mountain lakes, forests, maral deer farms and rich nature routes.', ['Ridder and Western Altai', 'Bukhtarma Reservoir', 'Katon-Karagay']],
+    ['Шығыс Қазақстан облысы', 'Өскемен', 'Алтай, тау көлдері, ормандар, марал шаруашылықтары және мазмұнды табиғи маршруттар.', ['Риддер және Батыс Алтай', 'Бұқтырма су қоймасы', 'Катонқарағай']]),
+  region('zhambyl', '/tourism/turkistan.jpg', ['history', 'culture', 'nature'],
+    ['Жамбылская область', 'Тараз', 'Один из центров древней истории: Тараз, мавзолеи, археология и природные ущелья.', ['Древний Тараз', 'Мавзолеи Айша-Биби и Бабаджа-Хатун', 'Аксу-Жабаглы рядом с регионом']],
+    ['Zhambyl Region', 'Taraz', 'A centre of ancient history: Taraz, mausoleums, archaeology and natural gorges.', ['Ancient Taraz', 'Aisha Bibi and Babaji Khatun mausoleums', 'Aksu-Zhabagly nearby']],
+    ['Жамбыл облысы', 'Тараз', 'Көне тарихтың орталықтарының бірі: Тараз, кесенелер, археология және табиғи шатқалдар.', ['Көне Тараз', 'Айша бибі мен Бабаджы қатын кесенелері', 'Ақсу-Жабағылы жақын маңда']]),
+  region('zhetysu', '/tourism/charyn.jpg', ['nature', 'mountains', 'eco', 'adventure'],
+    ['Область Жетысу', 'Талдыкорган', 'Семиречье с горными долинами, озером Алаколь, Джунгарским Алатау и мягкими природными маршрутами.', ['Алаколь', 'Джунгарский Алатау', 'Водопады и горные ущелья']],
+    ['Zhetysu Region', 'Taldykorgan', 'The Seven Rivers land with mountain valleys, Lake Alakol, the Dzungarian Alatau and gentle nature routes.', ['Lake Alakol', 'Dzungarian Alatau', 'Waterfalls and mountain gorges']],
+    ['Жетісу облысы', 'Талдықорған', 'Тау аңғарлары, Алакөл, Жоңғар Алатауы және жайлы табиғи маршруттары бар Жетісу.', ['Алакөл', 'Жоңғар Алатауы', 'Сарқырамалар мен тау шатқалдары']]),
+  region('west-kazakhstan', '/tourism/baikonur.jpg', ['history', 'nature', 'culture'],
+    ['Западно-Казахстанская область', 'Уральск', 'Исторический Уральск, река Жайык, купеческая архитектура и спокойные маршруты западной степи.', ['Старый Уральск', 'Река Жайык', 'Исторические музеи']],
+    ['West Kazakhstan Region', 'Oral', 'Historic Oral, the Zhaiyk River, merchant architecture and calm routes across the western steppe.', ['Old Oral', 'Zhaiyk River', 'History museums']],
+    ['Батыс Қазақстан облысы', 'Орал', 'Тарихи Орал, Жайық өзені, көпес сәулеті және батыс даласының жайлы маршруттары.', ['Ескі Орал', 'Жайық өзені', 'Тарихи музейлер']]),
+  region('karaganda', '/tourism/baikonur.jpg', ['history', 'nature', 'city'],
+    ['Карагандинская область', 'Караганда', 'Индустриальная история, КарЛаг, степные озера и путь к природным зонам Центрального Казахстана.', ['Музей КарЛага', 'Каркаралинск', 'Балхашское направление']],
+    ['Karaganda Region', 'Karaganda', 'Industrial history, the KarLag memorial, steppe lakes and the way into Central Kazakhstan’s nature.', ['KarLag Museum', 'Karkaraly', 'Lake Balkhash routes']],
+    ['Қарағанды облысы', 'Қарағанды', 'Индустриялық тарих, ҚарЛаг, дала көлдері және Орталық Қазақстан табиғатына апаратын жол.', ['ҚарЛаг музейі', 'Қарқаралы', 'Балқаш бағыты']]),
+  region('kostanay', '/tourism/burabay.jpg', ['eco', 'nature', 'history'],
+    ['Костанайская область', 'Костанай', 'Северные степи, заповедные территории, озера и маршруты для наблюдения за природой.', ['Наурзумский заповедник', 'Озера и степные ландшафты', 'Костанайская архитектура']],
+    ['Kostanay Region', 'Kostanay', 'Northern steppes, nature reserves, lakes and wildlife-watching routes.', ['Naurzum Nature Reserve', 'Lakes and steppe landscapes', 'Kostanay architecture']],
+    ['Қостанай облысы', 'Қостанай', 'Солтүстік даласы, қорық аумақтары, көлдер және табиғатты бақылау маршруттары.', ['Наурызым қорығы', 'Көлдер мен дала көріністері', 'Қостанай сәулеті']]),
+  region('kyzylorda', '/tourism/baikonur.jpg', ['space', 'history', 'adventure'],
+    ['Кызылординская область', 'Кызылорда', 'Байконур, Сырдарья, наследие древних городищ и маршруты к Аральскому морю.', ['Байконур', 'Коркыт Ата', 'Аральское море']],
+    ['Kyzylorda Region', 'Kyzylorda', 'Baikonur, the Syr Darya, ancient settlements and routes to the Aral Sea.', ['Baikonur', 'Korkyt Ata memorial', 'Aral Sea']],
+    ['Қызылорда облысы', 'Қызылорда', 'Байқоңыр, Сырдария, көне қалашықтар мұрасы және Арал теңізіне апаратын маршруттар.', ['Байқоңыр', 'Қорқыт Ата', 'Арал теңізі']]),
+  region('mangystau', '/tourism/mangystau.jpg', ['adventure', 'sacred', 'beach', 'nature'],
+    ['Мангистауская область', 'Актау', 'Каспийское море, пустынные каньоны, подземные мечети и один из самых фотогеничных регионов страны.', ['Бозжыра', 'Шерқала', 'Каспийское побережье и подземные мечети']],
+    ['Mangystau Region', 'Aktau', 'The Caspian Sea, desert canyons, underground mosques and one of the most photogenic regions in the country.', ['Bozzhyra', 'Sherkala', 'Caspian coast and underground mosques']],
+    ['Маңғыстау облысы', 'Ақтау', 'Каспий теңізі, шөл шатқалдары, жерасты мешіттері және елдегі ең көрікті аймақтардың бірі.', ['Бозжыра', 'Шерқала', 'Каспий жағалауы және жерасты мешіттері']]),
+  region('pavlodar', '/tourism/bayanaul.webp', ['nature', 'wellness', 'history'],
+    ['Павлодарская область', 'Павлодар', 'Баянаул, озера, скальные массивы и спокойный санаторно-природный отдых на северо-востоке.', ['Баянаульский национальный парк', 'Озеро Жасыбай', 'Павлодарская набережная']],
+    ['Pavlodar Region', 'Pavlodar', 'Bayanaul, lakes, rock formations and calm sanatorium and nature stays in the north-east.', ['Bayanaul National Park', 'Lake Zhasybay', 'Pavlodar riverside']],
+    ['Павлодар облысы', 'Павлодар', 'Баянауыл, көлдер, жартастар және солтүстік-шығыстағы жайлы шипажай-табиғат демалысы.', ['Баянауыл ұлттық паркі', 'Жасыбай көлі', 'Павлодар жағалауы']]),
+  region('north-kazakhstan', '/tourism/burabay.jpg', ['nature', 'eco', 'history'],
+    ['Северо-Казахстанская область', 'Петропавловск', 'Леса, озера, северная архитектура и мягкие маршруты для спокойного отдыха.', ['Имантау-Шалкарская зона', 'Петропавловск', 'Озерный отдых']],
+    ['North Kazakhstan Region', 'Petropavl', 'Forests, lakes, northern architecture and gentle routes for a calm holiday.', ['Imantau-Shalkar area', 'Petropavl', 'Lakeside rest']],
+    ['Солтүстік Қазақстан облысы', 'Петропавл', 'Ормандар, көлдер, солтүстік сәулеті және тыныш демалысқа арналған жайлы маршруттар.', ['Имантау-Шалқар аймағы', 'Петропавл', 'Көл жағасындағы демалыс']]),
+  region('turkistan', '/tourism/turkistan.jpg', ['sacred', 'history', 'culture', 'nature'],
+    ['Туркестанская область', 'Туркестан', 'Главное направление сакрального и исторического туризма: мавзолеи, древние города и южные природные парки.', ['Мавзолей Ходжи Ахмеда Ясави', 'Отрар', 'Сауран и Каратау']],
+    ['Turkistan Region', 'Turkistan', 'The main destination for sacred and historical tourism: mausoleums, ancient cities and southern nature parks.', ['Mausoleum of Khoja Ahmed Yasawi', 'Otrar', 'Sauran and Karatau']],
+    ['Түркістан облысы', 'Түркістан', 'Киелі және тарихи туризмнің басты бағыты: кесенелер, көне қалалар және оңтүстік табиғи парктері.', ['Қожа Ахмет Ясауи кесенесі', 'Отырар', 'Сауран және Қаратау']]),
+  region('ulytau', '/tourism/baikonur.jpg', ['history', 'sacred', 'nature'],
+    ['Область Улытау', 'Жезказган', 'Сердце Великой степи: горы Улытау, мавзолеи, исторические места и маршруты к наследию кочевых государств.', ['Горы Улытау', 'Жошы хан', 'Алаша хан']],
+    ['Ulytau Region', 'Zhezkazgan', 'The heart of the Great Steppe: the Ulytau mountains, mausoleums, historic sites and the heritage of nomadic states.', ['Ulytau Mountains', 'Jochi Khan mausoleum', 'Alasha Khan mausoleum']],
+    ['Ұлытау облысы', 'Жезқазған', 'Ұлы даланың жүрегі: Ұлытау таулары, кесенелер, тарихи орындар және көшпелі мемлекеттер мұрасы.', ['Ұлытау таулары', 'Жошы хан', 'Алаша хан']]),
+  region('abai', '/tourism/altai.jpg', ['culture', 'history', 'nature'],
+    ['Область Абай', 'Семей', 'Литературное наследие Абая, история Семея, Алаш и природные маршруты восточной степи.', ['Музей Абая', 'Семей и мост через Иртыш', 'Жидебай']],
+    ['Abai Region', 'Semey', 'Abai’s literary heritage, the history of Semey and Alash, and nature routes across the eastern steppe.', ['Abai Museum', 'Semey and the Irtysh bridge', 'Zhidebay']],
+    ['Абай облысы', 'Семей', 'Абайдың әдеби мұрасы, Семей мен Алаш тарихы және шығыс даласының табиғи маршруттары.', ['Абай музейі', 'Семей және Ертіс көпірі', 'Жидебай']]),
+].map((item, index) => ({ ...item, sortOrder: index + 1 }))
+
+export const TOURISM_LOCALES = ['ru', 'en', 'kk']
+
+const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+/** Регион на языке посетителя; пустые поля перевода берутся из русского. */
+export function localizeTourismRegion(item, language = 'ru') {
+  const lang = TOURISM_LOCALES.includes(language) ? language : 'ru'
+  const ru = item?.content?.ru || {}
+  const local = item?.content?.[lang] || {}
+  const highlights = (Array.isArray(local.highlights) && local.highlights.some((line) => String(line).trim()))
+    ? local.highlights
+    : (Array.isArray(ru.highlights) ? ru.highlights : [])
+  return {
+    ...item,
+    name: String(local.name || '').trim() || ru.name || item?.id || '',
+    center: String(local.center || '').trim() || ru.center || '',
+    summary: String(local.summary || '').trim() || ru.summary || '',
+    highlights: highlights.map((line) => String(line).trim()).filter(Boolean),
+  }
+}
+
+/**
+ * Сохранённые в CMS места по порядку. Встроенный список — только пока в CMS
+ * ничего не сохраняли: если админ удалил все места, страница пустая, а не
+ * возвращает удалённые.
+ */
+export function resolveTourismRegions(stored) {
+  const source = Array.isArray(stored) ? stored : tourismRegions
+  return source
+    .filter((item) => isPlainObject(item) && item.id)
+    .map((item, index) => ({
+      ...item,
+      types: Array.isArray(item.types) ? item.types.filter((type) => tourismTypes[type]) : [],
+      sortOrder: Number(item.sortOrder) || index + 1,
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+}
+
+/** Картинки по умолчанию лежат во frontend/public, загруженные — в Strapi. */
+export function resolveTourismImage(image) {
+  const url = typeof image === 'string' ? image : image?.url
+  if (typeof url === 'string' && (url.startsWith('/tourism/') || url.startsWith('/treatments/'))) return url
+  return getMediaUrl(image) || ''
+}

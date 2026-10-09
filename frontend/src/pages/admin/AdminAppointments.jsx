@@ -36,6 +36,7 @@ const STATUS_VARIANTS = {
   in_progress: { variant: 'info',     icon: PlayCircle },
   completed:   { variant: 'success',  icon: CheckCircle },
   cancelled:   { variant: 'danger',   icon: XCircle },
+  no_show:     { variant: 'warning',  icon: XCircle },
 }
 
 const STATUS_NEXT = {
@@ -44,6 +45,7 @@ const STATUS_NEXT = {
   in_progress: ['completed', 'cancelled'],
   completed:   [],
   cancelled:   [],
+  no_show:     [],
 }
 
 const PAYMENT_VARIANTS = {
@@ -89,6 +91,7 @@ function StatusBadge({ status }) {
     in_progress: t('admin_apt.status_in_progress'),
     completed:   t('admin_apt.status_completed'),
     cancelled:   t('admin_apt.status_cancelled'),
+    no_show:     t('admin_apt.status_no_show'),
   }
   const cfg = STATUS_VARIANTS[status] || { variant: 'default' }
   return <Badge variant={cfg.variant}>{labels[status] || status}</Badge>
@@ -306,6 +309,7 @@ function AdminAppointments() {
     { value: 'in_progress', label: t('admin_apt.filter_in_progress') },
     { value: 'completed',   label: t('admin_apt.filter_completed') },
     { value: 'cancelled',   label: t('admin_apt.filter_cancelled') },
+    { value: 'no_show',     label: t('admin_apt.filter_no_show') },
   ]
 
   const paymentFilters = [

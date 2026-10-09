@@ -1,25 +1,43 @@
-import { useEffect, useMemo, useState } from 'react'
+import { createElement, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { GripVertical, Loader2, Pencil, Plus, Search, Tags, Trash2 } from 'lucide-react'
+import { GripVertical, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
-import Textarea from '../../components/ui/Textarea'
 import Modal from '../../components/ui/Modal'
-import { useToast } from '../../components/ui/Toast'
+import HScroll from '../../components/ui/HScroll'
+import usePersistentFilters from '../../hooks/usePersistentFilters'
+import LocalizedFields from '../../components/admin/LocalizedFields'
+import SpecializationIconPicker from '../../components/admin/SpecializationIconPicker'
 import { normalizeResponse, specializationsAPI } from '../../services/api'
+import { getSpecializationIconEntry, getSpecializationIconLabel, resolveSpecializationIcon } from '../../config/specializationIcons'
+import { compactI18n, readI18n, setI18nValue } from '../../utils/localizedContent'
+import { useToast } from '../../components/ui/Toast'
+
+const FILTER_DEFAULTS = { search: '' }
+const FILTER_OPTIONS = { sessionKeys: ['search'] }
 
 const defaultForm = {
   name: '',
   description: '',
   icon: '',
+  nameKk: '',
+  nameEn: '',
+  i18n: readI18n(null),
 }
+
+// Переводы названия лежат в nameKk/nameEn (их читает getDoctorSpecLabel),
+// переводы описания — в i18n.<locale>.description.
+const NAME_FIELD_BY_LOCALE = { ru: 'name', kk: 'nameKk', en: 'nameEn' }
 
 function toPayload(form) {
   return {
     name: form.name.trim(),
+    nameKk: form.nameKk?.trim() || null,
+    nameEn: form.nameEn?.trim() || null,
     description: form.description?.trim() || '',
     icon: form.icon?.trim() || '',
+    i18n: compactI18n(form.i18n, ['description']),
   }
 }
 
@@ -38,15 +56,29 @@ const arrayMove = (arr, fromIndex, toIndex) => {
   return next
 }
 
+function SpecializationIconBadge({ item, language, t }) {
+  const Icon = resolveSpecializationIcon(item.icon, item.name)
+  const entry = getSpecializationIconEntry(item.icon)
+  const label = entry ? getSpecializationIconLabel(entry, language) : t('admin_spec.icon_auto')
+  return (
+    <span className='inline-flex items-center gap-2 rounded-full bg-teal-50 px-2.5 py-1 text-sm text-teal-700'>
+      {createElement(Icon, { className: 'h-4 w-4', 'aria-hidden': 'true' })}
+      {label}
+    </span>
+  )
+}
+
 function AdminSpecializations() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const toast = useToast()
   const [items, setItems] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isReordering, setIsReordering] = useState(false)
-  const [search, setSearch] = useState('')
+  const { filters, setFilter } = usePersistentFilters('admin-specializations', FILTER_DEFAULTS, FILTER_OPTIONS)
+  const { search } = filters
+  const setSearch = (value) => setFilter('search', value)
   const [editingItem, setEditingItem] = useState(null)
   const [form, setForm] = useState(defaultForm)
   const [draggingId, setDraggingId] = useState(null)
@@ -90,6 +122,9 @@ function AdminSpecializations() {
       name: item.name || '',
       description: item.description || '',
       icon: item.icon || '',
+      nameKk: item.nameKk || '',
+      nameEn: item.nameEn || '',
+      i18n: readI18n(item.i18n),
     })
     setIsModalOpen(true)
   }
@@ -214,7 +249,7 @@ function AdminSpecializations() {
           <h1 className='text-2xl font-bold text-slate-900'>{t('admin_spec.title')}</h1>
           <p className='text-slate-600'>{t('admin_spec.subtitle')}</p>
         </div>
-        <Button leftIcon={<Plus className='w-4 h-4' />} onClick={openCreateModal}>
+        <Button className='w-full sm:w-auto' leftIcon={<Plus className='w-4 h-4' />} onClick={openCreateModal}>
           {t('admin_spec.add_btn')}
         </Button>
       </div>
@@ -229,13 +264,64 @@ function AdminSpecializations() {
       <Card>
         <CardHeader>
           <CardTitle>{t('admin_spec.list_title', { count: filteredItems.length })}</CardTitle>
-          <p className='text-sm text-slate-500'>{t('admin_spec.drag_hint')}</p>
+          <p className='hidden text-sm text-slate-500 md:block'>{t('admin_spec.drag_hint')}</p>
           {search.trim() && (
-            <p className='text-xs text-amber-600'>{t('admin_spec.drag_disabled')}</p>
+            <p className='hidden text-xs text-amber-600 md:block'>{t('admin_spec.drag_disabled')}</p>
           )}
         </CardHeader>
         <CardContent className='p-0'>
-          <div className='overflow-x-auto'>
+          <div className='divide-y divide-slate-100 md:hidden'>
+            {filteredItems.length === 0 ? (
+              <div className='px-4 py-10 text-center text-slate-500'>
+                {t('admin_spec.not_found')}
+              </div>
+            ) : (
+              filteredItems.map((item) => (
+                <div key={item.documentId || item.id} className='p-4'>
+                  <div className='flex items-start justify-between gap-3'>
+                    <div className='min-w-0'>
+                      <p className='font-semibold text-slate-900 break-words'>{item.name}</p>
+                      <p className='mt-1 text-sm text-slate-500 break-words'>
+                        {item.description || '—'}
+                      </p>
+                    </div>
+                    <div className='shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600'>
+                      #{items.findIndex((x) => x.documentId === item.documentId) + 1}
+                    </div>
+                  </div>
+
+                  <div className='mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-600'>
+                    <SpecializationIconBadge item={item} language={i18n.language} t={t} />
+                  </div>
+
+                  <div className='mt-4 grid grid-cols-2 gap-2'>
+                    <Button
+                      size='sm'
+                      variant='secondary'
+                      className='w-full'
+                      onClick={() => openEditModal(item)}
+                      aria-label={t('admin_spec.edit_aria')}
+                    >
+                      <Pencil className='w-4 h-4' />
+                      {t('common.edit')}
+                    </Button>
+                    <Button
+                      size='sm'
+                      variant='secondary'
+                      className='w-full'
+                      onClick={() => handleDelete(item)}
+                      aria-label={t('admin_spec.delete_aria')}
+                    >
+                      <Trash2 className='w-4 h-4 text-rose-600' />
+                      {t('common.delete')}
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <HScroll className='hidden md:block'>
             <table className='w-full'>
               <thead>
                 <tr className='border-b border-slate-200'>
@@ -282,10 +368,7 @@ function AdminSpecializations() {
                         {item.description || '—'}
                       </td>
                       <td className='py-4 px-6 text-slate-600'>
-                        <div className='inline-flex items-center gap-2'>
-                          <Tags className='w-4 h-4 text-teal-600' />
-                          <span>{item.icon || '—'}</span>
-                        </div>
+                        <SpecializationIconBadge item={item} language={i18n.language} t={t} />
                       </td>
                       <td className='py-4 px-6 text-slate-600'>{items.findIndex((x) => x.documentId === item.documentId) + 1}</td>
                       <td className='py-4 px-6'>
@@ -313,7 +396,7 @@ function AdminSpecializations() {
                 )}
               </tbody>
             </table>
-          </div>
+          </HScroll>
         </CardContent>
       </Card>
 
@@ -334,20 +417,20 @@ function AdminSpecializations() {
         }
       >
         <form onSubmit={handleSave} className='space-y-4'>
-          <Input
-            label={t('admin_spec.label_name')}
-            required
-            value={form.name}
-            onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-            placeholder={t('admin_spec.placeholder_name')}
-          />
-
-          <Textarea
-            label={t('admin_spec.label_desc')}
-            rows={3}
-            value={form.description}
-            onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-            placeholder={t('admin_spec.placeholder_desc')}
+          <LocalizedFields
+            fields={[
+              { key: 'name', label: t('admin_spec.label_name'), required: true, placeholder: t('admin_spec.placeholder_name') },
+              { key: 'description', label: t('admin_spec.label_desc'), multiline: true, rows: 3, placeholder: t('admin_spec.placeholder_desc') },
+            ]}
+            getValue={(locale, key) => {
+              if (key === 'name') return form[NAME_FIELD_BY_LOCALE[locale]]
+              return locale === 'ru' ? form.description : form.i18n?.[locale]?.description
+            }}
+            setValue={(locale, key, value) => setForm((prev) => {
+              if (key === 'name') return { ...prev, [NAME_FIELD_BY_LOCALE[locale]]: value }
+              if (locale === 'ru') return { ...prev, description: value }
+              return { ...prev, i18n: setI18nValue(prev.i18n, locale, 'description', value) }
+            })}
           />
 
           <Input
@@ -357,15 +440,11 @@ function AdminSpecializations() {
             hint={t('admin_spec.hint_order')}
           />
 
-          <div className='grid md:grid-cols-2 gap-4'>
-            <Input
-              label={t('admin_spec.label_icon')}
-              value={form.icon}
-              onChange={(e) => setForm((prev) => ({ ...prev, icon: e.target.value }))}
-              placeholder={t('admin_spec.placeholder_icon')}
-              hint={t('admin_spec.hint_icon')}
-            />
-          </div>
+          <SpecializationIconPicker
+            value={form.icon}
+            name={form.name}
+            onChange={(icon) => setForm((prev) => ({ ...prev, icon }))}
+          />
         </form>
       </Modal>
     </div>

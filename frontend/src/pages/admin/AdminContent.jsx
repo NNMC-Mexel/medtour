@@ -1,882 +1,720 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Eye, FileText, Globe2, LayoutTemplate, Loader2, RefreshCcw, Save } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
+import {
+  Check,
+  ExternalLink,
+  FileSignature,
+  LayoutTemplate,
+  Loader2,
+  Menu as MenuIcon,
+  Palette,
+  Phone,
+  RefreshCcw,
+  RotateCcw,
+  Save,
+  Search,
+} from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Textarea from '../../components/ui/Textarea'
+import LocalizedFields from '../../components/admin/LocalizedFields'
 import { useToast } from '../../components/ui/Toast'
 import { contentAPI, normalizeResponse } from '../../services/api'
-import { DEFAULT_CONTENT_LOCALE, SUPPORTED_LOCALES } from '../../utils/locales'
+import { landingCopy } from '../../data/landingCopy'
+import { privacyCopy, termsCopy } from '../../data/legalCopy'
+import {
+  CONTENT_LANGS,
+  LANDING_SECTIONS,
+  NAV_ITEMS,
+  compactSiteContent,
+  contactHref,
+  fieldToText,
+  legalSectionsToText,
+  readSiteContent,
+  textToField,
+} from '../../config/siteContent'
+import {
+  SITE_THEME_PALETTES,
+  applySiteTheme,
+  getSiteThemePalette,
+  isValidHexColor,
+  normalizeSiteTheme,
+} from '../../config/siteThemes'
+import useSiteContentStore from '../../stores/siteContentStore'
+import { cn } from '../../utils/helpers'
 
-const defaultLandingConfig = {
-  hero: {
-    badge: 'Лечение в Казахстане под ключ',
-    titlePrefix: 'Медицинское лечение',
-    titleHighlight: 'без долгого ожидания',
-    description:
-      'MedTour помогает иностранным пациентам попасть в партнерские клиники Казахстана: документы, подбор врача, поездка и сопровождение лечения ведутся персональным менеджером.',
-    primaryButtonLabel: 'Начать заявку',
-    secondaryButtonLabel: 'Создать аккаунт',
-  },
-  heroCard: {
-    title: 'Персональная медицинская заявка',
-    subtitle: 'Ведет команда MedTour',
-    items: [
-      {
-        title: 'Партнерские клиники',
-        description: 'ННМЦ, MexelHealth и UMIT/Томотерапия в Астане',
-      },
-      {
-        title: 'Подбор врача',
-        description: 'Координатор направляет заявку в нужную клинику и к нужному врачу',
-      },
-      {
-        title: 'Поддержка поездки',
-        description: 'Виза, билеты, отель, трансфер и сопровождение в Казахстане',
-      },
-    ],
-    buttonLabel: 'Начать заявку',
-  },
-  stats: [
-    { value: '1100+', label: 'Заявок' },
-    { value: '3', label: 'Клиники' },
-    { value: '<2h', label: 'SLA ответа' },
-    { value: '24/7', label: 'Сопровождение' },
-  ],
-  featuresSection: {
-    badge: 'Почему мы',
-    title: 'Почему выбирают MedTour',
-    subtitle: 'Одна ответственная команда для лечения, логистики и поддержки пациента',
-    cards: [
-      {
-        title: 'Первичный врачебный review',
-        description: 'Онлайн-консультация помогает клинике понять, нужно ли лечение или операция.',
-      },
-      {
-        title: 'Безопасность данных',
-        description: 'Шифрование данных и соответствие стандартам медицинской безопасности.',
-      },
-      {
-        title: 'Персональный менеджер',
-        description: 'Менеджер MedTour ведет заявку от первого контакта до пост-ухода.',
-      },
-      {
-        title: 'Чеклист поездки',
-        description: 'Виза, билеты, отель, трансфер, визиты в клинику и выписка идут в одном процессе.',
-      },
-    ],
-  },
-  stepsSection: {
-    badge: 'Как это работает',
-    title: 'Всего 4 простых шага',
-    subtitle: 'От первой заявки до лечения в Казахстане',
-    steps: [
-      {
-        title: 'Создайте заявку',
-        description: 'Зарегистрируйтесь и опишите диагноз, симптомы и желаемые даты поездки',
-      },
-      {
-        title: 'Загрузите документы',
-        description: 'Добавьте анализы, снимки, выписки и направления для медицинского review',
-      },
-      {
-        title: 'Решение врача',
-        description: 'Врач партнерской клиники оценивает случай на онлайн-консультации',
-      },
-      {
-        title: 'Лечение под ключ',
-        description: 'MedTour координирует план лечения, визу, поездку, прилет и сопровождение',
-      },
-    ],
-  },
-  aboutSection: {
-    badge: 'О нас',
-    title: 'MedTour — лечение в Казахстане под ключ',
-    description:
-      'Мы соединяем иностранных пациентов с партнерскими клиниками Казахстана и координируем сервис вокруг лечения.',
-    bullets: [
-      'Три партнерские клиники по ключевым направлениям',
-      'Персональный менеджер и медицинский координатор',
-      'Безопасная работа с документами и коммуникацией',
-      'Виза, отель, трансфер и пост-уход в одном процессе',
-    ],
-    buttonLabel: 'Начать заявку',
-  },
-  contactSection: {
-    badge: 'Контакты',
-    title: 'Свяжитесь с нами',
-    subtitle: 'Мы всегда на связи и готовы ответить на ваши вопросы',
-    phone: {
-      title: 'Телефон',
-      note: 'Пн-Пт: 8:00 — 20:00, Сб: 9:00 — 15:00',
-      value: '+7 (717) 270-12-34',
+/**
+ * Контент сайта по разделам — как в MedConnect. Раньше страница правила поля
+ * старого лендинга, которые нигде не показывались; теперь каждое поле здесь
+ * соответствует тому, что видит посетитель.
+ *
+ * Сохранение общее: в хранилище это один документ (Global.landingConfig), и
+ * раздельная запись означала бы гонку правок. Поэтому рядом с кнопкой всегда
+ * видно, есть ли несохранённые изменения.
+ */
+const SECTIONS = [
+  { id: 'appearance', icon: Palette },
+  { id: 'landing', icon: LayoutTemplate },
+  { id: 'contacts', icon: Phone },
+  { id: 'navigation', icon: MenuIcon },
+  { id: 'legal', icon: FileSignature },
+  { id: 'seo', icon: Search },
+]
+
+const LANG_LABELS = { ru: 'Русский', kk: 'Қазақша', en: 'English' }
+
+const copyByLanguage = {
+  ru: {
+    title: 'Контент сайта MedTour', subtitle: 'Оформление сайта, тексты главной, контакты, меню, правовые документы и SEO',
+    refresh: 'Обновить', save: 'Сохранить', unsaved: 'Есть несохранённые изменения', saved: 'Контент сохранён — сайт уже обновлён',
+    loadError: 'Не удалось загрузить контент сайта', saveError: 'Не удалось сохранить контент',
+    leaveConfirm: 'Есть несохранённые изменения. Уйти со страницы?',
+    sections: { appearance: 'Оформление', landing: 'Главная страница', contacts: 'Контакты', navigation: 'Шапка и меню', legal: 'Правовые документы', seo: 'SEO и метаданные' },
+    intro: {
+      appearance: 'Палитра сайта и кабинетов. Общая для всех языков — переключать язык здесь не нужно.',
+      landing: 'Тексты главной страницы. Выберите язык и правьте блоки; пустое поле вернёт текст по умолчанию.',
+      contacts: 'Контакты в подвале сайта. Общие для всех языков, кроме адреса и часов работы.',
+      navigation: 'Пункты верхнего меню сайта: можно скрыть пункт или переименовать его на любом языке.',
+      legal: 'Тексты политики конфиденциальности и пользовательского соглашения на каждом языке.',
+      seo: 'Название сайта и то, как главная страница выглядит в поиске и при отправке ссылки.',
     },
-    email: {
-      title: 'Электронная почта',
-      note: 'Ответим в течение 24 часов',
-      value: 'info@medtour.kz',
+    paletteTitle: 'Цветовая схема сайта', paletteText: 'Палитра меняет акценты, кнопки, тёмные блоки и подсветку на лендинге и в кабинетах. До сохранения изменения видны только вам.',
+    accentTitle: 'Свой акцентный цвет', accentText: 'Кнопки, ссылки и активные состояния получат согласованную шкалу оттенков. Оставьте пустым, чтобы использовать цвет палитры.',
+    accentReset: 'Цвет палитры', accentInvalid: 'Цвет в формате #RRGGBB',
+    openSection: 'Открыть на сайте', resetField: 'Вернуть текст по умолчанию',
+    linesHint: 'Каждый пункт — с новой строки', pairsHint: 'Каждый этап с новой строки: «Заголовок | Текст»',
+    phone: 'Телефон', email: 'Email', website: 'Сайт', whatsapp: 'WhatsApp (номер)', telegram: 'Telegram (@username или ссылка)', instagram: 'Instagram (@username или ссылка)',
+    address: 'Адрес', hours: 'Часы работы', contactsHint: 'Пустое поле не показывается на сайте.', contactInvalid: 'Это не ссылка — поле не покажется на сайте',
+    navVisible: 'Показывать', navLabel: 'Подпись', navHidden: 'Скрыт', navHint: 'Пустая подпись — стандартная для языка.',
+    privacy: 'Политика конфиденциальности', terms: 'Пользовательское соглашение',
+    legalSyntax: 'Разметка: «## Заголовок» — новый раздел, «- текст» — пункт списка, остальные строки — абзацы.',
+    legalReset: 'Вернуть текст по умолчанию', legalCustom: 'Изменён', legalDefault: 'По умолчанию', legalOpen: 'Открыть страницу',
+    siteName: 'Название сайта', siteDescription: 'Описание сайта',
+    seoTitle: 'Заголовок главной в поиске', seoDescription: 'Описание главной в поиске',
+    seoNote: 'Для поисковых роботов без JavaScript заголовки задаются при сборке сайта; эти значения применяются в браузере и при следующей сборке не теряются.',
+    nameRequired: 'Укажите название сайта',
+  },
+  en: {
+    title: 'MedTour site content', subtitle: 'Appearance, home page copy, contacts, menu, legal documents and SEO',
+    refresh: 'Refresh', save: 'Save', unsaved: 'Unsaved changes', saved: 'Content saved — the site is already updated',
+    loadError: 'Failed to load site content', saveError: 'Failed to save content',
+    leaveConfirm: 'You have unsaved changes. Leave the page?',
+    sections: { appearance: 'Appearance', landing: 'Home page', contacts: 'Contacts', navigation: 'Header and menu', legal: 'Legal documents', seo: 'SEO and metadata' },
+    intro: {
+      appearance: 'Palette for the site and the accounts. Shared by all languages — no need to switch language here.',
+      landing: 'Home page copy. Pick a language and edit the blocks; an empty field restores the default text.',
+      contacts: 'Contacts in the site footer. Shared by all languages except the address and opening hours.',
+      navigation: 'Top menu items: hide an item or rename it in any language.',
+      legal: 'Privacy policy and terms of use in each language.',
+      seo: 'Site name and how the home page looks in search results and link previews.',
     },
-    address: {
-      title: 'Адрес',
-      note: 'Приём по записи',
-      value: 'г. Астана, просп. Абылай хана, 42',
+    paletteTitle: 'Site colour scheme', paletteText: 'The palette changes accents, buttons, dark blocks and highlights on the landing page and in the accounts. Until you save, only you see it.',
+    accentTitle: 'Custom accent colour', accentText: 'Buttons, links and active states get a matching shade scale. Leave empty to use the palette colour.',
+    accentReset: 'Palette colour', accentInvalid: 'Use the #RRGGBB format',
+    openSection: 'Open on site', resetField: 'Restore default text',
+    linesHint: 'One item per line', pairsHint: 'One step per line: “Title | Text”',
+    phone: 'Phone', email: 'Email', website: 'Website', whatsapp: 'WhatsApp (number)', telegram: 'Telegram (@username or link)', instagram: 'Instagram (@username or link)',
+    address: 'Address', hours: 'Opening hours', contactsHint: 'Empty fields are not shown on the site.', contactInvalid: 'Not a link — this field will not be shown',
+    navVisible: 'Show', navLabel: 'Label', navHidden: 'Hidden', navHint: 'An empty label uses the standard one for the language.',
+    privacy: 'Privacy policy', terms: 'Terms of use',
+    legalSyntax: 'Markup: “## Title” starts a section, “- text” is a list item, other lines are paragraphs.',
+    legalReset: 'Restore default text', legalCustom: 'Edited', legalDefault: 'Default', legalOpen: 'Open page',
+    siteName: 'Site name', siteDescription: 'Site description',
+    seoTitle: 'Home page title in search', seoDescription: 'Home page description in search',
+    seoNote: 'Crawlers without JavaScript get titles set at build time; these values apply in the browser and survive the next build.',
+    nameRequired: 'Enter the site name',
+  },
+  kk: {
+    title: 'MedTour сайтының мазмұны', subtitle: 'Безендіру, басты бет мәтіндері, байланыс, мәзір, құқықтық құжаттар және SEO',
+    refresh: 'Жаңарту', save: 'Сақтау', unsaved: 'Сақталмаған өзгерістер бар', saved: 'Мазмұн сақталды — сайт жаңартылды',
+    loadError: 'Сайт мазмұнын жүктеу мүмкін болмады', saveError: 'Мазмұнды сақтау мүмкін болмады',
+    leaveConfirm: 'Сақталмаған өзгерістер бар. Беттен шығасыз ба?',
+    sections: { appearance: 'Безендіру', landing: 'Басты бет', contacts: 'Байланыс', navigation: 'Тақырып және мәзір', legal: 'Құқықтық құжаттар', seo: 'SEO және метадеректер' },
+    intro: {
+      appearance: 'Сайт пен кабинеттердің палитрасы. Барлық тілге ортақ — мұнда тілді ауыстырудың қажеті жоқ.',
+      landing: 'Басты бет мәтіндері. Тілді таңдап, блоктарды өңдеңіз; бос өріс әдепкі мәтінді қайтарады.',
+      contacts: 'Сайт төменгі бөлігіндегі байланыс. Мекенжай мен жұмыс уақытынан басқасы барлық тілге ортақ.',
+      navigation: 'Жоғарғы мәзір тармақтары: тармақты жасыруға немесе кез келген тілде атауын өзгертуге болады.',
+      legal: 'Құпиялылық саясаты мен пайдаланушы келісімінің әр тілдегі мәтіні.',
+      seo: 'Сайт атауы және басты беттің іздеуде және сілтеме алдын ала қарауында көрінуі.',
     },
-    quickCard: {
-      title: 'Нужна помощь с лечением за границей?',
-      description:
-        'Создайте медицинскую заявку, и команда MedTour подскажет следующие шаги.',
-      bullets: ['Не нужно самостоятельно выбирать врача', 'Документы смотрит команда координаторов', 'План, чат и статус сохраняются в кабинете'],
-      buttonLabel: 'Начать медицинскую заявку',
-    },
-    mapEmbedUrl:
-      'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2505.5!2d71.4926513!3d51.1492038!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x4245817a521995c9%3A0xe653c982ba77912!2z0J3QsNGG0LjQvtC90LDQu9GM0L3Ri9C5INC90LDRg9GH0L3Ri9C5INC80LXQtNC40YbQuNC90YHQutC40Lkg0YbQtdC90YLRgA!5e0!3m2!1sru!2skz!4v1700000000000!5m2!1sru!2skz',
+    paletteTitle: 'Сайттың түс схемасы', paletteText: 'Палитра лендинг пен кабинеттердегі акцент, батырма, қараңғы блок және жарықтандыру түстерін өзгертеді. Сақтағанға дейін тек сізге көрінеді.',
+    accentTitle: 'Өз акцент түсіңіз', accentText: 'Батырмалар, сілтемелер және белсенді күйлер үйлесімді реңк шкаласын алады. Палитра түсін қолдану үшін бос қалдырыңыз.',
+    accentReset: 'Палитра түсі', accentInvalid: '#RRGGBB форматындағы түс',
+    openSection: 'Сайтта ашу', resetField: 'Әдепкі мәтінді қайтару',
+    linesHint: 'Әр тармақ жаңа жолдан', pairsHint: 'Әр кезең жаңа жолдан: «Тақырып | Мәтін»',
+    phone: 'Телефон', email: 'Email', website: 'Сайт', whatsapp: 'WhatsApp (нөмір)', telegram: 'Telegram (@username немесе сілтеме)', instagram: 'Instagram (@username немесе сілтеме)',
+    address: 'Мекенжай', hours: 'Жұмыс уақыты', contactsHint: 'Бос өріс сайтта көрсетілмейді.', contactInvalid: 'Бұл сілтеме емес — өріс сайтта көрсетілмейді',
+    navVisible: 'Көрсету', navLabel: 'Атауы', navHidden: 'Жасырын', navHint: 'Бос атау — тілдің стандартты атауы.',
+    privacy: 'Құпиялылық саясаты', terms: 'Пайдаланушы келісімі',
+    legalSyntax: 'Белгілеу: «## Тақырып» — жаңа бөлім, «- мәтін» — тізім тармағы, қалған жолдар — абзацтар.',
+    legalReset: 'Әдепкі мәтінді қайтару', legalCustom: 'Өзгертілген', legalDefault: 'Әдепкі', legalOpen: 'Бетті ашу',
+    siteName: 'Сайт атауы', siteDescription: 'Сайт сипаттамасы',
+    seoTitle: 'Басты беттің іздеудегі тақырыбы', seoDescription: 'Басты беттің іздеудегі сипаттамасы',
+    seoNote: 'JavaScript-сіз іздеу роботтары үшін тақырыптар сайт жиналғанда беріледі; бұл мәндер браузерде қолданылады.',
+    nameRequired: 'Сайт атауын көрсетіңіз',
   },
 }
 
-function getDefaultLandingConfigForLocale(i18n, locale) {
-  if (locale === DEFAULT_CONTENT_LOCALE) return defaultLandingConfig
-
-  const lt = i18n.getFixedT(locale)
-  return {
-    hero: {
-      badge: lt('landing.hero.badge'),
-      titlePrefix: lt('landing.hero.title_prefix'),
-      titleHighlight: lt('landing.hero.title_highlight'),
-      description: lt('landing.hero.description'),
-      primaryButtonLabel: lt('landing.hero.find_doctor'),
-      secondaryButtonLabel: lt('landing.hero.register'),
-    },
-    heroCard: {
-      title: lt('landing.hero_card.title'),
-      subtitle: lt('landing.hero_card.subtitle'),
-      items: [
-        { title: lt('landing.hero_card.item_0_title'), description: lt('landing.hero_card.item_0_desc') },
-        { title: lt('landing.hero_card.item_1_title'), description: lt('landing.hero_card.item_1_desc') },
-        { title: lt('landing.hero_card.item_2_title'), description: lt('landing.hero_card.item_2_desc') },
-      ],
-      buttonLabel: lt('landing.hero_card.book_now'),
-    },
-    stats: [
-      { value: '1100+', label: lt('landing.stats.consultations') },
-      { value: '3', label: lt('landing.stats.doctors') },
-      { value: '<2h', label: lt('landing.stats.avg_rating') },
-      { value: '24/7', label: lt('landing.stats.satisfaction') },
-    ],
-    featuresSection: {
-      badge: lt('landing.features.badge'),
-      title: lt('landing.features.title'),
-      subtitle: lt('landing.features.subtitle'),
-      cards: [
-        { title: lt('landing.features.card_0_title'), description: lt('landing.features.card_0_desc') },
-        { title: lt('landing.features.card_1_title'), description: lt('landing.features.card_1_desc') },
-        { title: lt('landing.features.card_2_title'), description: lt('landing.features.card_2_desc') },
-        { title: lt('landing.features.card_3_title'), description: lt('landing.features.card_3_desc') },
-      ],
-    },
-    stepsSection: {
-      badge: lt('landing.steps.badge'),
-      title: lt('landing.steps.title'),
-      subtitle: lt('landing.steps.subtitle'),
-      steps: [
-        { title: lt('landing.steps.step_0_title'), description: lt('landing.steps.step_0_desc') },
-        { title: lt('landing.steps.step_1_title'), description: lt('landing.steps.step_1_desc') },
-        { title: lt('landing.steps.step_2_title'), description: lt('landing.steps.step_2_desc') },
-        { title: lt('landing.steps.step_3_title'), description: lt('landing.steps.step_3_desc') },
-      ],
-    },
-    aboutSection: {
-      badge: lt('landing.about.badge'),
-      title: lt('landing.about.title'),
-      description: lt('landing.about.description'),
-      bullets: [
-        lt('landing.about.bullet_0'),
-        lt('landing.about.bullet_1'),
-        lt('landing.about.bullet_2'),
-        lt('landing.about.bullet_3'),
-      ],
-      buttonLabel: lt('landing.about.join'),
-    },
-    contactSection: {
-      badge: lt('landing.contact.badge'),
-      title: lt('landing.contact.title'),
-      subtitle: lt('landing.contact.subtitle'),
-      phone: {
-        title: lt('landing.contact.phone_title'),
-        note: lt('landing.contact.phone_note'),
-        value: '+7 (717) 270-12-34',
-      },
-      email: {
-        title: lt('landing.contact.email_title'),
-        note: lt('landing.contact.email_note'),
-        value: 'info@medtour.kz',
-      },
-      address: {
-        title: lt('landing.contact.address_title'),
-        note: lt('landing.contact.address_note'),
-        value: lt('footer.address'),
-      },
-      quickCard: {
-        title: lt('landing.contact.quick_title'),
-        description: lt('landing.contact.quick_desc'),
-        bullets: [
-          lt('landing.contact.quick_bullet_0'),
-          lt('landing.contact.quick_bullet_1'),
-          lt('landing.contact.quick_bullet_2'),
-        ],
-        buttonLabel: lt('landing.contact.quick_button'),
-      },
-      mapEmbedUrl: defaultLandingConfig.contactSection.mapEmbedUrl,
-    },
-  }
+const LEGAL_DEFAULTS = { privacy: privacyCopy, terms: termsCopy }
+const legalDefaultText = (doc, lang) => {
+  const source = LEGAL_DEFAULTS[doc]
+  const copy = source[lang] || source.en
+  return legalSectionsToText(copy.sections)
 }
 
-function mergeConfig(base, incoming) {
-  return {
-    ...base,
-    ...(incoming || {}),
-    hero: { ...base.hero, ...(incoming?.hero || {}) },
-    heroCard: {
-      ...base.heroCard,
-      ...(incoming?.heroCard || {}),
-      items: Array.isArray(incoming?.heroCard?.items) && incoming.heroCard.items.length > 0
-        ? incoming.heroCard.items
-        : base.heroCard.items,
-    },
-    stats: Array.isArray(incoming?.stats) && incoming.stats.length > 0 ? incoming.stats : base.stats,
-    featuresSection: {
-      ...base.featuresSection,
-      ...(incoming?.featuresSection || {}),
-      cards: Array.isArray(incoming?.featuresSection?.cards) && incoming.featuresSection.cards.length > 0
-        ? incoming.featuresSection.cards
-        : base.featuresSection.cards,
-    },
-    stepsSection: {
-      ...base.stepsSection,
-      ...(incoming?.stepsSection || {}),
-      steps: Array.isArray(incoming?.stepsSection?.steps) && incoming.stepsSection.steps.length > 0
-        ? incoming.stepsSection.steps
-        : base.stepsSection.steps,
-    },
-    aboutSection: {
-      ...base.aboutSection,
-      ...(incoming?.aboutSection || {}),
-      bullets: Array.isArray(incoming?.aboutSection?.bullets) && incoming.aboutSection.bullets.length > 0
-        ? incoming.aboutSection.bullets
-        : base.aboutSection.bullets,
-    },
-    contactSection: {
-      ...base.contactSection,
-      ...(incoming?.contactSection || {}),
-      phone: { ...base.contactSection.phone, ...(incoming?.contactSection?.phone || {}) },
-      email: { ...base.contactSection.email, ...(incoming?.contactSection?.email || {}) },
-      address: { ...base.contactSection.address, ...(incoming?.contactSection?.address || {}) },
-      quickCard: {
-        ...base.contactSection.quickCard,
-        ...(incoming?.contactSection?.quickCard || {}),
-        bullets:
-          Array.isArray(incoming?.contactSection?.quickCard?.bullets) && incoming.contactSection.quickCard.bullets.length > 0
-            ? incoming.contactSection.quickCard.bullets
-            : base.contactSection.quickCard.bullets,
-      },
-    },
-  }
+const landingDefaults = (lang) => landingCopy[lang] || landingCopy.ru
+
+/** Состояние редактора: тексты главной в виде строк, по языкам. */
+function buildLandingDrafts(content) {
+  return Object.fromEntries(CONTENT_LANGS.map((lang) => {
+    const defaults = landingDefaults(lang)
+    const overrides = content.landing[lang] || {}
+    const entries = LANDING_SECTIONS.flatMap((section) => section.fields.map((field) => {
+      const value = overrides[field.key] !== undefined ? overrides[field.key] : defaults[field.key]
+      return [field.key, fieldToText(field, value)]
+    }))
+    return [lang, Object.fromEntries(entries)]
+  }))
 }
 
-function linesToArray(value) {
-  return (value || '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
+/** Строки редактора → только отличия от текста по умолчанию. */
+function landingDraftsToOverrides(drafts) {
+  return Object.fromEntries(CONTENT_LANGS.map((lang) => {
+    const defaults = landingDefaults(lang)
+    const overrides = {}
+    LANDING_SECTIONS.forEach((section) => section.fields.forEach((field) => {
+      const text = drafts[lang]?.[field.key] ?? ''
+      if (!String(text).trim()) return
+      if (text.trim() === fieldToText(field, defaults[field.key]).trim()) return
+      overrides[field.key] = textToField(field, text)
+    }))
+    return [lang, overrides]
+  }))
 }
 
-function arrayToLines(value) {
-  return Array.isArray(value) ? value.join('\n') : ''
+function buildLegalDrafts(content) {
+  return Object.fromEntries(['privacy', 'terms'].map((doc) => [doc, Object.fromEntries(CONTENT_LANGS.map((lang) => [
+    lang,
+    content.legal[doc]?.[lang] || legalDefaultText(doc, lang),
+  ]))]))
+}
+
+function legalDraftsToOverrides(drafts) {
+  return Object.fromEntries(['privacy', 'terms'].map((doc) => [doc, Object.fromEntries(CONTENT_LANGS
+    .map((lang) => [lang, String(drafts[doc]?.[lang] || '')])
+    .filter(([lang, text]) => text.trim() && text.trim() !== legalDefaultText(doc, lang).trim()))]))
+}
+
+function LangTabs({ value, onChange, className }) {
+  return (
+    <div role='tablist' className={cn('inline-flex rounded-xl bg-slate-100 p-1', className)}>
+      {CONTENT_LANGS.map((lang) => (
+        <button
+          key={lang}
+          type='button'
+          role='tab'
+          aria-selected={value === lang}
+          onClick={() => onChange(lang)}
+          className={cn('rounded-lg px-4 py-2 text-sm font-semibold transition-colors', value === lang ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700')}
+        >
+          {LANG_LABELS[lang]}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function Panel({ title, description, actions, children }) {
+  return (
+    <section className='rounded-3xl border border-slate-200 bg-white'>
+      {(title || actions) && (
+        <div className='flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7'>
+          <div>
+            {title && <h2 className='text-lg font-bold text-slate-900'>{title}</h2>}
+            {description && <p className='mt-1 text-sm text-slate-500'>{description}</p>}
+          </div>
+          {actions}
+        </div>
+      )}
+      <div className='p-5 sm:p-7'>{children}</div>
+    </section>
+  )
+}
+
+function PalettePreview({ palette }) {
+  const tokens = palette.tokens
+  return (
+    <div className='relative h-36 overflow-hidden rounded-2xl p-4' style={{ background: `linear-gradient(135deg, ${tokens.night}, ${tokens['ink-soft']})` }}>
+      <div className='h-2.5 w-16 rounded-full bg-white/70' />
+      <div className='absolute inset-x-4 bottom-4 space-y-3'>
+        <div className='h-2 w-3/4 rounded-full bg-white/30' />
+        <div className='flex gap-2'>
+          <div className='h-8 w-20 rounded-lg' style={{ background: tokens.accent }} />
+          <div className='h-8 flex-1 rounded-lg bg-white/85' />
+        </div>
+      </div>
+      <div className='absolute right-4 top-4 h-10 w-10 rounded-full opacity-70 blur-md' style={{ background: tokens.glow }} />
+    </div>
+  )
 }
 
 function AdminContent() {
   const { t, i18n } = useTranslation()
+  const uiLang = ['ru', 'en', 'kk'].includes(i18n.language) ? i18n.language : 'ru'
+  const copy = copyByLanguage[uiLang]
   const toast = useToast()
+  const setFromGlobal = useSiteContentStore((state) => state.setFromGlobal)
+  const appliedTheme = useSiteContentStore((state) => state.content.siteTheme)
+
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [activeSection, setActiveSection] = useState(SECTIONS[0].id)
+  const [landingLang, setLandingLang] = useState('ru')
+  const [legalDoc, setLegalDoc] = useState('privacy')
+  const [legalLang, setLegalLang] = useState('ru')
+  const [seoLang, setSeoLang] = useState('ru')
 
   const [siteName, setSiteName] = useState('')
   const [siteDescription, setSiteDescription] = useState('')
-  const [seoMetaTitle, setSeoMetaTitle] = useState('')
-  const [seoMetaDescription, setSeoMetaDescription] = useState('')
-  const [activeContentLocale, setActiveContentLocale] = useState(DEFAULT_CONTENT_LOCALE)
-  const [landingConfigs, setLandingConfigs] = useState({})
+  const [siteTheme, setSiteTheme] = useState(normalizeSiteTheme(null))
+  const [accentInput, setAccentInput] = useState('')
+  const [landingDrafts, setLandingDrafts] = useState(() => buildLandingDrafts(readSiteContent(null)))
+  const [contacts, setContacts] = useState(() => readSiteContent(null).contacts)
+  const [navigation, setNavigation] = useState(() => readSiteContent(null).navigation)
+  const [legalDrafts, setLegalDrafts] = useState(() => buildLegalDrafts(readSiteContent(null)))
+  const [seo, setSeo] = useState(() => readSiteContent(null).seo)
+  const [savedSnapshot, setSavedSnapshot] = useState(null)
 
-  const defaultLandingConfigs = useMemo(
-    () =>
-      SUPPORTED_LOCALES.reduce((acc, locale) => {
-        acc[locale.code] = getDefaultLandingConfigForLocale(i18n, locale.code)
-        return acc
-      }, {}),
-    [i18n],
-  )
+  const snapshot = useMemo(() => JSON.stringify({
+    siteName, siteDescription, siteTheme, landingDrafts, contacts, navigation, legalDrafts, seo,
+  }), [siteName, siteDescription, siteTheme, landingDrafts, contacts, navigation, legalDrafts, seo])
+  const isDirty = savedSnapshot !== null && savedSnapshot !== snapshot
 
-  const landingConfig = landingConfigs[activeContentLocale] || defaultLandingConfigs[activeContentLocale] || defaultLandingConfig
+  // Предпросмотр палитры — сразу на всей странице, без сохранения в браузере.
+  // При уходе со страницы возвращаем сохранённую схему.
+  const savedThemeRef = useRef(appliedTheme)
+  savedThemeRef.current = appliedTheme
+  useEffect(() => {
+    applySiteTheme(siteTheme, { persist: false })
+  }, [siteTheme])
+  useEffect(() => () => applySiteTheme(savedThemeRef.current), [])
 
-  const heroCardItemsText = useMemo(
-    () => landingConfig.heroCard.items.map((item) => `${item.title} | ${item.description}`).join('\n'),
-    [landingConfig.heroCard.items],
-  )
-  const featuresCardsText = useMemo(
-    () => landingConfig.featuresSection.cards.map((item) => `${item.title} | ${item.description}`).join('\n'),
-    [landingConfig.featuresSection.cards],
-  )
-  const stepsText = useMemo(
-    () => landingConfig.stepsSection.steps.map((item) => `${item.title} | ${item.description}`).join('\n'),
-    [landingConfig.stepsSection.steps],
-  )
+  useEffect(() => {
+    if (!isDirty) return undefined
+    const handleBeforeUnload = (event) => {
+      event.preventDefault()
+      event.returnValue = copy.leaveConfirm
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [copy.leaveConfirm, isDirty])
 
-  const loadContent = useCallback(async () => {
+  const applyLoaded = (global) => {
+    const content = readSiteContent(global?.landingConfig)
+    const theme = normalizeSiteTheme(content.siteTheme)
+    const next = {
+      siteName: global?.siteName || 'MedTour',
+      siteDescription: global?.siteDescription || '',
+      siteTheme: theme,
+      landingDrafts: buildLandingDrafts(content),
+      contacts: content.contacts,
+      navigation: content.navigation,
+      legalDrafts: buildLegalDrafts(content),
+      seo: content.seo,
+    }
+    setSiteName(next.siteName)
+    setSiteDescription(next.siteDescription)
+    setSiteTheme(next.siteTheme)
+    setAccentInput(theme.accentColor)
+    setLandingDrafts(next.landingDrafts)
+    setContacts(next.contacts)
+    setNavigation(next.navigation)
+    setLegalDrafts(next.legalDrafts)
+    setSeo(next.seo)
+    setSavedSnapshot(JSON.stringify(next))
+  }
+
+  const loadContent = async () => {
     setIsLoading(true)
     try {
-      const globalRes = await contentAPI.getGlobal()
-      const { data: globalData } = normalizeResponse(globalRes)
-
-      const incomingConfig = globalData?.landingConfig || {}
-      const nextConfigs = SUPPORTED_LOCALES.reduce((acc, locale) => {
-        const localeDefault = defaultLandingConfigs[locale.code] || defaultLandingConfig
-        const localizedIncoming =
-          incomingConfig?.i18n?.[locale.code] ||
-          (locale.code === DEFAULT_CONTENT_LOCALE && incomingConfig?.hero ? incomingConfig : null)
-
-        acc[locale.code] = mergeConfig(localeDefault, localizedIncoming || {})
-        return acc
-      }, {})
-
-      setLandingConfigs(nextConfigs)
-
-      setSiteName(globalData?.siteName || 'MedTour')
-      setSiteDescription(globalData?.siteDescription || nextConfigs[DEFAULT_CONTENT_LOCALE]?.hero?.description || defaultLandingConfig.hero.description)
-      setSeoMetaTitle(globalData?.defaultSeo?.metaTitle || 'MedTour — лечение в Казахстане под ключ')
-      setSeoMetaDescription(
-        globalData?.defaultSeo?.metaDescription ||
-          'MedTour помогает иностранным пациентам пройти лечение в Казахстане: медицинская заявка, документы, клиника, врач, поездка и сопровождение.',
-      )
+      const response = await contentAPI.getGlobal().catch((error) => {
+        // Записи Global ещё нет — редактируем значения по умолчанию.
+        if (error?.response?.status === 404) return null
+        throw error
+      })
+      applyLoaded(response ? normalizeResponse(response)?.data : null)
     } catch (error) {
-      console.error('Error loading content:', error)
+      console.error('Error loading site content:', error)
+      toast.error(copy.loadError)
     } finally {
       setIsLoading(false)
     }
-  }, [defaultLandingConfigs])
+  }
 
   useEffect(() => {
     loadContent()
-  }, [loadContent])
-
-  const setConfigValue = (path, value) => {
-    setLandingConfigs((prev) => {
-      const baseConfig = prev[activeContentLocale] || defaultLandingConfigs[activeContentLocale] || defaultLandingConfig
-      const nextLocaleConfig = structuredClone(baseConfig)
-      const next = { ...prev, [activeContentLocale]: nextLocaleConfig }
-      let ref = nextLocaleConfig
-      for (let i = 0; i < path.length - 1; i += 1) {
-        ref = ref[path[i]]
-      }
-      ref[path[path.length - 1]] = value
-      return next
-    })
-  }
-
-  const parseTitleDescriptionRows = (textValue, fallbackRows) => {
-    const rows = linesToArray(textValue)
-    if (rows.length === 0) return fallbackRows
-    return rows.map((row, index) => {
-      const [titlePart, ...descriptionParts] = row.split('|')
-      const title = titlePart?.trim() || fallbackRows[index]?.title || ''
-      const description = descriptionParts.join('|').trim() || fallbackRows[index]?.description || ''
-      return { title, description }
-    })
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSave = async () => {
     if (!siteName.trim()) {
-      toast.warning(t('admin_content.err_name'))
+      setActiveSection('seo')
+      toast.warning(copy.nameRequired)
       return
     }
-
     setIsSaving(true)
     try {
-      const configsToSave = SUPPORTED_LOCALES.reduce((acc, locale) => {
-        const localeDefault = defaultLandingConfigs[locale.code] || defaultLandingConfig
-        acc[locale.code] = mergeConfig(localeDefault, landingConfigs[locale.code] || {})
-        return acc
-      }, {})
-
-      await contentAPI.updateGlobal({
-        siteName: siteName.trim(),
-        siteDescription: siteDescription.trim() || configsToSave[DEFAULT_CONTENT_LOCALE].hero.description,
-        defaultSeo: {
-          metaTitle: seoMetaTitle.trim() || 'MedTour — лечение в Казахстане под ключ',
-          metaDescription:
-            seoMetaDescription.trim() ||
-            'MedTour помогает иностранным пациентам пройти лечение в Казахстане: медицинская заявка, документы, клиника, врач, поездка и сопровождение.',
-        },
-        landingConfig: {
-          ...configsToSave[DEFAULT_CONTENT_LOCALE],
-          i18n: configsToSave,
-        },
+      const landingConfig = compactSiteContent({
+        siteTheme: normalizeSiteTheme(siteTheme),
+        landing: landingDraftsToOverrides(landingDrafts),
+        contacts,
+        navigation,
+        legal: legalDraftsToOverrides(legalDrafts),
+        seo,
       })
-
-      await loadContent()
-      toast.success(t('admin_content.saved'))
+      const response = await contentAPI.updateGlobal({
+        siteName: siteName.trim(),
+        siteDescription: siteDescription.trim() || undefined,
+        landingConfig,
+      })
+      const saved = normalizeResponse(response)?.data || { siteName, siteDescription, landingConfig }
+      savedThemeRef.current = landingConfig.siteTheme
+      setFromGlobal(saved)
+      applyLoaded(saved)
+      toast.success(copy.saved)
     } catch (error) {
-      console.error('Error saving content:', error)
-      toast.error(t('admin_content.err_save'))
+      console.error('Error saving site content:', error)
+      const reason = error?.response?.data?.error?.message
+      toast.error(reason ? `${copy.saveError}: ${reason}` : copy.saveError)
     } finally {
       setIsSaving(false)
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className='flex items-center justify-center py-12'>
-        <Loader2 className='w-8 h-8 text-teal-600 animate-spin' />
-      </div>
-    )
+  const updateLanding = (key, value) => setLandingDrafts((drafts) => ({
+    ...drafts,
+    [landingLang]: { ...drafts[landingLang], [key]: value },
+  }))
+
+  const setAccent = (value) => {
+    setAccentInput(value)
+    if (!value.trim()) setSiteTheme((theme) => ({ ...theme, accentColor: '' }))
+    else if (isValidHexColor(value)) setSiteTheme((theme) => ({ ...theme, accentColor: value.toLowerCase() }))
   }
 
+  if (isLoading) {
+    return <div className='flex justify-center py-20'><Loader2 className='h-8 w-8 animate-spin text-teal-600' /></div>
+  }
+
+  const palette = getSiteThemePalette(siteTheme.paletteId)
+  const legalText = legalDrafts[legalDoc]?.[legalLang] || ''
+  const legalIsDefault = legalText.trim() === legalDefaultText(legalDoc, legalLang).trim()
+
   return (
-    <div className='space-y-6 animate-fadeIn'>
-      <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+    <div className='space-y-6 pb-16'>
+      <div className='flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between'>
         <div>
-          <h1 className='text-2xl font-bold text-slate-900'>{t('admin_content.title')}</h1>
-          <p className='text-slate-600'>{t('admin_content.subtitle')}</p>
+          <h1 className='text-2xl font-bold text-slate-950 sm:text-3xl'>{copy.title}</h1>
+          <p className='mt-1 text-slate-600'>{copy.subtitle}</p>
+          {isDirty && <p className='mt-2 text-sm font-medium text-amber-600'>{copy.unsaved}</p>}
         </div>
-        <div className='flex gap-2'>
-          <Button variant='secondary' leftIcon={<RefreshCcw className='w-4 h-4' />} onClick={loadContent}>
-            {t('admin_content.refresh')}
-          </Button>
-          <Button leftIcon={<Save className='w-4 h-4' />} onClick={handleSave} isLoading={isSaving}>
-            {t('admin_content.save')}
-          </Button>
+        <div className='flex flex-wrap gap-2'>
+          <Button variant='ghost' onClick={loadContent} disabled={isSaving} leftIcon={<RefreshCcw className='h-4 w-4' />}>{copy.refresh}</Button>
+          <Button onClick={handleSave} isLoading={isSaving} disabled={!isDirty} leftIcon={<Save className='h-4 w-4' />}>{copy.save}</Button>
         </div>
       </div>
 
-      <div className='flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm'>
-        {SUPPORTED_LOCALES.map((locale) => (
+      <nav className='flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5'>
+        {SECTIONS.map(({ id, icon: Icon }) => (
           <button
-            key={locale.code}
+            key={id}
             type='button'
-            onClick={() => setActiveContentLocale(locale.code)}
-            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
-              activeContentLocale === locale.code
-                ? 'bg-teal-600 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
+            onClick={() => setActiveSection(id)}
+            aria-current={activeSection === id ? 'page' : undefined}
+            className={cn(
+              'inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors',
+              activeSection === id ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50',
+            )}
           >
-            {locale.label}
+            <Icon className='h-4 w-4' />
+            {copy.sections[id]}
           </button>
         ))}
-      </div>
+      </nav>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('admin_content.hero_title')}</CardTitle>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          <Input
-            label={t('admin_content.label_badge')}
-            value={landingConfig.hero.badge}
-            onChange={(e) => setConfigValue(['hero', 'badge'], e.target.value)}
-          />
-          <div className='grid md:grid-cols-2 gap-4'>
-            <Input
-              label={t('admin_content.label_title_prefix')}
-              value={landingConfig.hero.titlePrefix}
-              onChange={(e) => setConfigValue(['hero', 'titlePrefix'], e.target.value)}
-            />
-            <Input
-              label={t('admin_content.label_title_highlight')}
-              value={landingConfig.hero.titleHighlight}
-              onChange={(e) => setConfigValue(['hero', 'titleHighlight'], e.target.value)}
-            />
-          </div>
-          <Textarea
-            label={t('admin_content.label_hero_desc')}
-            rows={3}
-            value={landingConfig.hero.description}
-            onChange={(e) => setConfigValue(['hero', 'description'], e.target.value)}
-          />
-          <div className='grid md:grid-cols-2 gap-4'>
-            <Input
-              label={t('admin_content.label_btn1')}
-              value={landingConfig.hero.primaryButtonLabel}
-              onChange={(e) => setConfigValue(['hero', 'primaryButtonLabel'], e.target.value)}
-            />
-            <Input
-              label={t('admin_content.label_btn2')}
-              value={landingConfig.hero.secondaryButtonLabel}
-              onChange={(e) => setConfigValue(['hero', 'secondaryButtonLabel'], e.target.value)}
-            />
-          </div>
-          <div className='rounded-xl border border-dashed border-teal-300 bg-teal-50 p-4'>
-            <div className='flex items-center gap-2 text-sm font-medium text-teal-800 mb-2'>
-              <Eye className='w-4 h-4' />
-              {t('admin_content.hero_preview')}
+      <p className='text-sm text-slate-500'>{copy.intro[activeSection]}</p>
+
+      {activeSection === 'appearance' && (
+        <div className='space-y-6'>
+          <Panel title={copy.paletteTitle} description={copy.paletteText}>
+            <div role='radiogroup' aria-label={copy.paletteTitle} className='grid gap-4 sm:grid-cols-2 xl:grid-cols-3'>
+              {SITE_THEME_PALETTES.map((item) => {
+                const selected = item.id === siteTheme.paletteId
+                return (
+                  <button
+                    key={item.id}
+                    type='button'
+                    role='radio'
+                    aria-checked={selected}
+                    onClick={() => setSiteTheme((theme) => ({ ...theme, paletteId: item.id }))}
+                    className={cn(
+                      'relative rounded-3xl border-2 bg-white p-3 text-left transition-all',
+                      selected ? 'border-teal-600 shadow-lg shadow-teal-600/10' : 'border-slate-200 hover:border-slate-300',
+                    )}
+                  >
+                    <PalettePreview palette={item} />
+                    {selected && (
+                      <span className='absolute right-6 top-6 flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-900 shadow'>
+                        <Check className='h-4 w-4' />
+                      </span>
+                    )}
+                    <p className='mt-4 font-semibold text-slate-900'>{item.label[uiLang] || item.label.ru}</p>
+                    <p className='mt-1 min-h-10 text-sm text-slate-500'>{item.note[uiLang] || item.note.ru}</p>
+                    <div className='mt-3 flex h-2.5 overflow-hidden rounded-full'>
+                      {['accent', 'glow', 'mint', 'ink', 'coral'].map((token) => (
+                        <span key={token} className='flex-1' style={{ background: item.tokens[token] }} />
+                      ))}
+                    </div>
+                  </button>
+                )
+              })}
             </div>
-            <p className='text-slate-800 font-semibold'>{landingConfig.hero.badge}</p>
-            <p className='text-slate-900 text-lg mt-1'>
-              {landingConfig.hero.titlePrefix} <span className='text-teal-600'>{landingConfig.hero.titleHighlight}</span>
-            </p>
-            <p className='text-slate-700 mt-1'>{landingConfig.hero.description}</p>
-          </div>
-        </CardContent>
-      </Card>
+          </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('admin_content.hero_card_title')}</CardTitle>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='grid md:grid-cols-2 gap-4'>
-            <Input
-              label={t('admin_content.label_card_title')}
-              value={landingConfig.heroCard.title}
-              onChange={(e) => setConfigValue(['heroCard', 'title'], e.target.value)}
-            />
-            <Input
-              label={t('admin_content.label_card_subtitle')}
-              value={landingConfig.heroCard.subtitle}
-              onChange={(e) => setConfigValue(['heroCard', 'subtitle'], e.target.value)}
-            />
-          </div>
-          <Textarea
-            label={t('admin_content.label_card_items')}
-            rows={4}
-            value={heroCardItemsText}
-            onChange={(e) =>
-              setConfigValue(
-                ['heroCard', 'items'],
-                parseTitleDescriptionRows(e.target.value, landingConfig.heroCard.items).slice(0, 3),
-              )
-            }
-          />
-          <Input
-            label={t('admin_content.label_card_btn')}
-            value={landingConfig.heroCard.buttonLabel}
-            onChange={(e) => setConfigValue(['heroCard', 'buttonLabel'], e.target.value)}
-          />
-          <div className='grid md:grid-cols-2 lg:grid-cols-4 gap-4'>
-            {landingConfig.stats.map((item, index) => (
-              <div key={index} className='space-y-2 p-3 rounded-xl border border-slate-200'>
-                <Input
-                  label={t('admin_content.metric_value', { index: index + 1 })}
-                  value={item.value}
-                  onChange={(e) => {
-                    const next = [...landingConfig.stats]
-                    next[index] = { ...next[index], value: e.target.value }
-                    setConfigValue(['stats'], next)
-                  }}
+          <Panel title={copy.accentTitle} description={copy.accentText}>
+            <div className='flex flex-wrap items-end gap-3'>
+              <label className='flex h-11 w-14 cursor-pointer overflow-hidden rounded-xl border border-slate-200'>
+                <input
+                  type='color'
+                  value={siteTheme.accentColor || palette.tokens.accent}
+                  onChange={(event) => setAccent(event.target.value)}
+                  className='h-14 w-20 -translate-x-2 -translate-y-1 cursor-pointer border-0'
+                  aria-label={copy.accentTitle}
                 />
+              </label>
+              <div className='w-40'>
                 <Input
-                  label={t('admin_content.metric_label_input', { index: index + 1 })}
-                  value={item.label}
-                  onChange={(e) => {
-                    const next = [...landingConfig.stats]
-                    next[index] = { ...next[index], label: e.target.value }
-                    setConfigValue(['stats'], next)
-                  }}
+                  value={accentInput}
+                  onChange={(event) => setAccent(event.target.value.trim())}
+                  placeholder={palette.tokens.accent}
+                  error={accentInput && !isValidHexColor(accentInput) ? copy.accentInvalid : undefined}
                 />
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('admin_content.features_title')}</CardTitle>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='grid md:grid-cols-3 gap-4'>
-            <Input
-              label={t('admin_content.label_badge_s')}
-              value={landingConfig.featuresSection.badge}
-              onChange={(e) => setConfigValue(['featuresSection', 'badge'], e.target.value)}
-            />
-            <Input
-              label={t('admin_content.label_title_s')}
-              value={landingConfig.featuresSection.title}
-              onChange={(e) => setConfigValue(['featuresSection', 'title'], e.target.value)}
-            />
-            <Input
-              label={t('admin_content.label_subtitle_s')}
-              value={landingConfig.featuresSection.subtitle}
-              onChange={(e) => setConfigValue(['featuresSection', 'subtitle'], e.target.value)}
-            />
-          </div>
-          <Textarea
-            label={t('admin_content.label_cards')}
-            rows={6}
-            value={featuresCardsText}
-            onChange={(e) =>
-              setConfigValue(
-                ['featuresSection', 'cards'],
-                parseTitleDescriptionRows(e.target.value, landingConfig.featuresSection.cards).slice(0, 4),
-              )
-            }
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('admin_content.steps_title')}</CardTitle>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='grid md:grid-cols-3 gap-4'>
-            <Input
-              label={t('admin_content.label_badge_s')}
-              value={landingConfig.stepsSection.badge}
-              onChange={(e) => setConfigValue(['stepsSection', 'badge'], e.target.value)}
-            />
-            <Input
-              label={t('admin_content.label_title_s')}
-              value={landingConfig.stepsSection.title}
-              onChange={(e) => setConfigValue(['stepsSection', 'title'], e.target.value)}
-            />
-            <Input
-              label={t('admin_content.label_subtitle_s')}
-              value={landingConfig.stepsSection.subtitle}
-              onChange={(e) => setConfigValue(['stepsSection', 'subtitle'], e.target.value)}
-            />
-          </div>
-          <Textarea
-            label={t('admin_content.label_steps')}
-            rows={6}
-            value={stepsText}
-            onChange={(e) =>
-              setConfigValue(
-                ['stepsSection', 'steps'],
-                parseTitleDescriptionRows(e.target.value, landingConfig.stepsSection.steps).slice(0, 4),
-              )
-            }
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('admin_content.about_title')}</CardTitle>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='grid md:grid-cols-3 gap-4'>
-            <Input
-              label={t('admin_content.label_badge_s')}
-              value={landingConfig.aboutSection.badge}
-              onChange={(e) => setConfigValue(['aboutSection', 'badge'], e.target.value)}
-            />
-            <Input
-              label={t('admin_content.label_title_s')}
-              value={landingConfig.aboutSection.title}
-              onChange={(e) => setConfigValue(['aboutSection', 'title'], e.target.value)}
-            />
-            <Input
-              label={t('admin_content.label_btn_s')}
-              value={landingConfig.aboutSection.buttonLabel}
-              onChange={(e) => setConfigValue(['aboutSection', 'buttonLabel'], e.target.value)}
-            />
-          </div>
-          <Textarea
-            label={t('admin_content.label_about_desc')}
-            rows={4}
-            value={landingConfig.aboutSection.description}
-            onChange={(e) => setConfigValue(['aboutSection', 'description'], e.target.value)}
-          />
-          <Textarea
-            label={t('admin_content.label_bullets')}
-            rows={4}
-            value={arrayToLines(landingConfig.aboutSection.bullets)}
-            onChange={(e) => setConfigValue(['aboutSection', 'bullets'], linesToArray(e.target.value))}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('admin_content.contact_title')}</CardTitle>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='grid md:grid-cols-3 gap-4'>
-            <Input
-              label={t('admin_content.label_badge_s')}
-              value={landingConfig.contactSection.badge}
-              onChange={(e) => setConfigValue(['contactSection', 'badge'], e.target.value)}
-            />
-            <Input
-              label={t('admin_content.label_title_s')}
-              value={landingConfig.contactSection.title}
-              onChange={(e) => setConfigValue(['contactSection', 'title'], e.target.value)}
-            />
-            <Input
-              label={t('admin_content.label_subtitle_s')}
-              value={landingConfig.contactSection.subtitle}
-              onChange={(e) => setConfigValue(['contactSection', 'subtitle'], e.target.value)}
-            />
-          </div>
-
-          <div className='grid lg:grid-cols-3 gap-4'>
-            <div className='space-y-2 p-3 rounded-xl border border-slate-200'>
-              <h3 className='text-sm font-medium text-slate-700'>{t('admin_content.section_phone')}</h3>
-              <Input
-                label={t('admin_content.label_phone_title')}
-                value={landingConfig.contactSection.phone.title}
-                onChange={(e) => setConfigValue(['contactSection', 'phone', 'title'], e.target.value)}
-              />
-              <Input
-                label={t('admin_content.label_phone_note')}
-                value={landingConfig.contactSection.phone.note}
-                onChange={(e) => setConfigValue(['contactSection', 'phone', 'note'], e.target.value)}
-              />
-              <Input
-                label={t('admin_content.label_phone_value')}
-                value={landingConfig.contactSection.phone.value}
-                onChange={(e) => setConfigValue(['contactSection', 'phone', 'value'], e.target.value)}
-              />
+              {siteTheme.accentColor && (
+                <Button variant='secondary' onClick={() => setAccent('')} leftIcon={<RotateCcw className='h-4 w-4' />}>{copy.accentReset}</Button>
+              )}
             </div>
-            <div className='space-y-2 p-3 rounded-xl border border-slate-200'>
-              <h3 className='text-sm font-medium text-slate-700'>Email</h3>
-              <Input
-                label={t('admin_content.label_email_title')}
-                value={landingConfig.contactSection.email.title}
-                onChange={(e) => setConfigValue(['contactSection', 'email', 'title'], e.target.value)}
-              />
-              <Input
-                label={t('admin_content.label_email_note')}
-                value={landingConfig.contactSection.email.note}
-                onChange={(e) => setConfigValue(['contactSection', 'email', 'note'], e.target.value)}
-              />
-              <Input
-                label={t('admin_content.label_email_value')}
-                value={landingConfig.contactSection.email.value}
-                onChange={(e) => setConfigValue(['contactSection', 'email', 'value'], e.target.value)}
-              />
-            </div>
-            <div className='space-y-2 p-3 rounded-xl border border-slate-200'>
-              <h3 className='text-sm font-medium text-slate-700'>{t('admin_content.section_address')}</h3>
-              <Input
-                label={t('admin_content.label_address_title')}
-                value={landingConfig.contactSection.address.title}
-                onChange={(e) => setConfigValue(['contactSection', 'address', 'title'], e.target.value)}
-              />
-              <Input
-                label={t('admin_content.label_address_note')}
-                value={landingConfig.contactSection.address.note}
-                onChange={(e) => setConfigValue(['contactSection', 'address', 'note'], e.target.value)}
-              />
-              <Input
-                label={t('admin_content.label_address_value')}
-                value={landingConfig.contactSection.address.value}
-                onChange={(e) => setConfigValue(['contactSection', 'address', 'value'], e.target.value)}
-              />
-            </div>
-          </div>
+          </Panel>
+        </div>
+      )}
 
-          <div className='space-y-3 p-4 rounded-xl border border-slate-200'>
-            <h3 className='font-medium text-slate-800'>{t('admin_content.qcard_heading')}</h3>
-            <Input
-              label={t('admin_content.label_qcard_title')}
-              value={landingConfig.contactSection.quickCard.title}
-              onChange={(e) => setConfigValue(['contactSection', 'quickCard', 'title'], e.target.value)}
-            />
-            <Textarea
-              label={t('admin_content.label_qcard_desc')}
-              rows={3}
-              value={landingConfig.contactSection.quickCard.description}
-              onChange={(e) => setConfigValue(['contactSection', 'quickCard', 'description'], e.target.value)}
-            />
-            <Textarea
-              label={t('admin_content.label_qcard_bullets')}
-              rows={3}
-              value={arrayToLines(landingConfig.contactSection.quickCard.bullets)}
-              onChange={(e) => setConfigValue(['contactSection', 'quickCard', 'bullets'], linesToArray(e.target.value))}
-            />
-            <Input
-              label={t('admin_content.label_qcard_btn')}
-              value={landingConfig.contactSection.quickCard.buttonLabel}
-              onChange={(e) => setConfigValue(['contactSection', 'quickCard', 'buttonLabel'], e.target.value)}
-            />
-            <Input
-              label={t('admin_content.label_map')}
-              value={landingConfig.contactSection.mapEmbedUrl}
-              onChange={(e) => setConfigValue(['contactSection', 'mapEmbedUrl'], e.target.value)}
-            />
+      {activeSection === 'landing' && (
+        <div className='space-y-6'>
+          <div className='sticky top-20 z-10 -mx-1 rounded-2xl bg-slate-50/90 px-1 py-2 backdrop-blur'>
+            <LangTabs value={landingLang} onChange={setLandingLang} />
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('admin_content.seo_title')}</CardTitle>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='grid md:grid-cols-2 gap-4'>
-            <Input
-              label={t('admin_content.label_site_name')}
-              value={siteName}
-              onChange={(e) => setSiteName(e.target.value)}
-            />
-            <Input
-              label={t('admin_content.label_site_desc')}
-              value={siteDescription}
-              onChange={(e) => setSiteDescription(e.target.value)}
-            />
-          </div>
-          <Input
-            label={t('admin_content.label_seo_title')}
-            value={seoMetaTitle}
-            onChange={(e) => setSeoMetaTitle(e.target.value)}
-          />
-          <Textarea
-            label={t('admin_content.label_seo_desc')}
-            rows={3}
-            value={seoMetaDescription}
-            onChange={(e) => setSeoMetaDescription(e.target.value)}
-          />
-          <div className='rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4'>
-            <div className='flex items-center gap-2 text-sm font-medium text-slate-700 mb-2'>
-              <FileText className='w-4 h-4' />
-              {t('admin_content.save_section_title')}
-            </div>
-            <p className='text-sm text-slate-600'>{t('admin_content.save_info_1')}</p>
-            <p className='text-sm text-slate-600 mt-1'>{t('admin_content.save_info_2')}</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('admin_content.preview_title')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className='grid md:grid-cols-2 gap-4'>
-            <div className='p-4 rounded-xl border border-slate-200 bg-slate-50'>
-              <div className='flex items-center gap-2 text-slate-800 font-medium mb-2'>
-                <LayoutTemplate className='w-4 h-4 text-teal-600' />
-                Hero
+          {LANDING_SECTIONS.map((section) => (
+            <Panel
+              key={section.id}
+              title={section.label[uiLang] || section.label.ru}
+              actions={(
+                <a href={`/${section.anchor ? `#${section.anchor}` : ''}`} target='_blank' rel='noreferrer' className='inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-800'>
+                  {copy.openSection}<ExternalLink className='h-3.5 w-3.5' />
+                </a>
+              )}
+            >
+              <div className='grid gap-4 lg:grid-cols-2'>
+                {section.fields.map((field) => {
+                  const value = landingDrafts[landingLang]?.[field.key] ?? ''
+                  const defaultText = fieldToText(field, landingDefaults(landingLang)[field.key])
+                  const isWide = field.type !== 'text'
+                  const Component = field.type === 'text' ? Input : Textarea
+                  const hint = field.type === 'lines' ? copy.linesHint : field.type === 'pairs' ? copy.pairsHint : undefined
+                  return (
+                    <div key={field.key} className={cn('relative', isWide && 'lg:col-span-2')}>
+                      <Component
+                        label={field.label[uiLang] || field.label.ru}
+                        rows={field.type === 'text' ? undefined : field.rows || 3}
+                        value={value}
+                        onChange={(event) => updateLanding(field.key, event.target.value)}
+                        placeholder={defaultText}
+                        hint={hint}
+                      />
+                      {value.trim() !== defaultText.trim() && (
+                        <button
+                          type='button'
+                          onClick={() => updateLanding(field.key, defaultText)}
+                          className='absolute right-0 top-0 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-teal-700'
+                          title={copy.resetField}
+                        >
+                          <RotateCcw className='h-3 w-3' />{copy.resetField}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-              <p className='text-sm text-slate-600'>{landingConfig.hero.badge}</p>
-              <p className='text-lg font-semibold text-slate-900 mt-1'>
-                {landingConfig.hero.titlePrefix} {landingConfig.hero.titleHighlight}
-              </p>
+            </Panel>
+          ))}
+        </div>
+      )}
+
+      {activeSection === 'contacts' && (
+        <div className='space-y-6'>
+          <Panel title={copy.sections.contacts} description={copy.contactsHint}>
+            <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
+              {['phone', 'email', 'website', 'whatsapp', 'telegram', 'instagram'].map((key) => (
+                <Input
+                  key={key}
+                  label={copy[key]}
+                  type={key === 'email' ? 'email' : key === 'phone' || key === 'whatsapp' ? 'tel' : 'text'}
+                  value={contacts[key] || ''}
+                  onChange={(event) => setContacts((current) => ({ ...current, [key]: event.target.value }))}
+                  placeholder={key === 'phone' ? '+7 7172 00 00 00' : key === 'website' ? 'https://www.nnmc.kz/' : ''}
+                  error={String(contacts[key] || '').trim() && !contactHref(key, contacts[key]) ? copy.contactInvalid : undefined}
+                />
+              ))}
             </div>
-            <div className='p-4 rounded-xl border border-slate-200 bg-slate-50'>
-              <div className='flex items-center gap-2 text-slate-800 font-medium mb-2'>
-                <Globe2 className='w-4 h-4 text-teal-600' />
-                {t('admin_content.preview_contacts')}
-              </div>
-              <p className='text-sm text-slate-600'>{landingConfig.contactSection.title}</p>
-              <p className='text-sm text-slate-900 mt-1'>{landingConfig.contactSection.phone.value}</p>
-              <p className='text-sm text-slate-900'>{landingConfig.contactSection.email.value}</p>
-            </div>
+          </Panel>
+          <Panel title={`${copy.address} · ${copy.hours}`}>
+            <LocalizedFields
+              fields={[
+                { key: 'address', label: copy.address, multiline: true, rows: 2, placeholder: t('footer.address') },
+                { key: 'hours', label: copy.hours, multiline: true, rows: 2 },
+              ]}
+              getValue={(lang, key) => contacts[key]?.[lang] || ''}
+              setValue={(lang, key, value) => setContacts((current) => ({ ...current, [key]: { ...(current[key] || {}), [lang]: value } }))}
+            />
+          </Panel>
+        </div>
+      )}
+
+      {activeSection === 'navigation' && (
+        <Panel title={copy.sections.navigation} description={copy.navHint}>
+          <div className='divide-y divide-slate-100'>
+            {NAV_ITEMS.map((item) => {
+              const entry = navigation.items[item.id] || { visible: true, label: {} }
+              const update = (patch) => setNavigation((current) => ({
+                ...current,
+                items: { ...current.items, [item.id]: { ...entry, ...patch } },
+              }))
+              return (
+                <div key={item.id} className='grid gap-3 py-4 lg:grid-cols-[180px_1fr] lg:items-center'>
+                  <label className='flex cursor-pointer items-center gap-3'>
+                    <input
+                      type='checkbox'
+                      checked={entry.visible !== false}
+                      onChange={(event) => update({ visible: event.target.checked })}
+                      className='h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500'
+                    />
+                    <span className={cn('font-medium', entry.visible === false ? 'text-slate-400 line-through' : 'text-slate-800')}>
+                      {i18n.getFixedT(uiLang)(item.labelKey)}
+                    </span>
+                    {entry.visible === false && <span className='rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700'>{copy.navHidden}</span>}
+                  </label>
+                  <div className='grid gap-2 sm:grid-cols-3'>
+                    {CONTENT_LANGS.map((lang) => (
+                      <Input
+                        key={lang}
+                        aria-label={`${copy.navLabel} (${LANG_LABELS[lang]})`}
+                        value={entry.label?.[lang] || ''}
+                        onChange={(event) => update({ label: { ...(entry.label || {}), [lang]: event.target.value } })}
+                        placeholder={`${lang.toUpperCase()}: ${i18n.getFixedT(lang)(item.labelKey)}`}
+                        disabled={entry.visible === false}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
-        </CardContent>
-      </Card>
+        </Panel>
+      )}
+
+      {activeSection === 'legal' && (
+        <Panel
+          title={legalDoc === 'privacy' ? copy.privacy : copy.terms}
+          description={copy.legalSyntax}
+          actions={(
+            <a href={legalDoc === 'privacy' ? '/privacy' : '/terms'} target='_blank' rel='noreferrer' className='inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-800'>
+              {copy.legalOpen}<ExternalLink className='h-3.5 w-3.5' />
+            </a>
+          )}
+        >
+          <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+            <div className='inline-flex rounded-xl bg-slate-100 p-1'>
+              {['privacy', 'terms'].map((doc) => (
+                <button
+                  key={doc}
+                  type='button'
+                  onClick={() => setLegalDoc(doc)}
+                  className={cn('rounded-lg px-4 py-2 text-sm font-semibold', legalDoc === doc ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500')}
+                >
+                  {doc === 'privacy' ? copy.privacy : copy.terms}
+                </button>
+              ))}
+            </div>
+            <LangTabs value={legalLang} onChange={setLegalLang} />
+          </div>
+          <div className='mt-5 flex items-center justify-between gap-3'>
+            <span className={cn('rounded-full px-2.5 py-1 text-xs font-medium', legalIsDefault ? 'bg-slate-100 text-slate-600' : 'bg-amber-50 text-amber-700')}>
+              {legalIsDefault ? copy.legalDefault : copy.legalCustom}
+            </span>
+            {!legalIsDefault && (
+              <Button
+                variant='secondary'
+                size='sm'
+                onClick={() => setLegalDrafts((drafts) => ({ ...drafts, [legalDoc]: { ...drafts[legalDoc], [legalLang]: legalDefaultText(legalDoc, legalLang) } }))}
+                leftIcon={<RotateCcw className='h-4 w-4' />}
+              >
+                {copy.legalReset}
+              </Button>
+            )}
+          </div>
+          <Textarea
+            containerClassName='mt-3'
+            className='font-mono text-sm'
+            rows={22}
+            value={legalText}
+            onChange={(event) => setLegalDrafts((drafts) => ({ ...drafts, [legalDoc]: { ...drafts[legalDoc], [legalLang]: event.target.value } }))}
+          />
+        </Panel>
+      )}
+
+      {activeSection === 'seo' && (
+        <div className='space-y-6'>
+          <Panel title={copy.sections.seo}>
+            <div className='grid gap-4 lg:grid-cols-2'>
+              <Input label={copy.siteName} required value={siteName} onChange={(event) => setSiteName(event.target.value)} />
+              <Input label={copy.siteDescription} value={siteDescription} onChange={(event) => setSiteDescription(event.target.value)} />
+            </div>
+          </Panel>
+          <Panel
+            title={`${copy.seoTitle} · ${copy.seoDescription}`}
+            description={copy.seoNote}
+            actions={<LangTabs value={seoLang} onChange={setSeoLang} />}
+          >
+            <div className='space-y-4'>
+              <Input
+                label={copy.seoTitle}
+                maxLength={120}
+                value={seo[seoLang]?.title || ''}
+                onChange={(event) => setSeo((current) => ({ ...current, [seoLang]: { ...current[seoLang], title: event.target.value } }))}
+                placeholder={i18n.getFixedT(seoLang)('seo.home_title')}
+              />
+              <Textarea
+                label={copy.seoDescription}
+                rows={3}
+                maxLength={320}
+                value={seo[seoLang]?.description || ''}
+                onChange={(event) => setSeo((current) => ({ ...current, [seoLang]: { ...current[seoLang], description: event.target.value } }))}
+                placeholder={i18n.getFixedT(seoLang)('seo.home_description')}
+              />
+            </div>
+          </Panel>
+        </div>
+      )}
     </div>
   )
 }

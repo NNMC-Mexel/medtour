@@ -1,6 +1,8 @@
 import type { Core } from '@strapi/strapi';
 import { decryptUserPII, encryptUserPII, isPiiEncryptionEnabled } from './utils/pii-crypto';
 import { importPriceCatalog } from './utils/price-catalog-import';
+import { GLOBAL_DEFAULTS } from './utils/global-defaults';
+import { backfillDoctorSpecializations, repairDoctorPrimarySpecializations } from './utils/doctor-specializations-backfill';
 
 // Все запросы сводки аналитики фильтруют по дню, а таблица растёт с каждым
 // визитом. Strapi индексы по полям schema.json не создаёт — ставим сами.
@@ -564,6 +566,20 @@ async function seedClinics(strapi: Core.Strapi) {
   console.log('MedTour clinics seeded.');
 }
 
+// Global — single type, а на свежей базе его записи нет: GET отвечает 404, а
+// PUT из «Отделений» падает 400 на обязательных siteName/siteDescription.
+// Создаём запись один раз; сохранённые админом значения не трогаем.
+async function ensureGlobal(strapi: Core.Strapi) {
+  try {
+    const existing = await strapi.documents('api::global.global' as any).findFirst({});
+    if (existing) return;
+    await strapi.documents('api::global.global' as any).create({ data: { ...GLOBAL_DEFAULTS } } as any);
+    strapi.log.info('[bootstrap] Global settings record created.');
+  } catch (error: any) {
+    strapi.log.warn(`[bootstrap] Global settings record was not created: ${error?.message}`);
+  }
+}
+
 async function seedRolesAndPermissions(strapi: Core.Strapi) {
   console.log('Setting up roles and permissions...');
 
@@ -900,6 +916,13 @@ export default {
     await ensureAppointmentSlotUniqueIndex(strapi);
     await seedSpecializations(strapi);
     await seedClinics(strapi);
+    await ensureGlobal(strapi);
+    try {
+      await backfillDoctorSpecializations(strapi);
+      await repairDoctorPrimarySpecializations(strapi);
+    } catch (error: any) {
+      strapi.log.warn(`[bootstrap] doctor specializations backfill failed: ${error?.message}`);
+    }
     await seedRolesAndPermissions(strapi);
     await enforceUsersPermissionsAdvanced(strapi);
     await enforceUsersPermissionsEmailSettings(strapi);

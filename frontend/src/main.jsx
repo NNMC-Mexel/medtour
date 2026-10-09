@@ -3,6 +3,13 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import './i18n'
 import App from './App'
+import { applyStoredSiteTheme } from './config/siteThemes'
+import useSiteContentStore from './stores/siteContentStore'
+
+// Цветовая схема из админки: сначала сохранённая в браузере (без мигания),
+// затем актуальная с сервера.
+applyStoredSiteTheme()
+useSiteContentStore.getState().load()
 
 // Две разные высоты. --app-height — высота раскладки: по ней строятся меню,
 // лэйауты и модалки, и клавиатура её не трогает (в CSS это 100dvh). Раньше

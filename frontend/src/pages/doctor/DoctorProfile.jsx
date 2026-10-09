@@ -151,7 +151,6 @@ function DoctorProfile() {
                         bio: formData.shortBio, // bio в схеме
                         education: formData.education,
                         experience: parseInt(formData.experience) || 0,
-                        price: parseInt(formData.price) || 0,
                         languages: formData.languages || [],
                         i18n: formData.i18n || {},
                     },

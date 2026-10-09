@@ -65,18 +65,22 @@
     "cam_off": "Камераны өшіру",
     "leave_call": "Қоңыраудан шығу",
     "next": "Келесі",
-    "previous": "Артқа"
+    "previous": "Артқа",
+    "remove_filter": "Сүзгіні алып тастау",
+    "select_no_results": "Ештеңе табылмады",
+    "select_search": "Іздеу...",
+    "select_selected_count": "Таңдалды: {{count}}"
   },
   "pricing": {
-    "badge": "Прайскурант",
+    "badge": "Прейскурант",
     "title": "MedTour сервистерінің болжамды бағалары",
     "subtitle": "Халықаралық пациенттерге арналған бағалар АҚШ долларымен көрсетіледі. Соңғы емдеу жоспарын клиника құжаттарды қарағаннан кейін растайды.",
-    "patient_title": "Прайскурант",
+    "patient_title": "Прейскурант",
     "patient_subtitle": "Кеңестер мен сүйемелдеу қызметтерінің өзекті бағалары.",
-    "empty": "Прайскурант әзірге толтырылмаған.",
+    "empty": "Прейскурант әзірге толтырылмаған.",
     "cta": "Өтінім қалдыру",
     "view_all": "Барлығын көру",
-    "category_default": "Прайскурант",
+    "category_default": "Прейскурант",
     "more": "Толығырақ",
     "less": "Жию"
   },
@@ -87,7 +91,7 @@
     "blog": "Блог / Мақалалар",
     "treatments": "Емдеу",
     "process": "Процесс",
-    "prices": "Прайскурант",
+    "prices": "Прейскурант",
     "specializations": "Мамандықтар",
     "about": "Біз туралы",
     "contacts": "Байланыс",
@@ -115,7 +119,7 @@
     "admin_appointments": "Жазылымдар",
     "admin_specializations": "Мамандықтар",
     "admin_treatments": "Бөлімдер және емдеу",
-    "admin_prices": "Прайскурант",
+    "admin_prices": "Прейскурант",
     "price_requests": "Қызмет сұраулары",
     "sent_baskets": "Жіберілген себеттер",
     "admin_guide_videos": "Оқыту видеолары",
@@ -126,7 +130,8 @@
     "doctor_cabinet": "Дәрігер кабинеті",
     "open_profile": "Профильді ашу",
     "account_menu": "Аккаунт мәзірі",
-    "admin_analytics": "Аналитика"
+    "admin_analytics": "Аналитика",
+    "admin_tourism": "Туризм"
   },
   "auth": {
     "login": {
@@ -428,8 +433,8 @@
       "/admin/treatment-departments_sub": "Емдеу бағыттарының беттері",
       "/admin/guide-videos": "Оқыту видеолары",
       "/admin/guide-videos_sub": "Пациенттерге арналған оқыту материалдарын басқару",
-      "/admin/settings": "Баптаулар",
-      "/admin/settings_sub": "Жүйе баптаулары",
+      "/admin/settings": "Сайт мазмұны",
+      "/admin/settings_sub": "Безендіру, мәтіндер, байланыс және SEO",
       "/patient/cases": "Медициналық өтінімдер",
       "/patient/cases_sub": "Емдеу өтінімін бақылау",
       "/doctor/cases": "Медициналық өтінімдер",
@@ -452,7 +457,9 @@
       "/coordinator/documents_sub": "Өтінім құжаттары",
       "default": "Бет",
       "/admin/analytics": "Аналитика",
-      "/admin/analytics_sub": "Кірулер, жарнама және консультацияға дейінгі воронка"
+      "/admin/analytics_sub": "Кірулер, жарнама және консультацияға дейінгі воронка",
+      "/admin/tourism": "Туризм",
+      "/admin/tourism_sub": "Демалыс орындары мен бағыттар"
     }
   },
   "patient": {
@@ -1032,7 +1039,8 @@
     "vacation_day": "Демалыс",
     "vacation_until": "{{date}} дейін демалыста",
     "day_off": "Демалыс",
-    "interval_label": "{{number}}-аралық"
+    "interval_label": "{{number}}-аралық",
+    "status_no_show": "Өтпеді"
   },
   "patients": {
     "title": "Менің науқастарым",
@@ -1073,7 +1081,8 @@
     "doctype_xray": "Рентген",
     "doctype_ultrasound": "УДЗ",
     "doctype_other": "Тексеру жоспары",
-    "doc_fallback": "Құжат"
+    "doc_fallback": "Құжат",
+    "status_no_show": "Өтпеді"
   },
   "payment": {
     "creating_title": "Төлем сәтті өтті!",
@@ -1314,7 +1323,7 @@
     "medical_docs": "Медициналық құжаттар",
     "no_docs": "Бұл жазба бойынша құжаттар жоқ",
     "doc_label": "Құжат",
-    "doctype_analysis": "Анализ",
+    "doctype_analysis": "Талдау",
     "doctype_prescription": "Тағайындама",
     "doctype_certificate": "Анықтама",
     "doctype_other": "Басқа",
@@ -1330,7 +1339,8 @@
     "private_decision_more_docs": "Қосымша құжаттар қажет",
     "private_notes_placeholder": "Менеджерге пікір жазыңыз: пациентті Қазақстанға шақыру керек пе, қандай тәуекелдер бар, комиссияда нені талқылау қажет...",
     "window_available": "Қорытынды қосуға тағы {{hours}} сағ. бар",
-    "window_expired_detail": "Консультациядан кейінгі {{hours}} сағаттық мерзім өтті"
+    "window_expired_detail": "Консультациядан кейінгі {{hours}} сағаттық мерзім өтті",
+    "status_no_show": "Өтпеді"
   },
   "payment_failure": {
     "title": "Төлем қабылданбады",
@@ -1411,7 +1421,7 @@
     "languages": "Консультация тілдері",
     "services": "Қызметтер",
     "video_consult": "Бейне консультация",
-    "chat_consult": "Чат-консультация",
+    "chat_consult": "Чат-кеңес",
     "in_development": "Жасалуда",
     "patient_reviews": "Пациенттердің пікірлері",
     "no_reviews": "Әлі пікір жоқ",
@@ -1443,7 +1453,8 @@
     "stat_total_cases": "Медициналық өтінімдер",
     "stat_active_cases": "Белсенді өтінімдер",
     "stat_sla_overdue": "SLA мерзімі өтті",
-    "cases_link": "Барлық өтінімдер →"
+    "cases_link": "Барлық өтінімдер →",
+    "status_no_show": "Өтпеді"
   },
   "admin_apt": {
     "title": "Қабылдамаға жазылу",
@@ -1515,7 +1526,9 @@
     "details_btn": "Толығырақ",
     "open_room_icon": "Бөлмені ашу",
     "unknown_patient": "Белгісіз",
-    "change_status_desc": "{{patient}} пациентінің {{doctor}} дәрігерге жазба мәртебесін өзгерту?"
+    "change_status_desc": "{{patient}} пациентінің {{doctor}} дәрігерге жазба мәртебесін өзгерту?",
+    "status_no_show": "Өтпеді",
+    "filter_no_show": "Өтпегендер"
   },
   "admin_doc": {
     "title": "Дәрігерлер",
@@ -1661,7 +1674,16 @@
     "err_schedule_invalid_date": "Дұрыс қабылдау күнін көрсетіңіз",
     "err_schedule_duplicate_date": "Бір күн бірнеше рет көрсетілген",
     "vacation_days_few": "{{count}} күн",
-    "vacation_days_many": "{{count}} күн"
+    "vacation_days_many": "{{count}} күн",
+    "adjust_photo": "Кадрды баптау",
+    "adjust_photo_hint": "Масштаб пен орнын өзгерту үшін фотоны басыңыз",
+    "click_photo_hint": "Суретті таңдап, масштабын және орнын реттеңіз",
+    "hint_specs": "Бірнешеуін таңдауға болады — біріншісі негізгі болады",
+    "label_specs": "Мамандықтар",
+    "placeholder_specs": "Мамандықтарды таңдаңыз",
+    "replace_photo": "Фотоны ауыстыру",
+    "spec_no_results": "Мамандықтар табылмады",
+    "spec_search_placeholder": "Мамандықты іздеу..."
   },
   "admin_spec": {
     "title": "Мамандықтар",
@@ -1685,7 +1707,7 @@
     "placeholder_desc": "Мамандықтың қысқаша сипаттамасы",
     "label_order": "Реті",
     "hint_order": "Реті тізімде сүйреп апарумен өзгертіледі",
-    "label_icon": "Белгіше (slug)",
+    "label_icon": "Белгіше",
     "placeholder_icon": "Мысалы: heart",
     "hint_icon": "Белгішенің мәтіндік кілті",
     "err_save_order": "Мамандықтар ретін сақтау мүмкін болмады",
@@ -1696,10 +1718,13 @@
     "drag_disabled": "Іздеу кезінде сүйреп апару режимі өшірілген.",
     "add_btn": "Мамандық қосу",
     "not_found": "Мамандықтар табылмады",
-    "confirm_delete": "\"{{name}}\" мамандығын жою керек пе?"
+    "confirm_delete": "\"{{name}}\" мамандығын жою керек пе?",
+    "icon_auto": "Атауы бойынша",
+    "icon_hint": "«Атауы бойынша» — сайт белгішені мамандық атауы бойынша таңдайды.",
+    "icon_legacy_hint": "Қазір ескі «{{key}}» кілті сақталған, сайтта белгіше атауы бойынша таңдалады. Нақты белгілеу үшін белгішені таңдаңыз."
   },
   "admin_price": {
-    "title": "Прайскурант",
+    "title": "Прейскурант",
     "subtitle": "Лендинг пен пациент кабинетінде көрсетілетін бағаларды қосу, өңдеу және жою",
     "add_btn": "Баға қосу",
     "search_placeholder": "Қызмет, санат немесе сипаттама бойынша іздеу...",
@@ -1728,7 +1753,7 @@
     "label_order": "Реті",
     "label_badge": "Бейдж",
     "label_note": "Ескертпе",
-    "label_active": "Прайскурантта көрсету",
+    "label_active": "Прейскурантта көрсету",
     "label_featured": "Лендингте көрсету",
     "placeholder_title": "Мысалы: Профильдік дәрігердің онлайн кеңесі",
     "placeholder_category": "Мысалы: Кеңестер",
@@ -1745,7 +1770,18 @@
     "created": "Баға жасалды",
     "deleted": "Баға жойылды",
     "not_found": "Прайс позициялары табылмады",
-    "confirm_delete": "\"{{title}}\" бағасын жою керек пе?"
+    "confirm_delete": "\"{{title}}\" бағасын жою керек пе?",
+    "rate_unavailable": "ҚРҰБ бағамы қолжетімсіз",
+    "label_price_kzt": "Экономист бағасы (KZT)",
+    "label_price_usd": "Пациентке арналған баға (USD)",
+    "rate_info": "{{date}} ҚРҰБ бағамы: $1 = {{rate}} KZT. USD сомасы сақтауға дейін көрсетілген.",
+    "rate_error": "ҚРҰБ бағамы қолжетімсіз. KZT бағасын сақтау уақытша мүмкін емес.",
+    "rate_loading": "ҚРҰБ ресми бағамы жүктелуде…",
+    "recalculate": "Ағымдағы бағам бойынша қайта есептеу:",
+    "label_section": "Прейскурант бөлімі",
+    "section_checkup": "Check-up және пакеттер",
+    "section_analysis": "Талдаулар",
+    "section_service": "Басқа қызметтер"
   },
   "admin_users": {
     "title": "Пайдаланушылар",
@@ -1878,7 +1914,12 @@
   "image_crop": {
     "title": "Фотоны қиып алу",
     "description": "Карточкада көрсетілетін аймақты таңдаңыз",
-    "rotate": "Бұру"
+    "rotate": "Бұру",
+    "apply": "Қолдану",
+    "error": "Фотоны өңдеу мүмкін болмады. Файлды қайта таңдаңыз.",
+    "move_hint": "Фотоны жақтау ішінде жылжытыңыз",
+    "reset": "Қалпына келтіру",
+    "zoom": "Масштаб"
   },
   "case_next_step": {
     "NEW_LEAD": "Өтініміңіз қабылданды. Командамыз жақын арада сізбен хабарласады.",
@@ -2193,7 +2234,19 @@
     "tourism_status_declined": "Қабылданбады",
     "tourism_status_booked": "Брондалды",
     "tourism_status_completed": "Аяқталды",
-    "tourism_status_cancelled": "Бас тартылды"
+    "tourism_status_cancelled": "Бас тартылды",
+    "logistics_not_started": "Басталмаған",
+    "logistics_docs_requested": "Құжаттар сұралды",
+    "logistics_docs_received": "Құжаттар алынды",
+    "logistics_invitation_preparing": "Шақыру дайындалуда",
+    "logistics_invitation_sent": "Шақыру жіберілді",
+    "logistics_submitted": "Тапсырылды",
+    "logistics_not_required": "Қажет емес",
+    "logistics_draft": "Жоба",
+    "logistics_offered": "Ұсынылды",
+    "logistics_accepted": "Қабылданды",
+    "logistics_declined": "Бас тартылды",
+    "logistics_booked": "Брондалды"
   },
   "staff": {
     "manager_title": "Менеджер жұмыс орны",
@@ -2486,7 +2539,7 @@
         "desc": "Дәрігерге қандай файлдар керек және олар қайда сақталады."
       },
       "consultation": {
-        "title": "Онлайн-консультация",
+        "title": "Онлайн-кеңес",
         "desc": "Уақытты таңдау, видео қоңырауға қосылу және дәрігер қорытындысын алу."
       },
       "chat": {
@@ -2611,5 +2664,11 @@
     "funnel_interested": "Бағыттарды, дәрігерлерді немесе бағаларды қарады",
     "funnel_sign_up": "Тіркелді",
     "funnel_case_created": "Өтінім (кейс) құрды"
+  },
+  "admin_i18n": {
+    "tabs_label": "Мазмұн тілі",
+    "fallback_hint": "Бос өрістер сайтта орыс тілінде көрсетіледі.",
+    "missing": "Аударылмаған өрістер: {{count}}",
+    "complete": "Аударма толтырылған"
   }
 }

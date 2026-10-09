@@ -1,19 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router-dom'
-import { CalendarClock, Camera, Check, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { CalendarClock, Camera, Check, Crop, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import PasswordInput from '../../components/ui/PasswordInput'
 import Select from '../../components/ui/Select'
-import Textarea from '../../components/ui/Textarea'
+import SearchableSelect from '../../components/ui/SearchableSelect'
+import Avatar from '../../components/ui/Avatar'
+import LocalizedFields from '../../components/admin/LocalizedFields'
 import Modal from '../../components/ui/Modal'
 import Badge from '../../components/ui/Badge'
 import ImageCropModal from '../../components/ui/ImageCropModal'
 import { useToast } from '../../components/ui/Toast'
 import api, { clinicsAPI, contentAPI, doctorsAPI, getMediaUrl, normalizeResponse, specializationsAPI, uploadFile } from '../../services/api'
-import { getPasswordError } from '../../utils/helpers'
+import { doctorMatchesSpec, getDoctorField, getDoctorSpecLabel, getDoctorSpecNames, getDoctorSpecializations, getPasswordError, getSpecName, toDigits } from '../../utils/helpers'
+import { compactI18n, formLocaleGetter, formLocaleSetter, readI18n } from '../../utils/localizedContent'
 import AdminScheduleBuilder from '../../components/admin/AdminScheduleBuilder'
 import DoctorScheduleModal from '../../components/admin/DoctorScheduleModal'
 import { createRecurringSchedule, getDoctorScheduleConfig } from '../../utils/schedule'
@@ -29,10 +32,9 @@ const defaultForm = {
   password: '',
   confirmPassword: '',
   fullName: '',
-  specialization: '',
+  specializationIds: [],
   treatmentDepartments: [],
   experience: '0',
-  price: '8000',
   licenseNumber: '',
   position: '',
   workplace: '',
@@ -41,7 +43,12 @@ const defaultForm = {
   isActive: true,
   slotDuration: '30',
   scheduleConfig: null,
+  i18n: readI18n(null),
 }
+
+// Поля карточки врача, которые переводятся во вкладках модалки (doctor.i18n).
+const TRANSLATED_FIELDS = ['fullName', 'education', 'bio']
+const MAX_EXPERIENCE_DIGITS = 2
 
 const slotDurationOptions = [15, 30, 45, 60]
 
@@ -87,18 +94,24 @@ const extractCreatedUser = (response) => {
 function toPayload(form, clinics, schedulePayload) {
   const selectedClinic = clinics.find((clinic) => clinic.name === form.workplace)
 
+  // Первая выбранная специальность остаётся «основной»: на неё смотрят
+  // карточки, письма и записи, созданные до появления списка.
+  const specializationIds = (form.specializationIds || []).map(Number).filter(Number.isFinite)
+
+  // Цены нет: консультации в MedTour бесплатные.
   return {
     fullName: form.fullName.trim(),
-    specialization: form.specialization ? Number(form.specialization) : null,
+    specialization: specializationIds[0] ?? null,
+    specializations: specializationIds,
     treatmentDepartments: form.treatmentDepartments,
     experience: Number(form.experience) || 0,
-    price: Number(form.price) || 0,
     licenseNumber: form.licenseNumber.trim(),
     position: form.position.trim(),
     workplace: selectedClinic?.name || '',
     clinic: selectedClinic ? getClinicRef(selectedClinic) : null,
     bio: form.bio || '',
     education: form.education || '',
+    i18n: compactI18n(form.i18n, TRANSLATED_FIELDS),
     isActive: Boolean(form.isActive),
     ...schedulePayload,
   }
@@ -129,6 +142,7 @@ function AdminDoctors({ readonly = false }) {
   const [form, setForm] = useState(defaultForm)
   const [photoFile, setPhotoFile] = useState(null)
   const [photoPreview, setPhotoPreview] = useState('')
+  const [photoEditSource, setPhotoEditSource] = useState('')
   const [removePhoto, setRemovePhoto] = useState(false)
   const [cropModalOpen, setCropModalOpen] = useState(false)
   const [cropImageSrc, setCropImageSrc] = useState(null)
@@ -174,7 +188,14 @@ function AdminDoctors({ readonly = false }) {
       const { data: specsData } = normalizeResponse(specsRes)
       const { data: clinicsData } = normalizeResponse(clinicsRes)
       const { data: globalData } = normalizeResponse(globalRes) || {}
-      const usersRes = await api.get('/api/users?populate[role][fields][0]=id&populate[role][fields][1]=type&populate[role][fields][2]=name&pagination[limit]=1000')
+      // Список аккаунтов нужен только для логина/email в форме; координатору
+      // (страница только для чтения) он закрыт — тогда врачи всё равно видны.
+      const usersRes = await api
+        .get('/api/users?populate[role][fields][0]=id&populate[role][fields][1]=type&populate[role][fields][2]=name&pagination[limit]=1000')
+        .catch((error) => {
+          if (readonly && error?.response?.status === 403) return { data: [] }
+          throw error
+        })
       const usersData = Array.isArray(usersRes.data) ? usersRes.data : []
       const usersMap = new Map(usersData.map((user) => [user.id, user]))
 
@@ -198,7 +219,7 @@ function AdminDoctors({ readonly = false }) {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [readonly])
 
   useEffect(() => {
     loadData()
@@ -208,9 +229,9 @@ function AdminDoctors({ readonly = false }) {
     () =>
       (specializations || []).map((spec) => ({
         value: String(spec.id),
-        label: spec.name,
+        label: getSpecName(spec, i18n.language) || spec.name,
       })),
-    [specializations],
+    [i18n.language, specializations],
   )
 
   const workplaceOptions = useMemo(
@@ -230,19 +251,20 @@ function AdminDoctors({ readonly = false }) {
   )
 
   const filteredDoctors = useMemo(() => {
+    const needle = search.trim().toLowerCase()
     return (doctors || []).filter((doctor) => {
       const matchesSearch =
-        !search ||
-        doctor.fullName?.toLowerCase().includes(search.toLowerCase()) ||
-        doctor.bio?.toLowerCase().includes(search.toLowerCase())
+        !needle ||
+        doctor.fullName?.toLowerCase().includes(needle) ||
+        doctor.bio?.toLowerCase().includes(needle) ||
+        doctor.licenseNumber?.toLowerCase().includes(needle) ||
+        getDoctorSpecNames(doctor, i18n.language).some((name) => name.toLowerCase().includes(needle))
 
-      const doctorSpecId =
-        typeof doctor.specialization === 'object' ? String(doctor.specialization?.id) : String(doctor.specialization || '')
-      const matchesSpec = specFilter === 'all' || doctorSpecId === specFilter
+      const matchesSpec = specFilter === 'all' || doctorMatchesSpec(doctor, specFilter)
 
       return matchesSearch && matchesSpec
     })
-  }, [doctors, search, specFilter])
+  }, [doctors, i18n.language, search, specFilter])
 
   const openCreateModal = () => {
     const defaultClinic = clinics.find((clinic) => clinic.clinicType === 'nnmc' || clinic.slug === 'nnmc') || clinics[0]
@@ -254,6 +276,8 @@ function AdminDoctors({ readonly = false }) {
     })
     setPhotoFile(null)
     setPhotoPreview('')
+    setPhotoEditSource('')
+    setCropImageSrc(null)
     setRemovePhoto(false)
     setDoctorSaveState('idle')
     setIsModalOpen(true)
@@ -269,15 +293,13 @@ function AdminDoctors({ readonly = false }) {
       password: '',
       confirmPassword: '',
       fullName: doctor.fullName || '',
-      specialization:
-        typeof doctor.specialization === 'object'
-          ? String(doctor.specialization?.id || '')
-          : String(doctor.specialization || ''),
+      specializationIds: getDoctorSpecializations(doctor)
+        .map((spec) => String(spec?.id ?? spec ?? ''))
+        .filter(Boolean),
       treatmentDepartments: assignmentDepartment
         ? [...new Set([...(Array.isArray(doctor.treatmentDepartments) ? doctor.treatmentDepartments : []), assignmentDepartment.slug])]
         : (Array.isArray(doctor.treatmentDepartments) ? doctor.treatmentDepartments : []),
       experience: String(doctor.experience || 0),
-      price: String(doctor.price || 0),
       licenseNumber: doctor.licenseNumber || '',
       position: doctor.position || '',
       workplace: resolveDoctorWorkplace(doctor, clinics),
@@ -286,9 +308,13 @@ function AdminDoctors({ readonly = false }) {
       isActive: doctor.isActive !== false,
       slotDuration: String(doctor.slotDuration || 30),
       scheduleConfig: getDoctorScheduleConfig(doctor),
+      i18n: readI18n(doctor.i18n),
     })
+    const photoUrl = getMediaUrl(doctor.photo) || ''
     setPhotoFile(null)
-    setPhotoPreview(getMediaUrl(doctor.photo) || '')
+    setPhotoPreview(photoUrl)
+    setPhotoEditSource(photoUrl)
+    setCropImageSrc(null)
     setRemovePhoto(false)
     setDoctorSaveState('idle')
     setIsModalOpen(true)
@@ -320,12 +346,26 @@ function AdminDoctors({ readonly = false }) {
   const handleCroppedPhoto = async (croppedFile) => {
     setPhotoFile(croppedFile)
     setPhotoPreview(URL.createObjectURL(croppedFile))
+    // Исходник, а не обрезанный кадр: повторная настройка начинается с полного фото.
+    setPhotoEditSource(cropImageSrc)
     setRemovePhoto(false)
+  }
+
+  // Клик по фото открывает настройку кадра текущего снимка, без фото — выбор файла.
+  const handlePhotoEdit = () => {
+    if (!photoPreview) {
+      photoInputRef.current?.click()
+      return
+    }
+    setCropImageSrc(photoEditSource || photoPreview)
+    setCropModalOpen(true)
   }
 
   const handleRemovePhoto = () => {
     setPhotoFile(null)
     setPhotoPreview('')
+    setPhotoEditSource('')
+    setCropImageSrc(null)
     setRemovePhoto(true)
   }
 
@@ -344,11 +384,6 @@ function AdminDoctors({ readonly = false }) {
 
     if (!form.fullName.trim()) {
       toast.warning(t('admin_doc.err_name'))
-      return
-    }
-
-    if (!form.price || Number(form.price) < 0) {
-      toast.warning(t('admin_doc.err_price'))
       return
     }
 
@@ -436,6 +471,8 @@ function AdminDoctors({ readonly = false }) {
       setForm(defaultForm)
       setPhotoFile(null)
       setPhotoPreview('')
+      setPhotoEditSource('')
+      setCropImageSrc(null)
       setRemovePhoto(false)
       await loadData()
     } catch (error) {
@@ -525,7 +562,6 @@ function AdminDoctors({ readonly = false }) {
                   <th className='text-left py-4 px-6 font-medium text-slate-500'>{t('admin_doc.col_spec')}</th>
                   <th className='text-left py-4 px-6 font-medium text-slate-500'>{t('admin_doc.col_license')}</th>
                   <th className='text-left py-4 px-6 font-medium text-slate-500'>{t('admin_doc.col_exp')}</th>
-                  <th className='text-left py-4 px-6 font-medium text-slate-500'>{t('admin_doc.col_price')}</th>
                   <th className='text-left py-4 px-6 font-medium text-slate-500'>{t('admin_doc.col_status')}</th>
                   <th className='text-right py-4 px-6 font-medium text-slate-500'>{t('admin_doc.col_actions')}</th>
                 </tr>
@@ -533,25 +569,25 @@ function AdminDoctors({ readonly = false }) {
               <tbody>
                 {filteredDoctors.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className='text-center py-10 text-slate-500'>
+                    <td colSpan={6} className='text-center py-10 text-slate-500'>
                       {t('admin_doc.not_found')}
                     </td>
                   </tr>
                 ) : (
                   filteredDoctors.map((doctor) => (
                     <tr key={doctor.documentId || doctor.id} className='border-b border-slate-100 hover:bg-slate-50'>
-                      <td className='py-4 px-6 font-medium text-slate-900'>{doctor.fullName}</td>
+                      <td className='py-4 px-6'>
+                        <div className='flex min-w-[220px] items-center gap-3'>
+                          <Avatar src={getMediaUrl(doctor.photo)} name={doctor.fullName} size='md' />
+                          <span className='font-medium text-slate-900'>{getDoctorField(doctor, 'fullName', i18n.language) || doctor.fullName}</span>
+                        </div>
+                      </td>
                       <td className='py-4 px-6 text-slate-600'>
-                        {typeof doctor.specialization === 'object'
-                          ? doctor.specialization?.name || t('admin_doc.no_spec')
-                          : doctor.specialization || t('admin_doc.no_spec')}
+                        {getDoctorSpecLabel(doctor, i18n.language) || t('admin_doc.no_spec')}
                       </td>
                       <td className='py-4 px-6 text-slate-600'>{doctor.licenseNumber || '—'}</td>
-                      <td className='py-4 px-6 text-slate-600'>
+                      <td className='py-4 px-6 text-slate-600 whitespace-nowrap'>
                         {t('admin_doc.exp_years', { count: doctor.experience || 0 })}
-                      </td>
-                      <td className='py-4 px-6 text-slate-600'>
-                        {(doctor.price || 0).toLocaleString('ru-RU')} ₸
                       </td>
                       <td className='py-4 px-6'>
                         <Badge variant={doctor.isActive === false ? 'danger' : 'success'}>
@@ -672,47 +708,65 @@ function AdminDoctors({ readonly = false }) {
             <input ref={photoInputRef} type='file' accept='image/*' className='hidden' onChange={handlePhotoSelect} />
             <button
               type='button'
-              onClick={() => photoInputRef.current?.click()}
-              className='group relative h-20 w-20 shrink-0 overflow-hidden rounded-full bg-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2'
-              aria-label={t('admin_doc.upload_photo')}
+              onClick={handlePhotoEdit}
+              className='group relative h-20 w-20 shrink-0 overflow-hidden rounded-full bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2'
+              aria-label={photoPreview ? t('admin_doc.adjust_photo') : t('admin_doc.upload_photo')}
+              title={photoPreview ? t('admin_doc.adjust_photo') : t('admin_doc.upload_photo')}
             >
               {photoPreview ? (
                 <img src={photoPreview} alt={t('admin_doc.photo_alt')} className='w-full h-full object-cover' />
               ) : (
-                <Camera className='w-8 h-8 text-slate-500' />
+                <span className='flex h-full w-full items-center justify-center'>
+                  <Camera className='w-8 h-8 text-slate-500' />
+                </span>
               )}
-              <span className='absolute inset-0 flex items-center justify-center bg-slate-900/50 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100'>
-                <Pencil className='h-5 w-5' />
+              <span className='absolute inset-0 flex items-center justify-center bg-slate-900/50 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100'>
+                {photoPreview ? <Crop className='h-5 w-5' /> : <Camera className='h-5 w-5' />}
               </span>
             </button>
-            <div className='flex flex-wrap gap-2'>
-              <Button type='button' variant='secondary' onClick={() => photoInputRef.current?.click()} leftIcon={<Camera className='w-4 h-4' />}>
-                {t('admin_doc.upload_photo')}
-              </Button>
-              {photoPreview && (
-                <Button type='button' variant='secondary' onClick={handleRemovePhoto} leftIcon={<X className='w-4 h-4' />}>
-                  {t('admin_doc.remove_photo')}
+            <div className='min-w-0 flex-1 basis-40'>
+              <div className='flex flex-wrap gap-2'>
+                {photoPreview && (
+                  <Button type='button' variant='secondary' onClick={handlePhotoEdit} leftIcon={<Crop className='w-4 h-4' />}>
+                    {t('admin_doc.adjust_photo')}
+                  </Button>
+                )}
+                <Button type='button' variant='secondary' onClick={() => photoInputRef.current?.click()} leftIcon={<Camera className='w-4 h-4' />}>
+                  {photoPreview ? t('admin_doc.replace_photo') : t('admin_doc.upload_photo')}
                 </Button>
-              )}
+                {photoPreview && (
+                  <Button type='button' variant='secondary' onClick={handleRemovePhoto} leftIcon={<X className='w-4 h-4' />}>
+                    {t('admin_doc.remove_photo')}
+                  </Button>
+                )}
+              </div>
+              <p className='mt-2 text-xs text-slate-500'>
+                {photoPreview ? t('admin_doc.adjust_photo_hint') : t('admin_doc.click_photo_hint')}
+              </p>
             </div>
           </div>
 
-          <div className='grid md:grid-cols-2 gap-4'>
-            <Input
-              label={t('admin_doc.label_name')}
-              required
-              value={form.fullName}
-              onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))}
-              placeholder={t('admin_doc.placeholder_name')}
-            />
-            <Select
-              label={t('admin_doc.label_spec')}
-              value={form.specialization}
-              onChange={(e) => setForm((prev) => ({ ...prev, specialization: e.target.value }))}
-              options={specializationOptions}
-              placeholder={t('admin_doc.placeholder_spec')}
-            />
-          </div>
+          <LocalizedFields
+            fields={[
+              { key: 'fullName', label: t('admin_doc.label_name'), required: true, placeholder: t('admin_doc.placeholder_name') },
+              { key: 'education', label: t('admin_doc.label_education'), multiline: true, rows: 3, placeholder: t('admin_doc.placeholder_education') },
+              { key: 'bio', label: t('admin_doc.label_bio'), multiline: true, rows: 4, placeholder: t('admin_doc.placeholder_bio') },
+            ]}
+            getValue={formLocaleGetter(form)}
+            setValue={formLocaleSetter(setForm)}
+          />
+
+          <SearchableSelect
+            multiple
+            label={t('admin_doc.label_specs')}
+            value={form.specializationIds}
+            onChange={(specializationIds) => setForm((prev) => ({ ...prev, specializationIds }))}
+            options={specializationOptions}
+            placeholder={t('admin_doc.placeholder_specs')}
+            searchPlaceholder={t('admin_doc.spec_search_placeholder')}
+            noResultsText={t('admin_doc.spec_no_results')}
+            hint={t('admin_doc.hint_specs')}
+          />
 
           <div className='rounded-xl border border-slate-200 p-4'>
             <div>
@@ -765,21 +819,13 @@ function AdminDoctors({ readonly = false }) {
             />
           </div>
 
-          <div className='grid md:grid-cols-3 gap-4'>
+          <div className='grid md:grid-cols-2 gap-4'>
             <Input
               label={t('admin_doc.label_exp')}
-              type='number'
-              min='0'
+              type='text'
+              inputMode='numeric'
               value={form.experience}
-              onChange={(e) => setForm((prev) => ({ ...prev, experience: e.target.value }))}
-            />
-            <Input
-              label={t('admin_doc.label_price')}
-              type='number'
-              min='0'
-              required
-              value={form.price}
-              onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))}
+              onChange={(e) => setForm((prev) => ({ ...prev, experience: toDigits(e.target.value, MAX_EXPERIENCE_DIGITS) }))}
             />
             <Select
               label={t('admin_doc.label_duration')}
@@ -792,22 +838,6 @@ function AdminDoctors({ readonly = false }) {
           <AdminScheduleBuilder
             value={form.scheduleConfig || createRecurringSchedule()}
             onChange={(scheduleConfig) => setForm((prev) => ({ ...prev, scheduleConfig }))}
-          />
-
-          <Textarea
-            label={t('admin_doc.label_education')}
-            rows={3}
-            value={form.education}
-            onChange={(e) => setForm((prev) => ({ ...prev, education: e.target.value }))}
-            placeholder={t('admin_doc.placeholder_education')}
-          />
-
-          <Textarea
-            label={t('admin_doc.label_bio')}
-            rows={4}
-            value={form.bio}
-            onChange={(e) => setForm((prev) => ({ ...prev, bio: e.target.value }))}
-            placeholder={t('admin_doc.placeholder_bio')}
           />
 
           <label className='flex items-center gap-2 text-sm text-slate-700'>

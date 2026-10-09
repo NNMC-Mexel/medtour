@@ -118,6 +118,7 @@ function PatientHistory() {
     cancelled: { label: t('patients.status_cancelled'), variant: 'danger' },
     completed: { label: t('patients.status_completed'), variant: 'success' },
     in_progress: { label: t('patients.status_in_progress'), variant: 'default' },
+    no_show: { label: t('patients.status_no_show'), variant: 'warning' },
   }
 
   const docTypeLabels = {

@@ -34,6 +34,19 @@
   --color-accent-500: #f43f5e;
   --color-accent-600: #e11d48;
 
+  /* MedTour brand tokens. Admin > Контент сайта > Оформление переопределяет их
+     на :root (config/siteThemes.js); здесь — фирменная палитра по умолчанию. */
+  --color-mt-night: #07132f;
+  --color-mt-ink: #111d3f;
+  --color-mt-ink-soft: #13254d;
+  --color-mt-accent: #0a9a87;
+  --color-mt-accent-strong: #087f72;
+  --color-mt-glow: #42d1b1;
+  --color-mt-glow-soft: #b8f3e9;
+  --color-mt-mint: #e8f7f4;
+  --color-mt-blue: #3157d5;
+  --color-mt-coral: #ff6b55;
+
   /* Font Families */
   --font-sans: 'DM Sans', system-ui, sans-serif;
   --font-heading: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -325,7 +338,7 @@
 
 /* MedTour 2026 visual system */
 .medtour-kicker {
-  color: #ff6b55;
+  color: var(--color-mt-coral);
   font-size: 0.76rem;
   font-weight: 800;
   letter-spacing: 0.18em;
@@ -334,7 +347,7 @@
 
 .medtour-title {
   max-width: 760px;
-  color: #101b3f;
+  color: var(--color-mt-ink);
   font-size: clamp(2.35rem, 5vw, 4rem);
   font-weight: 650;
   line-height: 1.06;
@@ -370,7 +383,7 @@
 .medical-tile:hover .medical-glyph { border-radius: 1rem; transform: rotate(0deg) scale(1.05); }
 .medical-tile:hover .medical-glyph > svg { transform: rotate(0deg); }
 .medical-glyph.tone-0 { background: #ffecef; color: #e64b61; }
-.medical-glyph.tone-1 { background: #eaf0ff; color: #3157d5; }
+.medical-glyph.tone-1 { background: #eaf0ff; color: var(--color-mt-blue); }
 .medical-glyph.tone-2 { background: #f0edff; color: #6941c6; }
 .medical-glyph.tone-3 { background: #e7f6f1; color: #147b68; }
 
@@ -426,7 +439,7 @@
 
 .landing-primary-cta:hover {
   transform: translateY(-2px);
-  box-shadow: 0 22px 58px rgba(10, 163, 143, 0.34);
+  box-shadow: 0 22px 58px color-mix(in srgb, var(--color-mt-accent) 34%, transparent);
 }
 
 .landing-float-card {
@@ -435,7 +448,7 @@
 
 .landing-float-card:hover {
   transform: translateY(-5px);
-  border-color: rgba(82, 209, 187, 0.5);
+  border-color: color-mix(in srgb, var(--color-mt-glow) 50%, transparent);
 }
 
 .landing-scrollbar {

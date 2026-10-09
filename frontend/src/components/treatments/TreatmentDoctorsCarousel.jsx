@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getMediaUrl } from '../../services/api'
 import { treatmentUi } from '../../data/treatmentDepartments'
-import { cn, getDoctorField, getInitials, getSpecName, isDoctorOnline } from '../../utils/helpers'
+import { cn, getDoctorField, getDoctorSpecLabel, getInitials, isDoctorOnline } from '../../utils/helpers'
 
 const colors = [
   'from-teal-400 to-teal-700', 'from-sky-400 to-sky-700', 'from-violet-400 to-violet-700',
@@ -14,12 +14,7 @@ const colors = [
 function DoctorTreatmentCard({ doctor }) {
   const { t, i18n } = useTranslation()
   const name = getDoctorField(doctor, 'fullName', i18n.language) || doctor.fullName
-  const localizedSpecialization = i18n.language === 'en'
-    ? doctor.specialization?.nameEn
-    : i18n.language === 'kk'
-      ? doctor.specialization?.nameKk
-      : getSpecName(doctor.specialization, i18n.language)
-  const specialization = localizedSpecialization || t('common.specialist')
+  const specialization = getDoctorSpecLabel(doctor, i18n.language) || t('common.specialist')
   const photoUrl = getMediaUrl(doctor.photo)
   const color = colors[(name?.charCodeAt(0) || 0) % colors.length]
   const experience = doctor.experience || 0

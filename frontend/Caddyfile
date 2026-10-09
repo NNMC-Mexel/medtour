@@ -59,9 +59,12 @@
 
 	# Маршруты приложения из src/App.jsx. Добавили страницу — добавьте её сюда,
 	# иначе сервер ответит на неё 404.
+	# Сначала настоящий файл: картинки лежат под теми же префиксами, что и
+	# страницы (public/tourism/*.jpg, public/treatments/*.png), и без этой
+	# проверки вместо картинки уходил index.html.
 	@app path_regexp ^/((about|blog|doctors|specializations|prices|tourism|privacy|terms|login|register|forgot-password|reset-password|verify-email-sent|email-confirmed|patient|doctor|admin|manager|coordinator)(/.*)?|(treatments|consultation)/.+|payment/(success|failure))/?$
 	handle @app {
-		try_files /seo/{seo_lang}{path}/index.html {path}/index.html /index.html
+		try_files {path} /seo/{seo_lang}{path}/index.html {path}/index.html /index.html
 		file_server
 	}
 

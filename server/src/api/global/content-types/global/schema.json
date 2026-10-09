@@ -20,7 +20,11 @@
       "type": "media",
       "multiple": false,
       "required": false,
-      "allowedTypes": ["images", "files", "videos"]
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos"
+      ]
     },
     "siteDescription": {
       "type": "text",
@@ -35,6 +39,9 @@
       "type": "json"
     },
     "treatmentDepartments": {
+      "type": "json"
+    },
+    "tourismRegions": {
       "type": "json"
     }
   }

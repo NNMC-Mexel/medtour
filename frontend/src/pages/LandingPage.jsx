@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import HeroSection from '../components/landing/HeroSection'
 import VisualBridge from '../components/landing/VisualBridge'
@@ -12,37 +12,48 @@ import ArticlesSection from '../components/landing/ArticlesSection'
 import FinalCtaSection from '../components/landing/FinalCtaSection'
 import { landingCopy } from '../data/landingCopy'
 import { mergeTreatmentDepartments, TREATMENT_DEPARTMENTS } from '../data/treatmentDepartments'
-import { contentAPI, doctorsAPI, normalizeResponse } from '../services/api'
+import { doctorsAPI, normalizeResponse } from '../services/api'
+import { mergeLandingCopy } from '../config/siteContent'
+import useSiteContentStore from '../stores/siteContentStore'
 import useSeo from '../components/seo/useSeo'
 
 function LandingPage() {
   const { i18n } = useTranslation()
-  useSeo({ title: i18n.t('seo.home_title'), description: i18n.t('seo.home_description'), path: '/' })
   const lang = i18n.language?.split('-')?.[0] || 'ru'
-  const copy = landingCopy[lang] || landingCopy.ru
-  const [departments, setDepartments] = useState(TREATMENT_DEPARTMENTS)
+  const siteContent = useSiteContentStore((state) => state.content)
+  const globalData = useSiteContentStore((state) => state.global)
+  const seo = siteContent.seo[lang] || {}
+  useSeo({
+    title: seo.title?.trim() || i18n.t('seo.home_title'),
+    description: seo.description?.trim() || i18n.t('seo.home_description'),
+    path: '/',
+  })
+  // Тексты из кода, поверх — правки из Admin > Контент сайта > Главная страница.
+  const copy = useMemo(
+    () => mergeLandingCopy(landingCopy[lang] || landingCopy.ru, siteContent.landing[lang]),
+    [lang, siteContent],
+  )
+  const departments = useMemo(
+    () => (globalData ? mergeTreatmentDepartments(globalData.treatmentDepartments) : TREATMENT_DEPARTMENTS),
+    [globalData],
+  )
   const [doctors, setDoctors] = useState([])
 
   useEffect(() => {
     let active = true
-    Promise.allSettled([contentAPI.getGlobal(), doctorsAPI.getAll()]).then(([contentResult, doctorsResult]) => {
-      if (!active) return
-      if (contentResult.status === 'fulfilled') {
-        const normalized = normalizeResponse(contentResult.value)
-        const globalData = normalized?.data || normalized
-        setDepartments(mergeTreatmentDepartments(globalData?.treatmentDepartments))
-      }
-      if (doctorsResult.status === 'fulfilled') {
-        const normalized = normalizeResponse(doctorsResult.value)
+    doctorsAPI.getAll()
+      .then((response) => {
+        if (!active) return
+        const normalized = normalizeResponse(response)
         const list = normalized?.data || normalized
         setDoctors(Array.isArray(list) ? list.filter((doctor) => doctor?.isActive !== false) : [])
-      }
-    })
+      })
+      .catch(() => {})
     return () => { active = false }
   }, [])
 
   return (
-    <div className='overflow-x-clip bg-[#f4f7fb] text-[#111d3f]'>
+    <div className='overflow-x-clip bg-[#f4f7fb] text-mt-ink'>
       <HeroSection copy={copy} lang={lang} />
       <VisualBridge lang={lang} />
       <JourneySection copy={copy} />

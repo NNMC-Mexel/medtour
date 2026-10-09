@@ -20,6 +20,11 @@
       "target": "api::specialization.specialization",
       "inversedBy": "doctors"
     },
+    "specializations": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::specialization.specialization"
+    },
     "treatmentDepartments": {
       "type": "json"
     },
@@ -69,7 +74,7 @@
     },
     "price": {
       "type": "integer",
-      "required": true,
+      "default": 0,
       "min": 0,
       "max": 10000000
     },

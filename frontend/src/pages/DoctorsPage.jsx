@@ -13,7 +13,7 @@ import { Card, CardContent } from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import DoctorCard from '../components/doctors/DoctorCard'
 import useAppointmentStore from '../stores/appointmentStore'
-import { getSpecName } from '../utils/helpers'
+import { doctorMatchesSpec, getDoctorSpecNames, getSpecName } from '../utils/helpers'
 import { SHOW_DOCTOR_PRICES } from '../utils/constants'
 import { useUsdRate } from '../hooks/useUsdRate'
 import useSeo from '../components/seo/useSeo'
@@ -61,13 +61,12 @@ function DoctorsPage() {
   // Filter and sort doctors
   const filteredDoctors = doctors
     .filter((doc) => {
-      const specDisplay = getSpecName(doc.specialization, i18n.language) || doc.specialization?.name || ''
+      const needle = searchQuery.toLowerCase()
       const matchesSearch =
-        doc.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        specDisplay.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesSpec = !selectedSpec || 
-        doc.specialization?.name === selectedSpec ||
-        doc.specialization?.id?.toString() === selectedSpec
+        doc.fullName?.toLowerCase().includes(needle) ||
+        Object.values(doc.i18n || {}).some((entry) => entry?.fullName?.toLowerCase().includes(needle)) ||
+        getDoctorSpecNames(doc, i18n.language).some((name) => name.toLowerCase().includes(needle))
+      const matchesSpec = !selectedSpec || doctorMatchesSpec(doc, selectedSpec)
       const matchesMinPrice = !SHOW_DOCTOR_PRICES || !priceRange.min || !usdRate || doc.price / usdRate >= Number(priceRange.min)
       const matchesMaxPrice = !SHOW_DOCTOR_PRICES || !priceRange.max || !usdRate || doc.price / usdRate <= Number(priceRange.max)
       return matchesSearch && matchesSpec && matchesMinPrice && matchesMaxPrice

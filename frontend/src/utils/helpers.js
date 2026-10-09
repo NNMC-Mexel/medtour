@@ -106,6 +106,42 @@ export const getSpecName = (spec, lang) => {
   return name
 }
 
+// Целое число из пользовательского ввода: только цифры, без ведущих нулей.
+// `type="number"` принимает 'e', '+' и '-', а колесо мыши меняет значение при прокрутке формы.
+export const toDigits = (value, maxLength = 12) =>
+  String(value ?? '')
+    .replace(/\D/g, '')
+    .replace(/^0+(?=\d)/, '')
+    .slice(0, maxLength)
+
+// Все специальности врача. Основное поле `specialization` осталось для
+// совместимости (карточки, письма, старые записи), полный список приходит в
+// `specializations`. Врачи, заведённые до появления списка, читаются по старому полю.
+export const getDoctorSpecializations = (doctor) => {
+  const list = Array.isArray(doctor?.specializations) ? doctor.specializations.filter(Boolean) : []
+  if (list.length > 0) return list
+  return doctor?.specialization ? [doctor.specialization] : []
+}
+
+// Локализованные названия всех специальностей врача.
+export const getDoctorSpecNames = (doctor, lang) =>
+  getDoctorSpecializations(doctor)
+    .map((spec) => getSpecName(spec, lang))
+    .filter(Boolean)
+
+// Строка для карточки: «Терапевт, Кардиолог».
+export const getDoctorSpecLabel = (doctor, lang) => getDoctorSpecNames(doctor, lang).join(', ')
+
+// Совпадение врача с выбранной специальностью: фильтры передают то id, то название.
+export const doctorMatchesSpec = (doctor, selected) => {
+  if (!selected) return true
+  const needle = String(selected)
+  return getDoctorSpecializations(doctor).some((spec) => {
+    if (typeof spec !== 'object') return String(spec) === needle
+    return String(spec.id ?? '') === needle || String(spec.documentId ?? '') === needle || spec.name === selected
+  })
+}
+
 // Get localized field from any entity (doctor, user/patient) with fallback to Russian.
 // Usage: getLocalizedField(entity, 'fullName', 'en') → English name or Russian fallback
 export const getLocalizedField = (entity, field, lang) => {

@@ -10,6 +10,11 @@ import {
     ChevronDown,
     UserCircle,
     Stethoscope,
+    Globe,
+    Clock,
+    MessageCircle,
+    Send,
+    Instagram,
 } from "lucide-react";
 import { cn } from "../../utils/helpers";
 import Button from "../ui/Button";
@@ -17,6 +22,23 @@ import LanguageSwitcher from "../ui/LanguageSwitcher";
 import useAuthStore from "../../stores/authStore";
 import PatientChatWidget from "../chat/PatientChatWidget";
 import BrandLogo from "../ui/BrandLogo";
+import useScrollSpy from "../../hooks/useScrollSpy";
+import useSiteContentStore from "../../stores/siteContentStore";
+import { NAV_ITEMS, contactHref, pickLocalized } from "../../config/siteContent";
+
+// Секции лендинга по порядку и пункт шапки, который они подсвечивают.
+const LANDING_SECTION_NAV = [
+    ["process", "process"],
+    ["specializations", "treatments"],
+    ["platform", "treatments"],
+    ["doctors", "treatments"],
+    ["programs", "treatments"],
+    ["travel", "tourism"],
+    ["blog", "blog"],
+    ["contact", "contacts"],
+];
+const LANDING_SECTION_IDS = LANDING_SECTION_NAV.map(([id]) => id);
+const SECTION_TO_NAV = Object.fromEntries(LANDING_SECTION_NAV);
 
 function PublicLayout() {
     const { t, i18n } = useTranslation();
@@ -74,18 +96,30 @@ function PublicLayout() {
     };
 
     const isOnLanding = location.pathname === "/";
+    const siteContent = useSiteContentStore((state) => state.content);
+    const contacts = siteContent.contacts;
 
-    const navLinks = [
-        { href: "/", label: t("nav.home") },
-        { href: "#specializations", label: t("nav.treatments"), isAnchor: true },
-        { href: "/tourism", label: t("nav.tourism") },
-        { href: "/blog", label: t("nav.blog") },
-        { href: "#process", label: t("nav.process"), isAnchor: true },
-        { href: "/prices", label: t("nav.prices") },
-        { href: "#contact", label: t("nav.contacts"), isAnchor: true },
-    ];
+    // Пункты и подписи — из Admin > Контент сайта > Шапка и меню.
+    const navLinks = NAV_ITEMS
+        .filter((item) => siteContent.navigation.items[item.id]?.visible !== false)
+        .map((item) => ({
+            ...item,
+            label: pickLocalized(siteContent.navigation.items[item.id]?.label, lang) || t(item.labelKey),
+        }));
+
+    // На лендинге подсвечиваем пункт той секции, до которой докрутили;
+    // выше первой секции — «Главная».
+    const spiedSection = useScrollSpy(LANDING_SECTION_IDS, { enabled: isOnLanding });
+    const activeNavId = isOnLanding
+        ? SECTION_TO_NAV[spiedSection] || "home"
+        : NAV_ITEMS.find((item) => !item.isAnchor && item.href !== "/" && location.pathname.startsWith(item.href))?.id || "";
 
     const handleNavClick = (e, link) => {
+        if (link.id === "home" && isOnLanding) {
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            return;
+        }
         if (link.isAnchor) {
             e.preventDefault();
             if (isOnLanding) {
@@ -140,15 +174,16 @@ function PublicLayout() {
                 <nav className='flex-1 p-4 space-y-1 overflow-y-auto'>
                     {navLinks.map((link) => (
                         <Link
-                            key={link.href}
+                            key={link.id}
                             to={link.isAnchor ? `/${link.href}` : link.href}
+                            aria-current={activeNavId === link.id ? (isOnLanding ? "location" : "page") : undefined}
                             onClick={(e) => {
                                 handleNavClick(e, link)
                                 setIsMobileMenuOpen(false)
                             }}
                             className={cn(
                                 'flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-colors',
-                                location.pathname === link.href && !link.isAnchor
+                                activeNavId === link.id
                                     ? 'bg-teal-50 text-teal-700'
                                     : 'text-slate-700 hover:bg-slate-50',
                             )}
@@ -233,17 +268,17 @@ function PublicLayout() {
                         <nav className='hidden lg:flex items-center gap-5'>
                             {navLinks.map((link) => (
                                 <Link
-                                    key={link.href}
+                                    key={link.id}
                                     to={link.isAnchor ? `/${link.href}` : link.href}
+                                    aria-current={activeNavId === link.id ? (isOnLanding ? "location" : "page") : undefined}
                                     onClick={(e) => handleNavClick(e, link)}
                                     className={cn(
-                                        "relative py-2 text-sm font-medium transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-px after:origin-left after:scale-x-0 after:bg-[#52d1bb] after:transition-transform hover:text-[#52d1bb] hover:after:scale-x-100",
+                                        "relative py-2 text-sm font-medium transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-px after:origin-left after:scale-x-0 after:bg-mt-glow after:transition-transform hover:text-mt-glow hover:after:scale-x-100",
                                         showDarkHeader
                                             ? "text-white/90"
                                             : "text-slate-700",
-                                        location.pathname === link.href &&
-                                            !link.isAnchor &&
-                                            "text-[#0a9a87] after:scale-x-100",
+                                        activeNavId === link.id &&
+                                            (showDarkHeader ? "text-mt-glow after:scale-x-100" : "text-mt-accent after:scale-x-100"),
                                     )}>
                                     {link.label}
                                 </Link>
@@ -360,7 +395,7 @@ function PublicLayout() {
             </main>
 
             {/* Footer */}
-            <footer className='bg-[#081229] text-white'>
+            <footer className='bg-mt-night text-white'>
                 <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16'>
                     <div className='grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-[1.25fr_.8fr_.8fr_1fr]'>
                         {/* Brand */}
@@ -432,19 +467,59 @@ function PublicLayout() {
                         {/* Contact */}
                         <div>
                             <h4 className='font-semibold mb-6'>{t("footer.contacts")}</h4>
+                            {/* Контакты — из Admin > Контент сайта > Контакты. */}
                             <ul className='space-y-4'>
-                                <li className='flex items-center gap-3 text-slate-400'>
-                                    <Phone className='w-5 h-5 text-teal-500' />
-                                    <a href='https://www.nnmc.kz/' target='_blank' rel='noreferrer' className='text-sm hover:text-white'>www.nnmc.kz</a>
-                                </li>
-                                <li className='flex items-center gap-3 text-slate-400'>
-                                    <Mail className='w-5 h-5 text-teal-500' />
-                                    <a href='mailto:support@nnmc.kz' className='text-sm hover:text-white'>support@nnmc.kz</a>
-                                </li>
+                                {contacts.phone && (
+                                    <li className='flex items-center gap-3 text-slate-400'>
+                                        <Phone className='w-5 h-5 shrink-0 text-teal-500' />
+                                        <a href={contactHref('phone', contacts.phone)} className='text-sm hover:text-white'>{contacts.phone}</a>
+                                    </li>
+                                )}
+                                {contacts.email && (
+                                    <li className='flex items-center gap-3 text-slate-400'>
+                                        <Mail className='w-5 h-5 shrink-0 text-teal-500' />
+                                        <a href={contactHref('email', contacts.email)} className='text-sm hover:text-white break-all'>{contacts.email}</a>
+                                    </li>
+                                )}
+                                {contactHref('website', contacts.website) && (
+                                    <li className='flex items-center gap-3 text-slate-400'>
+                                        <Globe className='w-5 h-5 shrink-0 text-teal-500' />
+                                        <a href={contactHref('website', contacts.website)} target='_blank' rel='noreferrer' className='text-sm hover:text-white break-all'>
+                                            {contacts.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                                        </a>
+                                    </li>
+                                )}
                                 <li className='flex items-start gap-3 text-slate-400'>
                                     <MapPin className='w-5 h-5 text-teal-500 flex-shrink-0' />
-                                    <span className='text-sm'>{t('footer.address')}</span>
+                                    <span className='text-sm'>{pickLocalized(contacts.address, lang) || t('footer.address')}</span>
                                 </li>
+                                {pickLocalized(contacts.hours, lang) && (
+                                    <li className='flex items-start gap-3 text-slate-400'>
+                                        <Clock className='w-5 h-5 text-teal-500 flex-shrink-0' />
+                                        <span className='text-sm whitespace-pre-line'>{pickLocalized(contacts.hours, lang)}</span>
+                                    </li>
+                                )}
+                                {(contacts.whatsapp || contacts.telegram || contacts.instagram) && (
+                                    <li className='flex items-center gap-2 pt-1'>
+                                        {[
+                                            ['whatsapp', MessageCircle, 'WhatsApp'],
+                                            ['telegram', Send, 'Telegram'],
+                                            ['instagram', Instagram, 'Instagram'],
+                                        ].filter(([kind]) => contactHref(kind, contacts[kind])).map(([kind, Icon, label]) => (
+                                            <a
+                                                key={kind}
+                                                href={contactHref(kind, contacts[kind])}
+                                                target='_blank'
+                                                rel='noreferrer'
+                                                aria-label={label}
+                                                title={label}
+                                                className='flex h-9 w-9 items-center justify-center rounded-xl bg-white/8 text-slate-300 transition-colors hover:bg-teal-500 hover:text-white'
+                                            >
+                                                <Icon className='h-4 w-4' />
+                                            </a>
+                                        ))}
+                                    </li>
+                                )}
                             </ul>
                         </div>
                     </div>

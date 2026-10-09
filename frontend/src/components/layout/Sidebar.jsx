@@ -1,6 +1,7 @@
 import { NavLink, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
+  MapPinned,
   Home,
   Calendar,
   Users,
@@ -43,6 +44,7 @@ const iconMap = {
   'bar-chart': BarChart3,
   tags: Tags,
   activity: Activity,
+  'map-pinned': MapPinned,
   'circle-help': CircleHelp,
   'clipboard-list': ClipboardList,
 }
