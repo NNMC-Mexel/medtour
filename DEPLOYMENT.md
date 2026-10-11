@@ -256,6 +256,53 @@ sudo ufw allow 49152:65535/udp
   тип «JavaScript-событие» с идентификаторами `sign_up`, `case_created`,
   `price_request`, `booking_complete`.
 
+## Выкатка «Безопасность входа и пароли» (порт MedConnect 2026-10-10)
+
+Что входит: реальный IP клиента за Traefik, блокировка аккаунта после 10
+неудачных входов подряд (на 15 минут, письмо владельцу), срок ссылки сброса
+(«Забыли пароль?» — 1 час, ссылка от админа — 24 часа), запрет служебных полей
+в `PUT/POST /api/users`, пароли пользователей в «Админ → Пользователи → Пароль»
+(`POST /api/users/:id/password-reset`, `PUT /api/users/:id/password`),
+экранирование имён в письмах по кейсам.
+
+### Переменные окружения Strapi
+```env
+# Coolify ставит перед Strapi один Traefik — значение 1. Если впереди появится
+# ещё Nginx или Cloudflare — 2 (по числу прокси, дописывающих X-Forwarded-For).
+IS_PROXIED=true
+PROXY_MAX_IPS_COUNT=1
+```
+`IS_PROXIED` в production и так включён по умолчанию. `RATE_LIMIT_TRUST_PROXY`
+больше не читается — удалите его из Coolify. Раньше лимитер брал первый адрес
+`X-Forwarded-For`: его присылает сам клиент, и подменой лимит входа
+обходился полностью.
+
+Strapi 5.48 сам `maxIpsCount` в Koa не передаёт — его выставляет
+`src/index.ts` (register). После обновления Strapi до версии, где это
+исправлено, код просто продублирует настройку.
+
+### Что изменится сразу после выкатки
+- В `up_users` появятся колонки `reset_password_token_expires_at`,
+  `failed_login_count`, `last_failed_login_at`, `login_locked_until` (Strapi
+  создаёт их сам, старые строки получают `NULL`).
+- Ссылки сброса пароля, выданные до выкатки, перестанут работать (у них нет
+  срока) — пользователь запросит новую.
+- `PUT /api/users/:id` с полем `password` → `400 password_change_not_allowed_here`
+  (фронт уже ходит в `/password`).
+- В логе Strapi появятся строки `LOGIN_FAILURE`, `ACCOUNT_LOCKED`,
+  `PASSWORD_RESET_REQUESTED`, `PASSWORD_CHANGED` с полем `ip`.
+
+### Вручную в админке Strapi
+Users & Permissions → Email templates → Reset password: допишите в письмо
+«Ссылка действует 1 час».
+
+### Проверка после выкатки
+- Войдите с неверным паролем и найдите в логе Strapi строку `LOGIN_FAILURE`:
+  в `ip` должен быть ваш внешний адрес. Если там `10.x`/`172.x` — прокси
+  больше одного, увеличьте `PROXY_MAX_IPS_COUNT`.
+- Админ → Пользователи → ключ у тестового пациента → «Отправить ссылку»: письмо
+  пришло, ссылка открывает форму нового пароля.
+
 ## Pre-deploy verification
 
 ```bash

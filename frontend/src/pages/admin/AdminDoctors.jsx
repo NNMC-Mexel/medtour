@@ -439,10 +439,13 @@ function AdminDoctors({ readonly = false }) {
             fullName: form.fullName.trim(),
             phone: form.phone.trim() || null,
           }
-          if (form.password) {
-            userPayload.password = form.password
-          }
           await api.put(`/api/users/${userId}`, userPayload)
+          // Пароль — отдельным запросом: сервер проверит политику, завершит
+          // старые сессии врача и пришлёт ему уведомление (PUT /users/:id
+          // пароль больше не принимает).
+          if (form.password) {
+            await api.put(`/api/users/${userId}/password`, { password: form.password })
+          }
         } else {
           const createdUser = await createDoctorUser()
           userId = createdUser.id

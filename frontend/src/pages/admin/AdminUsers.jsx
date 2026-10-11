@@ -9,6 +9,7 @@ import {
   X,
   UserPlus,
   Pencil,
+  KeyRound,
 } from 'lucide-react'
 import { Card, CardContent } from '../../components/ui/Card'
 import Button from '../../components/ui/Button'
@@ -24,6 +25,7 @@ import useAuthStore from '../../stores/authStore'
 import { formatDate, getPasswordError } from '../../utils/helpers'
 import usePersistentFilters from '../../hooks/usePersistentFilters'
 import HScroll from '../../components/ui/HScroll'
+import AdminPasswordModal from '../../components/admin/AdminPasswordModal'
 
 const roleVariants = {
   patient: 'default',
@@ -50,8 +52,6 @@ const defaultEditForm = {
   username: '',
   email: '',
   phone: '',
-  password: '',
-  confirmPassword: '',
   userRole: '',
 }
 
@@ -89,6 +89,7 @@ function AdminUsers() {
   const [createSaveState, setCreateSaveState] = useState('idle')
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [passwordUser, setPasswordUser] = useState(null)
   const [editingUser, setEditingUser] = useState(null)
   const [editForm, setEditForm] = useState(defaultEditForm)
   const [isSavingEdit, setIsSavingEdit] = useState(false)
@@ -185,8 +186,6 @@ function AdminUsers() {
       username: user.username || '',
       email: user.email || '',
       phone: user.phone || '',
-      password: '',
-      confirmPassword: '',
       userRole: user.userRole || '',
     })
     setIsEditModalOpen(true)
@@ -198,8 +197,6 @@ function AdminUsers() {
     if (!editForm.fullName.trim()) return toast.warning(t('admin_users.err_name'))
     if (!editForm.username.trim()) return toast.warning(t('admin_users.err_login'))
     if (!editForm.email.trim()) return toast.warning(t('admin_users.err_email'))
-    if (editForm.password && getPasswordError(editForm.password)) return toast.warning(t(getPasswordError(editForm.password)))
-    if (editForm.password !== editForm.confirmPassword) return toast.warning(t('admin_users.err_password_mismatch'))
 
     setIsSavingEdit(true)
     setEditSaveState('idle')
@@ -209,9 +206,6 @@ function AdminUsers() {
         username: editForm.username.trim(),
         email: editForm.email.trim().toLowerCase(),
         phone: editForm.phone.trim() || null,
-      }
-      if (editForm.password) {
-        payload.password = editForm.password
       }
       const roleChanged = Boolean(editForm.userRole) && editForm.userRole !== editingUser.userRole
       if (roleChanged) payload.userRole = editForm.userRole
@@ -396,6 +390,15 @@ function AdminUsers() {
                           >
                             <Pencil className="w-4 h-4" />
                           </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            onClick={() => setPasswordUser(user)}
+                            aria-label={t('admin_password.action')}
+                            title={t('admin_password.action')}
+                          >
+                            <KeyRound className="w-4 h-4" />
+                          </Button>
                           {user.blocked ? (
                             <Button
                               variant="outline"
@@ -561,22 +564,24 @@ function AdminUsers() {
           />
 
           <div className="border-t border-slate-200 pt-4">
-            <p className="text-sm font-medium text-slate-700 mb-3">{t('admin_users.section_password')}</p>
-            <div className="grid grid-cols-2 gap-4">
-              <PasswordInput
-                label={t('admin_users.label_new_password')}
-                value={editForm.password}
-                onChange={(e) => setEditForm(prev => ({ ...prev, password: e.target.value }))}
-                placeholder="••••••"
-                hint={t('admin_users.hint_password')}
-              />
-              <PasswordInput
-                label={t('admin_users.label_confirm')}
-                value={editForm.confirmPassword}
-                onChange={(e) => setEditForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                placeholder="••••••"
-              />
-            </div>
+            <p className="text-sm font-medium text-slate-700 mb-1">{t('admin_users.section_password')}</p>
+            {/* Пароль меняется отдельным действием: там ссылка на почту или новый
+                пароль с завершением всех сессий пользователя. */}
+            <p className="text-sm text-slate-500 mb-3">{t('admin_password.edit_hint')}</p>
+            <Button
+              type="button"
+              variant="outline"
+              leftIcon={<KeyRound className="h-4 w-4" />}
+              onClick={() => {
+                const target = editingUser
+                setIsEditModalOpen(false)
+                setEditingUser(null)
+                setEditForm(defaultEditForm)
+                setPasswordUser(target)
+              }}
+            >
+              {t('admin_password.action')}
+            </Button>
           </div>
         </form>
       </Modal>
@@ -685,6 +690,12 @@ function AdminUsers() {
           </p>
         </div>
       </Modal>
+
+      <AdminPasswordModal
+        user={passwordUser}
+        currentUserId={currentUserId}
+        onClose={() => setPasswordUser(null)}
+      />
     </div>
   )
 }

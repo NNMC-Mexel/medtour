@@ -489,6 +489,10 @@ const roleDefinitions = {
       'plugin::users-permissions.user.create',
       'plugin::users-permissions.user.update',
       'plugin::users-permissions.user.destroy',
+      // Пароли пользователей: письмо со ссылкой на сброс или новый пароль
+      // (utils/admin-password.ts).
+      'plugin::users-permissions.user.adminSendPasswordReset',
+      'plugin::users-permissions.user.adminSetPassword',
       'plugin::users-permissions.user.me',
       'plugin::users-permissions.user.updateMe',
       'plugin::users-permissions.role.find',
@@ -881,6 +885,14 @@ async function ensureAppointmentSlotUniqueIndex(strapi: Core.Strapi) {
 
 export default {
   register({ strapi }: { strapi: Core.Strapi }) {
+    // Strapi 5.48 передаёт в Koa только server.proxy.koa, а maxIpsCount
+    // теряет (проброс появился в более поздних версиях). Без него Koa при
+    // proxy=true берёт ПЕРВЫЙ адрес X-Forwarded-For — тот, что прислал сам
+    // клиент, — и любой мог бы подставить свой IP, обходя лимиты входа.
+    const koaApp: any = (strapi as any).server?.app;
+    const maxIpsCount = Number(strapi.config.get('server.proxy.maxIpsCount')) || 0;
+    if (koaApp && maxIpsCount > 0) koaApp.maxIpsCount = maxIpsCount;
+
     // PII encryption-at-rest for iin / passportNumber (RK Law 94-V art.10).
     // Hooks the DB layer so every write path — REST API, custom register,
     // updateMe and the Strapi admin panel — is covered uniformly. Encrypt

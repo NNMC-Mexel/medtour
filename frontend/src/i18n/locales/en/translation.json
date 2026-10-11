@@ -20,6 +20,7 @@
   "common": {
     "loading": "Loading...",
     "save": "Save",
+    "saved": "Saved",
     "cancel": "Cancel",
     "skip": "Skip",
     "back": "Back",
@@ -153,6 +154,7 @@
       "error_unconfirmed": "This account email is not confirmed. Check your inbox and open the confirmation link.",
       "error_invalid_credentials": "Invalid email, phone, or password.",
       "error_blocked": "This account is blocked. Please contact support.",
+      "error_account_locked": "Too many failed sign-in attempts. The account is locked for 15 minutes. Reset your password to sign in right away.",
       "doctor_title": "Doctor's Dashboard",
       "doctor_desc": "Manage your schedule, conduct consultations, and help patients online",
       "platform_desc": "Medical tourism platform for managed treatment in Kazakhstan",
@@ -2670,5 +2672,29 @@
     "fallback_hint": "Empty fields are shown in Russian on the site.",
     "missing": "Untranslated fields: {{count}}",
     "complete": "Translation complete"
+  },
+  "admin_password": {
+    "action": "Password",
+    "title": "Password: {{name}}",
+    "link_title": "Email a reset link",
+    "link_desc": "The user gets an email at {{email}} and sets a new password themselves. The link is valid for 24 hours; until they use it, the old password keeps working.",
+    "link_btn": "Send link",
+    "link_sent": "Email sent to {{email}}. The link is valid for 24 hours, until it is used or a new one is sent.",
+    "link_sent_toast": "Password reset link sent",
+    "set_title": "Set a password yourself",
+    "set_desc": "The password changes immediately and all of the user's sessions end. They get an email notice without the password — tell them the password in person.",
+    "label_new": "New password",
+    "label_confirm": "Repeat password",
+    "set_btn": "Change password",
+    "set_toast": "Password changed",
+    "set_toast_notified": "Password changed, the user was notified by email",
+    "self_title": "Change your password",
+    "self_desc": "Enter your current password. After the change, your sessions on other devices will end.",
+    "err_current_invalid": "The current password is incorrect.",
+    "edit_hint": "Email the user a reset link or set a new password — all of their sessions will end.",
+    "err_blocked": "The account is blocked — unblock it first.",
+    "err_no_email": "The user has no email address.",
+    "err_email_failed": "The email was not sent. Check the user's email address or set the password yourself.",
+    "err_generic": "Could not complete the action. Please try again."
   }
 }

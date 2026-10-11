@@ -14,6 +14,7 @@
     "import:prices": "node ./scripts/import-price-catalog.js",
     "import:prices:dry": "node ./scripts/import-price-catalog.js --dry-run",
     "test:prices": "tsc && node --test tests/price-catalog-import.test.js",
+    "test:login-protection": "tsc src/utils/login-protection.ts src/utils/login-protection.test.ts --outDir .tmp/test-login-protection --module commonjs --target es2021 --moduleResolution node --esModuleInterop --skipLibCheck && node --test .tmp/test-login-protection",
     "migrate:case-statuses": "node ./scripts/migrate-medical-case-statuses.js",
     "migrate:case-statuses:dry": "node ./scripts/migrate-medical-case-statuses.js --dry-run",
     "migrate:case-chats": "node ./scripts/backfill-case-chats.js",

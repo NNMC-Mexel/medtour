@@ -63,7 +63,6 @@ export default ({ env }) => {
     {
       name: 'global::rate-limit',
       config: {
-        trustProxy: env.bool('RATE_LIMIT_TRUST_PROXY', isProduction),
         limits: {
           '/api/auth/local': {
             max: env.int('AUTH_LOGIN_RATE_LIMIT_MAX', 60),
