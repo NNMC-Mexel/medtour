@@ -1,0 +1,7 @@
+# Stand by-products
+*.log
+mails.jsonl
+key.pem
+cert.pem
+seed-*.out
+pgdata/
