@@ -2696,5 +2696,28 @@
     "err_no_email": "The user has no email address.",
     "err_email_failed": "The email was not sent. Check the user's email address or set the password yourself.",
     "err_generic": "Could not complete the action. Please try again."
+  },
+  "doctor_certificates": {
+    "title": "Certificates and diplomas",
+    "public_title": "Certificates and diplomas",
+    "profile_hint": "Upload your certificates, diplomas and licences. Every patient can see them on your page.",
+    "admin_hint": "PDF or images. Visible to everyone on the doctor's page.",
+    "hint": "PDF, JPG, PNG or WebP, up to 20 MB each. At most {{max}} files.",
+    "add": "Add certificate",
+    "uploading": "Uploading…",
+    "remove": "Remove “{{name}}”",
+    "open": "Open",
+    "empty": "No certificates",
+    "err_too_many": "You can upload at most {{max}} certificates.",
+    "err_type": "“{{name}}”: only PDF, JPG, PNG or WebP files.",
+    "err_size": "“{{name}}”: the file is larger than 20 MB.",
+    "err_upload": "Could not upload the file. Please try again.",
+    "err_save": "Could not save the change. Please try again.",
+    "certificates_invalid": "The certificate list is broken — reload the page.",
+    "certificates_duplicate": "The same file was added twice.",
+    "certificates_too_many": "Too many certificates.",
+    "certificates_not_found": "File not found — upload it again.",
+    "certificates_bad_type": "A certificate must be a PDF or an image.",
+    "certificates_not_available": "This file cannot be attached — upload it again."
   }
 }

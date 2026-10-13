@@ -15,6 +15,7 @@ import {
   validateScheduleConfigInput,
 } from '../../../utils/doctor-schedule';
 import { syncSpecializationPayload, withSpecializationList } from '../../../utils/doctor-specializations';
+import { validateCertificatesInput } from '../../../utils/doctor-certificates';
 
 // Врачи, сохранённые до появления списка специальностей, отдаются со списком
 // из основной — фронтенд читает только `specializations`.
@@ -70,6 +71,18 @@ const getRequestData = (ctx: any) => {
  * client shows them and repeats the request with acknowledgeScheduleConflicts.
  * Returns true when the request has already been answered.
  */
+/** Отвечает 400 и возвращает true, если поле certificates нельзя сохранить. */
+async function rejectCertificates(strapi: any, ctx: any, body: any, doctorDocumentId?: string): Promise<boolean> {
+  if (!body || !('certificates' in body)) return false;
+  const code = await validateCertificatesInput(strapi, body.certificates, {
+    userId: ctx.state.user.id,
+    doctorDocumentId,
+  });
+  if (!code) return false;
+  ctx.badRequest('Certificates cannot be saved', { code });
+  return true;
+}
+
 async function rejectScheduleChange(strapi: any, ctx: any, body: any): Promise<boolean> {
   const acknowledged = body.acknowledgeScheduleConflicts === true
     || String(ctx.query?.acknowledgeScheduleConflicts || '') === 'true';
@@ -156,6 +169,7 @@ export default factories.createCoreController('api::doctor.doctor', ({ strapi })
       return ctx.badRequest('Treatment department assignments are invalid');
     }
     syncSpecializationPayload(body);
+    if (await rejectCertificates(strapi, ctx, body)) return;
 
     return await super.create(ctx);
   },
@@ -207,6 +221,7 @@ export default factories.createCoreController('api::doctor.doctor', ({ strapi })
     }
 
     syncSpecializationPayload(getRequestData(ctx));
+    if (await rejectCertificates(strapi, ctx, getRequestData(ctx), ctx.params.id)) return;
     if (await rejectScheduleChange(strapi, ctx, getRequestData(ctx))) return;
 
     return await super.update(ctx);

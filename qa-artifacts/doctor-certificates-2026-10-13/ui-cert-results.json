@@ -1,0 +1,132 @@
+[
+  {
+    "name": "admin form: two certificates appear in the list after upload",
+    "ok": true,
+    "detail": "2"
+  },
+  {
+    "name": "admin form: a .txt file is refused with a clear message",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "admin form: doctor created with 2 certificates",
+    "ok": true,
+    "detail": "[\"sample.pdf\",\"sample.jpg\"]"
+  },
+  {
+    "name": "admin edit: existing certificates are shown",
+    "ok": true,
+    "detail": "2"
+  },
+  {
+    "name": "admin edit: removing one certificate is saved",
+    "ok": true,
+    "detail": "1"
+  },
+  {
+    "name": "admin edit: save toast is translated (not common.saved)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "doctor profile: certificates card with the existing one",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "doctor profile: upload saves immediately (2 in the list)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "doctor profile: survives reload",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "doctor profile: removing updates the public data",
+    "ok": true,
+    "detail": "1"
+  },
+  {
+    "name": "doctor profile: PDF added back",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "doctor profile: a Cyrillic file name becomes a readable title",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "setup: certificate with HTML in its caption attached",
+    "ok": true,
+    "detail": "200 201 \"<img src=x onerror=window.__xss=1>\""
+  },
+  {
+    "name": "public page (ru, 1366px): section \"Сертификаты и дипломы\" with 3 tiles",
+    "ok": true,
+    "detail": "4"
+  },
+  {
+    "name": "public page (ru): HTML in a certificate caption is shown as text, not executed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "public page: certificate link opens for an anonymous visitor",
+    "ok": true,
+    "detail": "200 http://localhost:1351/uploads/sample_b54685d731.png"
+  },
+  {
+    "name": "public page: links use rel=\"noopener noreferrer\"",
+    "ok": true,
+    "detail": "noopener noreferrer"
+  },
+  {
+    "name": "public page (ru, 390px): section \"Сертификаты и дипломы\" with 3 tiles",
+    "ok": true,
+    "detail": "4"
+  },
+  {
+    "name": "public page (ru, mobile): no horizontal scroll",
+    "ok": true,
+    "detail": "0"
+  },
+  {
+    "name": "public page (ru): HTML in a certificate caption is shown as text, not executed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "public page (en, 390px): section \"Certificates and diplomas\" with 3 tiles",
+    "ok": true,
+    "detail": "4"
+  },
+  {
+    "name": "public page (en, mobile): no horizontal scroll",
+    "ok": true,
+    "detail": "0"
+  },
+  {
+    "name": "public page (en): HTML in a certificate caption is shown as text, not executed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "public page (kk, 1366px): section \"Сертификаттар мен дипломдар\" with 3 tiles",
+    "ok": true,
+    "detail": "4"
+  },
+  {
+    "name": "public page (kk): HTML in a certificate caption is shown as text, not executed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "no JS dialogs or page errors during the run",
+    "ok": true,
+    "detail": ""
+  }
+]

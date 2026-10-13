@@ -1,0 +1,158 @@
+[
+  {
+    "id": "S0",
+    "name": "seed logins",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "C1",
+    "name": "admin uploads PDF and PNG",
+    "ok": true,
+    "detail": "201 201 [{\"id\":1,\"documentId\":\"b29g3vif9smxwzsiioe8ozil\",\"name\":\"license.pdf\",\"alternativeText\":null,\"caption\":null,\"focalPoint\""
+  },
+  {
+    "id": "C2",
+    "name": "admin creates a doctor with certificates",
+    "ok": true,
+    "detail": "201 {\"data\":{\"id\":2,\"documentId\":\"hx3ak2xhqx9e7kjba7pyc5gn\",\"fullName\":\"QA Cert Doctor\",\"treatmentDepartments\":null,\"experience\":null,\"bio\":null,\"education\":null,\"licenseNumber\":\"QA-LIC-1\",\"position\":null"
+  },
+  {
+    "id": "C3",
+    "name": "anonymous doctor page lists both certificates (name, mime, url)",
+    "ok": true,
+    "detail": "[[\"license.pdf\",\"application/pdf\"],[\"diploma.png\",\"image/png\"]]"
+  },
+  {
+    "id": "C4",
+    "name": "anonymous can open the PDF certificate file",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "id": "C5",
+    "name": "public doctors list includes certificates",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "C6",
+    "name": "doctor uploads a JPEG",
+    "ok": true,
+    "detail": "[{\"id\":3,\"documentId\":\"f24563a3b29zg3f7dxa4jvl6\",\"name\":\"course.jpg\",\"alternativeText\":null,\"caption\":null,\"focalPoint\":"
+  },
+  {
+    "id": "C7",
+    "name": "profile save WITHOUT ?status=published reaches the public page",
+    "ok": true,
+    "detail": "200 public=3"
+  },
+  {
+    "id": "C8",
+    "name": "doctor adds own certificate (published save) -> public page shows 3",
+    "ok": true,
+    "detail": "200 public=3 {\"data\":{\"id\":4,\"documentId\":\"hx3ak2xhqx9e7kjba7pyc5gn\",\"fullName\":\"QA Cert Doctor\",\"treatmentDepartments\":null,\"experience\":null,\"bio\":null,\"educatio"
+  },
+  {
+    "id": "C9",
+    "name": "doctor cannot publish someone else's upload as a certificate",
+    "ok": true,
+    "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"Certificates cannot be saved\",\"details\":{\"code\":\"certificates_not_available\"}}}"
+  },
+  {
+    "id": "C10",
+    "name": "admin cannot publish a patient's upload either",
+    "ok": true,
+    "detail": "400"
+  },
+  {
+    "id": "C11",
+    "name": "DOCX is refused as a certificate (PDF/JPEG/PNG/WebP only)",
+    "ok": true,
+    "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"Certificates cannot be saved\",\"details\":{\"code\":\"certificates_bad_type\"}}}"
+  },
+  {
+    "id": "C12",
+    "name": "SVG upload refused",
+    "ok": true,
+    "detail": "415"
+  },
+  {
+    "id": "C13",
+    "name": "invalid list (garbage) -> 400 certificates_invalid",
+    "ok": true,
+    "detail": "400 certificates_invalid"
+  },
+  {
+    "id": "C13",
+    "name": "invalid list (duplicates) -> 400 certificates_duplicate",
+    "ok": true,
+    "detail": "400 certificates_duplicate"
+  },
+  {
+    "id": "C13",
+    "name": "invalid list (missing id) -> 400 certificates_not_found",
+    "ok": true,
+    "detail": "400 certificates_not_found"
+  },
+  {
+    "id": "C13",
+    "name": "invalid list (too many) -> 400 certificates_too_many",
+    "ok": true,
+    "detail": "400 certificates_too_many"
+  },
+  {
+    "id": "C14",
+    "name": "after rejected saves the public list is unchanged",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "C15",
+    "name": "another doctor cannot change this doctor's certificates",
+    "ok": true,
+    "detail": "403"
+  },
+  {
+    "id": "C16",
+    "name": "patient cannot change certificates",
+    "ok": true,
+    "detail": "403"
+  },
+  {
+    "id": "C17",
+    "name": "anonymous cannot change certificates",
+    "ok": true,
+    "detail": "403"
+  },
+  {
+    "id": "C18",
+    "name": "doctor removes a certificate",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "id": "C19",
+    "name": "a removed certificate (now unattached) can be re-attached by its uploader only",
+    "ok": true,
+    "detail": "400 (uploaded by admin, re-attach by doctor)"
+  },
+  {
+    "id": "C20",
+    "name": "admin clears certificates from the doctor form",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "id": "C21",
+    "name": "admin re-attaches own uploads",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "id": "C22",
+    "name": "doctor saves bio; price stays admin-only",
+    "ok": true,
+    "detail": "200 price=0"
+  }
+]
