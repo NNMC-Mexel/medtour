@@ -1,9 +1,14 @@
 /**
  * Notification controller.
- * - find: пользователь видит только свои, admin — все
+ * - find: каждый, включая админа, видит только свои уведомления
  * - unreadCount: число непрочитанных у текущего пользователя
  * - markAllAsRead: помечает все непрочитанные текущего пользователя
- * - update/delete: только владелец (или admin)
+ * - update/delete: только владелец
+ *
+ * Раньше админ получал в колокольчике уведомления всех пользователей
+ * (превью чужих чатов), а «Прочитать все» помечало только его собственные:
+ * чужие непрочитанные возвращались при следующем опросе. Клик админа по
+ * чужому уведомлению гасил бейдж у настоящего получателя.
  */
 import { factories } from '@strapi/strapi';
 
@@ -12,13 +17,8 @@ export default factories.createCoreController('api::notification.notification', 
     const user = ctx.state.user;
     if (!user) return ctx.forbidden('Not authenticated');
 
-    const isAdmin = user.role?.type === 'admin' || user.userRole === 'admin';
     const queryFilters = (ctx.query?.filters as any) || {};
-    const filters: any = { ...queryFilters };
-
-    if (!isAdmin) {
-      filters.user = { id: user.id };
-    }
+    const filters: any = { ...queryFilters, user: { id: user.id } };
 
     const sort = (ctx.query?.sort as any) || ['createdAt:desc'];
     const limitRaw = (ctx.query?.pagination as any)?.limit;
@@ -88,8 +88,7 @@ export default factories.createCoreController('api::notification.notification', 
     });
     if (!existing) return ctx.notFound('Notification not found');
 
-    const isAdmin = user.role?.type === 'admin' || user.userRole === 'admin';
-    if (!isAdmin && (existing as any).user?.id !== user.id) {
+    if ((existing as any).user?.id !== user.id) {
       return ctx.forbidden('Cannot update this notification');
     }
 
@@ -113,8 +112,7 @@ export default factories.createCoreController('api::notification.notification', 
     });
     if (!existing) return ctx.notFound('Notification not found');
 
-    const isAdmin = user.role?.type === 'admin' || user.userRole === 'admin';
-    if (!isAdmin && (existing as any).user?.id !== user.id) {
+    if ((existing as any).user?.id !== user.id) {
       return ctx.forbidden('Cannot delete this notification');
     }
 

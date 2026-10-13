@@ -303,6 +303,20 @@ Users & Permissions → Email templates → Reset password: допишите в 
 - Админ → Пользователи → ключ у тестового пациента → «Отправить ссылку»: письмо
   пришло, ссылка открывает форму нового пароля.
 
+## Почта (SMTP): если регистрация или «Забыли пароль?» висят
+
+Раньше при недоступном SMTP nodemailer ждал соединения до 2 минут, а сокет — до
+10, и формы висели на «Загрузка…». Теперь таймауты 10/10/20 с
+(`SMTP_CONNECTION_TIMEOUT_MS`, `SMTP_GREETING_TIMEOUT_MS`, `SMTP_SOCKET_TIMEOUT_MS`):
+форма отвечает, аккаунт создаётся, но письмо не уходит. Причину ищите так:
+
+- в логе Strapi строки `[auth.forgotPassword] reset email failed: …` или
+  `Confirmation email … failed`: `ETIMEDOUT`/`ECONNREFUSED` — сеть,
+  `Invalid login`/`535` — логин или пароль приложения Yandex;
+- из терминала контейнера Strapi в Coolify: `nc -vz smtp.yandex.ru 465`
+  (и `587`). Если не соединяется — хостер режет исходящий SMTP: откройте порт
+  или переключитесь на 587 (`SMTP_PORT=587`, `SMTP_SECURE` выставится сам).
+
 ## Pre-deploy verification
 
 ```bash
