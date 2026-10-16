@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import {
     Menu,
     X,
-    Phone,
     Mail,
     MapPin,
     ChevronDown,
@@ -24,7 +23,8 @@ import PatientChatWidget from "../chat/PatientChatWidget";
 import BrandLogo from "../ui/BrandLogo";
 import useScrollSpy from "../../hooks/useScrollSpy";
 import useSiteContentStore from "../../stores/siteContentStore";
-import { NAV_ITEMS, contactHref, pickLocalized } from "../../config/siteContent";
+import { NAV_ITEMS, contactHref, messengersOnNumber, pickLocalized } from "../../config/siteContent";
+import ContactPhones from "./ContactPhones";
 
 // Секции лендинга по порядку и пункт шапки, который они подсвечивают.
 const LANDING_SECTION_NAV = [
@@ -98,6 +98,16 @@ function PublicLayout() {
     const isOnLanding = location.pathname === "/";
     const siteContent = useSiteContentStore((state) => state.content);
     const contacts = siteContent.contacts;
+    // Мессенджеры на номере координатора уже подписаны рядом с ним в ContactPhones.
+    const messengersOnPhones = new Set(
+        [contacts.phone, contacts.coordinatorMobile, contacts.coordinatorPhone]
+            .flatMap((number) => messengersOnNumber(contacts, number).map(({ kind }) => kind))
+    );
+    const socialLinks = [
+        ["whatsapp", MessageCircle, "WhatsApp"],
+        ["telegram", Send, "Telegram"],
+        ["instagram", Instagram, "Instagram"],
+    ].filter(([kind]) => !messengersOnPhones.has(kind) && contactHref(kind, contacts[kind]));
 
     // Пункты и подписи — из Admin > Контент сайта > Шапка и меню.
     const navLinks = NAV_ITEMS
@@ -468,13 +478,8 @@ function PublicLayout() {
                         <div>
                             <h4 className='font-semibold mb-6'>{t("footer.contacts")}</h4>
                             {/* Контакты — из Admin > Контент сайта > Контакты. */}
+                            <ContactPhones contacts={contacts} className='mb-4 space-y-4' />
                             <ul className='space-y-4'>
-                                {contacts.phone && (
-                                    <li className='flex items-center gap-3 text-slate-400'>
-                                        <Phone className='w-5 h-5 shrink-0 text-teal-500' />
-                                        <a href={contactHref('phone', contacts.phone)} className='text-sm hover:text-white'>{contacts.phone}</a>
-                                    </li>
-                                )}
                                 {contacts.email && (
                                     <li className='flex items-center gap-3 text-slate-400'>
                                         <Mail className='w-5 h-5 shrink-0 text-teal-500' />
@@ -499,13 +504,9 @@ function PublicLayout() {
                                         <span className='text-sm whitespace-pre-line'>{pickLocalized(contacts.hours, lang)}</span>
                                     </li>
                                 )}
-                                {(contacts.whatsapp || contacts.telegram || contacts.instagram) && (
+                                {socialLinks.length > 0 && (
                                     <li className='flex items-center gap-2 pt-1'>
-                                        {[
-                                            ['whatsapp', MessageCircle, 'WhatsApp'],
-                                            ['telegram', Send, 'Telegram'],
-                                            ['instagram', Instagram, 'Instagram'],
-                                        ].filter(([kind]) => contactHref(kind, contacts[kind])).map(([kind, Icon, label]) => (
+                                        {socialLinks.map(([kind, Icon, label]) => (
                                             <a
                                                 key={kind}
                                                 href={contactHref(kind, contacts[kind])}

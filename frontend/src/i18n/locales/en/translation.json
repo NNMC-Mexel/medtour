@@ -387,7 +387,9 @@
     "privacy": "Privacy Policy",
     "terms": "Terms of Service",
     "description": "Global medical tourism platform for managed treatment in Kazakhstan.",
-    "address": "Astana, Abylai Khan Ave., 42"
+    "address": "Astana, Abylai Khan Ave., 42",
+    "call_center": "Call center",
+    "coordinator": "Coordinator"
   },
   "dashboard": {
     "page_titles": {

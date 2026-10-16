@@ -71,7 +71,7 @@ export const privacyCopy = {
       {
         title: '9. Contacts',
         paragraphs: ['For personal data questions, contact us:'],
-        bullets: ['Email: info@medtour.kz', 'Phone: +7 (7172) 123-456', 'Address: Astana, Abylai Khan Ave., 42'],
+        bullets: ['Email: info@medtour.kz', 'Phone: +7 (7172) 57-20-09', 'Address: Astana, Abylai Khan Ave., 42'],
       },
     ],
   },
@@ -144,7 +144,7 @@ export const privacyCopy = {
       {
         title: '9. Контакты',
         paragraphs: ['По вопросам обработки персональных данных обращайтесь:'],
-        bullets: ['Email: info@medtour.kz', 'Телефон: +7 (7172) 123-456', 'Адрес: г. Астана, просп. Абылай хана, 42'],
+        bullets: ['Email: info@medtour.kz', 'Телефон: +7 (7172) 57-20-09', 'Адрес: г. Астана, просп. Абылай хана, 42'],
       },
     ],
   },
@@ -202,7 +202,7 @@ export const termsCopy = {
         title: '7. Dispute resolution',
         paragraphs: ['In case of a dispute, including disputes related to payment through Halyk Bank / ePay, the user may:'],
         bullets: [
-          'Contact platform support: info@medtour.kz or +7 (7172) 123-456.',
+          'Contact platform support: info@medtour.kz or +7 (7172) 57-20-09.',
           'Contact Halyk Bank through epay.homebank.kz.',
           'Apply to court at the Company’s location in Astana, Kazakhstan.',
         ],
@@ -215,7 +215,7 @@ export const termsCopy = {
       },
       {
         title: '9. Contact information',
-        bullets: ['Company: NNMC Digital LLP', 'Address: Astana, Abylai Khan Ave., 42', 'Phone: +7 (7172) 123-456', 'Email: info@medtour.kz'],
+        bullets: ['Company: NNMC Digital LLP', 'Address: Astana, Abylai Khan Ave., 42', 'Phone: +7 (7172) 57-20-09', 'Email: info@medtour.kz'],
       },
     ],
     paymentPartnerTitle: 'Payment partner: Halyk Bank of Kazakhstan',
@@ -232,7 +232,7 @@ export const termsCopy = {
     ],
     refundRequestTitle: 'How to request a refund',
     refundRequestText:
-      'Email info@medtour.kz or call +7 (7172) 123-456 with the appointment number and refund reason. Refunds are issued to the card used for payment.',
+      'Email info@medtour.kz or call +7 (7172) 57-20-09 with the appointment number and refund reason. Refunds are issued to the card used for payment.',
   },
   ru: {
     back: 'На главную',
@@ -285,7 +285,7 @@ export const termsCopy = {
         title: '7. Разрешение споров',
         paragraphs: ['В случае возникновения спора, в том числе связанного с оплатой через Halyk Bank / ePay, пользователь вправе:'],
         bullets: [
-          'Обратиться в службу поддержки Платформы: info@medtour.kz или +7 (7172) 123-456.',
+          'Обратиться в службу поддержки Платформы: info@medtour.kz или +7 (7172) 57-20-09.',
           'Обратиться в Halyk Bank через сайт epay.homebank.kz.',
           'Обратиться в суд по месту нахождения Компании (г. Астана, РК).',
         ],
@@ -298,7 +298,7 @@ export const termsCopy = {
       },
       {
         title: '9. Контактная информация',
-        bullets: ['Компания: ТОО «ННМЦ Диджитал»', 'Адрес: г. Астана, просп. Абылай хана, 42', 'Телефон: +7 (7172) 123-456', 'Email: info@medtour.kz'],
+        bullets: ['Компания: ТОО «ННМЦ Диджитал»', 'Адрес: г. Астана, просп. Абылай хана, 42', 'Телефон: +7 (7172) 57-20-09', 'Email: info@medtour.kz'],
       },
     ],
     paymentPartnerTitle: 'Платёжный партнёр — АО «Народный Банк Казахстана»',
@@ -315,7 +315,7 @@ export const termsCopy = {
     ],
     refundRequestTitle: 'Как запросить возврат',
     refundRequestText:
-      'Напишите на info@medtour.kz или позвоните по номеру +7 (7172) 123-456, указав номер записи и причину возврата. Возврат осуществляется на карту, с которой была произведена оплата.',
+      'Напишите на info@medtour.kz или позвоните по номеру +7 (7172) 57-20-09, указав номер записи и причину возврата. Возврат осуществляется на карту, с которой была произведена оплата.',
   },
 }
 
@@ -392,7 +392,7 @@ privacyCopy.kk = {
       paragraphs: ['Дербес деректерді өңдеу мәселелері бойынша хабарласыңыз:'],
       bullets: [
         'Email: info@medtour.kz',
-        'Телефон: +7 (7172) 123-456',
+        'Телефон: +7 (7172) 57-20-09',
         'Мекенжай: Астана қ., Абылай хан даңғылы, 42',
       ],
     },
@@ -453,7 +453,7 @@ termsCopy.kk = {
       title: '7. Дауларды шешу',
       paragraphs: ['Дау туындаған жағдайда, соның ішінде Halyk Bank / ePay арқылы төлеуге байланысты, пайдаланушы құқылы:'],
       bullets: [
-        'Платформаның қолдау қызметіне жүгінуге: info@medtour.kz немесе +7 (7172) 123-456.',
+        'Платформаның қолдау қызметіне жүгінуге: info@medtour.kz немесе +7 (7172) 57-20-09.',
         'epay.homebank.kz сайты арқылы Halyk Bank-ке жүгінуге.',
         'Компанияның орналасқан жеріндегі сотқа жүгінуге (Астана қ., ҚР).',
       ],
@@ -469,7 +469,7 @@ termsCopy.kk = {
       bullets: [
         'Компания: «ННМЦ Диджитал» ЖШС',
         'Мекенжай: Астана қ., Абылай хан даңғылы, 42',
-        'Телефон: +7 (7172) 123-456',
+        'Телефон: +7 (7172) 57-20-09',
         'Email: info@medtour.kz',
       ],
     },
@@ -486,5 +486,5 @@ termsCopy.kk = {
     ['Кеңес толық көлемде өтті', 'Қарастырылмаған', '-'],
   ],
   refundRequestTitle: 'Қайтаруды қалай сұрауға болады',
-  refundRequestText: 'Жазба нөмірі мен қайтару себебін көрсетіп, info@medtour.kz мекенжайына жазыңыз немесе +7 (7172) 123-456 нөміріне қоңырау шалыңыз. Қаражат төлем жасалған картаға қайтарылады.',
+  refundRequestText: 'Жазба нөмірі мен қайтару себебін көрсетіп, info@medtour.kz мекенжайына жазыңыз немесе +7 (7172) 57-20-09 нөміріне қоңырау шалыңыз. Қаражат төлем жасалған картаға қайтарылады.',
 }
