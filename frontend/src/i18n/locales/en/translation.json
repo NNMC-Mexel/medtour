@@ -132,7 +132,8 @@
     "open_profile": "Open profile",
     "account_menu": "Account menu",
     "admin_analytics": "Analytics",
-    "admin_tourism": "Tourism"
+    "admin_tourism": "Tourism",
+    "admin_legal_documents": "Legal documents"
   },
   "auth": {
     "login": {
@@ -203,9 +204,6 @@
       "education_placeholder": "University, graduation year",
       "workplace": "Workplace (optional)",
       "workplace_placeholder": "Clinic name",
-      "agree_with": "I agree to the",
-      "terms": "Terms of Service",
-      "privacy": "Privacy Policy",
       "submit": "Sign Up",
       "already_account": "Already have an account?",
       "login_link": "Sign In",
@@ -244,7 +242,8 @@
         "invalid_email": "Please enter a valid email address.",
         "password_required": "Password is required.",
         "registration_failed": "Registration failed. Please try again."
-      }
+      },
+      "accept_documents": "I accept the <offer>Public Offer Agreement</offer>, give my <consent>consent to data processing and informed consent</consent>, and agree to the <privacy>Privacy Policy</privacy>"
     },
     "forgot_password": {
       "title": "Forgot Password?",
@@ -389,7 +388,9 @@
     "description": "Global medical tourism platform for managed treatment in Kazakhstan.",
     "address": "Astana, Abylai Khan Ave., 42",
     "call_center": "Call center",
-    "coordinator": "Coordinator"
+    "coordinator": "Coordinator",
+    "documents": "Legal documents",
+    "offer": "Public offer"
   },
   "dashboard": {
     "page_titles": {
@@ -441,6 +442,8 @@
       "/admin/treatment-departments_sub": "Treatment direction pages",
       "/admin/guide-videos": "Guide Videos",
       "/admin/guide-videos_sub": "Manage patient training materials",
+      "/admin/legal-documents": "Legal documents",
+      "/admin/legal-documents_sub": "Offer and consents in four languages",
       "/admin/settings": "Site content",
       "/admin/settings_sub": "Appearance, copy, contacts and SEO",
       "/manager": "Medical Cases",
@@ -2591,7 +2594,13 @@
     "terms_description": "Terms of using the MedTour platform.",
     "not_found_title": "Page not found — MedTour",
     "not_found_text": "This page does not exist or has been moved.",
-    "not_found_home": "Go to the home page"
+    "not_found_home": "Go to the home page",
+    "documents_title": "Legal documents — MedTour",
+    "documents_description": "MedTour public offer, data processing consent, informed consent and privacy policy.",
+    "offer_title": "Public Offer Agreement — MedTour",
+    "offer_description": "Terms of paid medical services for international patients: payment, rights and obligations of the parties, user agreement.",
+    "consent_title": "Data Processing Consent and Informed Consent — MedTour",
+    "consent_description": "Consent to the collection and processing of personal data and informed consent to remote and in-person medical services."
   },
   "admin_analytics": {
     "period_7": "7 days",
@@ -2721,5 +2730,23 @@
     "certificates_not_found": "File not found — upload it again.",
     "certificates_bad_type": "A certificate must be a PDF or an image.",
     "certificates_not_available": "This file cannot be attached — upload it again."
+  },
+  "legal_docs": {
+    "hub_title": "Legal documents",
+    "hub_text": "The terms on which we provide medical services and the patient consents. Every document is available in Russian, Kazakh, English and Chinese.",
+    "revision": "Version of {{date}}",
+    "languages": "Document language",
+    "contents": "Contents",
+    "print": "Print / PDF",
+    "all_documents": "All documents",
+    "open": "Open",
+    "not_found": "Document not found",
+    "not_found_text": "The link may be outdated. All current documents are on the Legal documents page.",
+    "load_error": "Could not load the document",
+    "retry": "Try again",
+    "sample": "Sample",
+    "to_top": "Back to top",
+    "privacy_text": "How we collect, store and protect your data.",
+    "terms_text": "Rules for using the website and your account."
   }
 }

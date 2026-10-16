@@ -1276,6 +1276,42 @@ export interface ApiGuideVideoGuideVideo extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiLegalDocumentLegalDocument
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'legal_documents';
+  info: {
+    description: 'Public offer, consents and other legal documents with their own pages (/documents/:slug)';
+    displayName: 'Legal Document';
+    pluralName: 'legal-documents';
+    singularName: 'legal-document';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    body: Schema.Attribute.JSON;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::legal-document.legal-document'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    revisionDate: Schema.Attribute.Date;
+    slug: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    sortOrder: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    title: Schema.Attribute.JSON;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiMedicalCaseMedicalCase extends Struct.CollectionTypeSchema {
   collectionName: 'medical_cases';
   info: {
@@ -2602,6 +2638,7 @@ declare module '@strapi/strapi' {
       'api::finance-ledger.finance-ledger': ApiFinanceLedgerFinanceLedger;
       'api::global.global': ApiGlobalGlobal;
       'api::guide-video.guide-video': ApiGuideVideoGuideVideo;
+      'api::legal-document.legal-document': ApiLegalDocumentLegalDocument;
       'api::medical-case.medical-case': ApiMedicalCaseMedicalCase;
       'api::medical-document.medical-document': ApiMedicalDocumentMedicalDocument;
       'api::message.message': ApiMessageMessage;

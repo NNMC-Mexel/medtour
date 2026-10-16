@@ -1,0 +1,62 @@
+[
+ {
+  "id": "pg.count",
+  "name": "в таблице legal_documents ровно два документа",
+  "ok": true,
+  "detail": "consent,offer"
+ },
+ {
+  "id": "pg.jsonb",
+  "name": "body хранится как jsonb",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "pg.get.offer.ru",
+  "name": "offer/ru: текст совпадает посимвольно",
+  "ok": true,
+  "detail": "200 39901 vs 39901"
+ },
+ {
+  "id": "pg.get.offer.kk",
+  "name": "offer/kk: текст совпадает посимвольно",
+  "ok": true,
+  "detail": "200 39433 vs 39433"
+ },
+ {
+  "id": "pg.get.offer.en",
+  "name": "offer/en: текст совпадает посимвольно",
+  "ok": true,
+  "detail": "200 40166 vs 40166"
+ },
+ {
+  "id": "pg.get.offer.zh",
+  "name": "offer/zh: текст совпадает посимвольно",
+  "ok": true,
+  "detail": "200 12421 vs 12421"
+ },
+ {
+  "id": "pg.get.consent.ru",
+  "name": "consent/ru: текст совпадает посимвольно",
+  "ok": true,
+  "detail": "200 31705 vs 31705"
+ },
+ {
+  "id": "pg.get.consent.kk",
+  "name": "consent/kk: текст совпадает посимвольно",
+  "ok": true,
+  "detail": "200 29740 vs 29740"
+ },
+ {
+  "id": "pg.get.consent.en",
+  "name": "consent/en: текст совпадает посимвольно",
+  "ok": true,
+  "detail": "200 31863 vs 31863"
+ },
+ {
+  "id": "pg.get.consent.zh",
+  "name": "consent/zh: текст совпадает посимвольно",
+  "ok": true,
+  "detail": "200 10064 vs 10064"
+ }
+]

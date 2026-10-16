@@ -645,3 +645,16 @@
     object-fit: cover;
   }
 }
+
+/* Печать правового документа (/documents/:slug): только текст — без шапки,
+   подвала, чата и прочих закреплённых элементов. */
+@media print {
+  body:has([data-legal-document]) header,
+  body:has([data-legal-document]) footer,
+  body:has([data-legal-document]) .fixed {
+    display: none !important;
+  }
+  body:has([data-legal-document]) {
+    background: #fff;
+  }
+}

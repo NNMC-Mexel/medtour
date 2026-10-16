@@ -1,0 +1,405 @@
+PUBLIC OFFER AGREEMENT
+
+on the Provision of Paid Medical Services to Foreign Medical Tourists
+
+In accordance with Articles 387 (Public Agreement), 389 (Accession Agreement), and 395 (Offer) of the Civil Code of the Republic of Kazakhstan, this document constitutes an official public offer by the Group of Companies (hereinafter referred to as the GC): National Scientific Medical Center JSC, Mexel Health LLP, and Үміт (Umit) International Tomotherapy Oncology Center LLP.
+
+This Agreement is addressed to an individual who is not a citizen of the Republic of Kazakhstan and who has expressed a readiness to use the services of the GC under the terms set forth below.
+
+In accordance with Article 396 of the Civil Code of the Republic of Kazakhstan, the full and unconditional Acceptance of this Offer shall be the performance by the Patient of any of the following actions: registering on the GC web portal, signing an informed consent form, signing a data collection and processing consent form, authorizing using an email address or phone number, booking an appointment, or making a payment for services.
+
+The Public Offer together with the Patient's Acceptance constitute an agreement for the provision of paid medical services (hereinafter referred to as the Agreement).
+
+This Public Offer has been developed on the basis of the standard form of the agreement on the provision of paid medical services (assistance) approved by Order of the Minister of Health of the Republic of Kazakhstan No. ҚР ДСМ-170/2020 dated October 29, 2020
+
+1. TERMS AND DEFINITIONS
+Group of Companies (hereinafter – GC):
+National Scientific Medical Center JSC,
+Mexel Health LLP,
+Үміт (Umit) International Tomotherapy Oncology Center LLP. which hold all types of required licenses, including licenses for carrying out medical activities in the Republic of Kazakhstan (hereinafter – the RK).
+Provider: One of the GC entities providing medical services to the Patient. The GC includes the following companies: National Scientific Medical Center JSC (hereinafter – NSMC JSC); Mexel Health LLP; Үміт (Umit) International Tomotherapy Oncology Center LLP (hereinafter – Үміт (Umit) LLP).
+Patient (Customer): An individual who is not a citizen of the Republic of Kazakhstan, who has proof of citizenship of another state, who does not hold a residence permit (hereinafter – RP), and who is (or was) a consumer of medical services regardless of the presence or absence of a disease or condition requiring medical assistance. If such person lacks legal capacity, their legal representative (parent, guardian, attorney-in-fact under a power of attorney, etc.) acts on their behalf and performs Acceptance actions in the interests of their ward.
+Medical Professional (Physician): An individual who has an employment or civil-law relationship with one of the GC entities, holds a professional medical education, and carries out medical activities in accordance with Article 27 of the RK Code "On Public Health and the Healthcare System" (hereinafter – the Health Code).
+Remote Medical Services (Telemedicine): Remote medical services, including establishing a clinical diagnosis and monitoring the condition of an individual at a distance, as well as other non-clinical functions such as disease prevention, health promotion, public health support, health education, and medical scientific research (Paragraph 10, Article 58 of the Health Code).
+Offline (In-Person) Medical Service: A classic format of medical assistance that involves direct physical contact between a medical professional and a patient at a medical institution of the GC.
+Digital Signature (DS): A set of electronic digital symbols created by digital signature tools and confirming the authenticity of an electronic document, its ownership, and the integrity of its content, in accordance with the RK Law "On Electronic Documents and Digital Signatures."
+Informed Voluntary Consent to Medical Services (IC): The procedure whereby an individual provides written voluntary confirmation of their consent to receive a medical service and/or participate in a specific study after receiving information on all aspects of the medical service and/or study significant for their decision-making.
+Unified Price List: The approved internal directory of prices and tariffs for medical services effective within the legal entities comprising the GC. Click the link to review the price list.
+Agreement Amount: The cost of all Services actually provided to the Patient, and in the event of early termination of the Agreement (unilateral refusal of the Agreement), also the costs actually incurred by the Provider.
+Calculation (Estimate): A document reflecting the calculation of the detailed cost of treatment, including all actual or planned expenses for medical services (surgeries, manipulations, medications, clinic stay, etc.).
+Multidisciplinary Group (hereinafter – MDG): A group of various specialists formed depending on the nature of disorders in the patient's body functions and structures, and the severity of their clinical condition.
+Consilium: An examination of an individual to establish a diagnosis, determine treatment tactics, and forecast disease prognosis with the participation of at least three physicians.
+Second Opinion: The practice of obtaining an additional consultation from a medical specialist based on the results of performed medical tests in order to clarify the diagnosis and treatment plan.
+Imputed Medical Insurance (hereinafter – IMI): A type of medical insurance for foreigners temporarily staying in the RK, in accordance with the RK Law "On Population Migration" and international treaties ratified by the RK, allowing them to receive medical services under the conditions defined by Order of the Minister of Health of the RK No. 111 dated June 7, 2023, "On Approval of the Standard Imputed Medical Insurance Agreement and the Minimum List of Medical Assistance under Imputed Medical Insurance."
+2. SUBJECT OF THE AGREEMENT AND DELINEATION OF LIABILITY
+
+2.1. Under this Agreement, the Provider undertakes to provide the Patient with paid medical services, as well as other related services (hereinafter – the Services), and the Patient undertakes to accept and timely pay for such services. A separate portion of the Services may be provided in a remote format via the web portal.
+
+2.2. The Services provided by the Provider include, but are not limited to:
+
+2.2.1. Provision of offline medical services at the outpatient and inpatient levels.
+
+2.2.2. Remote medical services, including assisting in providing Patients with the opportunity to use the web portal for the convenience and prompt selection of necessary medical services, searching for Physicians, planning consultations, using video/audio communication, secure chat, payment systems, and other features, as well as reviewing the unified price list of the GC.
+
+2.2.3. Preparation for a medical appointment, collection of necessary medical documents and their translation (if necessary), organization of the participation of an interpreter and other specialists, assistance in formulating questions, and explanations regarding the established diagnosis and treatment tactics.
+
+2.2.4. Holding physician consiliums, consultations by a multidisciplinary group of physicians, and consultations involving an experienced specialized physician to form a "Second opinion" in order to confirm the existing diagnosis and treatment tactics of the patient, or to form an alternative opinion.
+
+2.3. The direct scope of Services to be provided to the Patient is determined based on the Patient's condition, diagnosis, defined diagnostic and treatment tactics, and the Patient's preferences, and is recorded in the medical documents drawn up by the Provider during the provision of the Services.
+
+2.4. When applying for a Service, the Patient must review and consent to the terms of the Public Offer Agreement posted on the official internet resources or in the registration/admission department of the Provider, as well as the informed consent (link for review), and give consent to the collection and processing of personal data (link for review). Registration on the web portal is carried out in accordance with the step-by-step video instructions (available at this link). Upon registration, the Provider grants the Patient access to the GC web portal to receive remote medical services and ensure prompt feedback while complying with all information security measures.
+
+2.5. The Patient agrees that Remote Medical Services do not fully replace a comprehensive in-person medical examination, and the medical professional provides the service based on the provided documents.
+
+2.6. When providing a Remote Medical Service, the Provider is not liable for interference and image quality related to the Patient's technical equipment. The Patient must independently ensure the operability and safety of their computer equipment and software, antivirus protection tools, and Internet access for high-quality online communication with the Provider. For its part, the Provider will take all measures to ensure the operability of the equipment and software used by the physician, as well as to ensure the security, encryption, and confidentiality of all medical data transmitted during the online consultation.
+
+2.7. Hospitalization is carried out in accordance with the medical profiles of the Provider's activities. Hospitalization is not carried out in the presence of:
+
+2.7.1. Highly dangerous and quarantine infections, acute infectious diseases, and parasitic diseases.
+
+2.7.2. Pregnancy, childbirth, and the postpartum period (in case of pathologies requiring specialized obstetric and gynecological care), as well as if the patient is under 18 years of age.
+
+2.7.3. Acute cerebrovascular accident (CVA), as well as other acute vascular emergencies subject to emergency hospitalization in specialized stroke centers.
+
+2.8. Upon completion of the provision of medical services, the Provider issues the following medical documents to the Patient:
+
+2.8.1. Upon examination and treatment in outpatient clinic settings:
+
+Physician's Consultation Sheet;
+For day hospital patients: medical record extract.
+
+2.8.2. Upon examination and treatment in inpatient (round-the-clock) settings:
+
+Extract from the inpatient patient's medical record.
+
+2.8.3. Upon provision of a remote medical service:
+
+Physician's Consultation Sheet in electronic format, signed with the Physician's Digital Signature (DS).
+3. PAYMENT PROCEDURE
+
+3.1. The Patient shall pay for the Provider's medical services in accordance with the current Unified Price List in the national currency of the Republic Kazakhstan—tenge (KZT), by cashless payment or by depositing cash into the Provider's cash desk. When paying with cards of foreign banks, the funds shall be debited from the Patient's bank account with conversion at the exchange rate of the issuing bank or the corresponding international payment system as of the date of the transaction.
+
+3.2. The Unified Price List is posted on the GC's official internet resources, as well as in the GC clinics.
+
+3.3. Payment for a remote medical service shall be made by the Patient making a 100% prepayment via the online payment system upon registration for the appointment;
+
+3.4. When outpatient and consultative assistance is provided, the Patient or their representative shall make a 100% payment for the medical services required by the Patient, either in cash or by cashless payment.
+
+3.5. For a day hospital, the Patient shall make an advance payment in tenge equivalent to at least 450 US dollars (USD). The remaining amount shall be paid by the Patient or their representative in accordance with the calculation upon completion of treatment based on the services actually provided on the day of the Patient's discharge. If the actual amount of the services rendered turns out to be less than the amount of the advance payment made, the resulting difference shall be refunded to the Patient within 3 (three) business days.
+
+3.6. For an inpatient facility (round-the-clock stay), the Patient shall make an advance payment in tenge equivalent to at least 1,200 US dollars (USD) (when performing surgical interventions costing over 1,200 US dollars (USD) — at least 80% of the preliminary cost of treatment). The remaining amount shall be paid by the Patient or their representative in accordance with the calculation upon completion of treatment based on the services actually provided on the day of the Patient's discharge. If the actual amount of the services rendered turns out to be less than the amount of the advance payment made, the resulting difference shall be refunded to the Patient within 3 (three) business days.
+
+3.7. In addition to the above payment methods, the Patient may use a deposit system whereby a certain amount (deposit) is paid in advance. Services are paid for from this deposit as they are provided, with the possibility of its subsequent replenishment as it is used up.
+
+3.8. The calculation of the cost of the patient's stay in the inpatient facility / day hospital, in addition to diagnostic examinations, drug therapy, and surgical treatment, includes the cost of actually spent bed-days, meals, and other services provided to the Patient and stipulated by the approved Unified Price List.
+
+3.9. The Patient is aware and agrees that the cost of medical services determined prior to the start of treatment is preliminary. The scope of services may be changed taking into account medical indications related to the Patient's condition, identified diseases and pathological conditions, results of examinations already performed, and the need for additional examinations, surgeries, and/or therapeutic manipulations. The Provider has the right to demand intermediate payment for services during the course of treatment. Such payment is mandatory for the Patient or their representative.
+
+3.10. The Provider shall issue documents confirming the fact of payment to the Patient in accordance with the legislation of the RK.
+
+3.11. In the event of the impossibility of providing services by the Provider for reasons not related to force majeure circumstances, the Provider shall offer the Patient alternative terms for the provision of services or equivalent services. If the Patient disagrees, the Provider shall refund the funds paid for services not rendered.
+
+3.12. In the event of the Patient's failure to fulfill the terms of this Agreement (including refusal to undergo prescribed procedures, violation of preparation rules for examination, or untimely appearance), which resulted in the impossibility of rendering services and caused damage to the Provider in the form of wasted time and resources, the Provider has the right to withhold 30% of the amount paid by the Patient for the Services.
+
+3.13. Refunds shall be made on the basis of a written application by the Patient within 10 (ten) business days from the date the application is accepted by the Provider, in accordance with Clause 3.12 of the Agreement.
+
+4. OBLIGATIONS OF THE PARTIES
+4.1. The Provider shall:
+
+4.1.1. render the Services with high quality and in full, in accordance with the legislation of the RK;
+
+4.1.2. take all measures to ensure the Patient's safety and maximum satisfaction with the results of the medical services provided;
+
+4.1.3. ensure the protection of personal data and medical confidentiality within its area of responsibility;
+
+4.1.4. maintain documentation on the medical services rendered in accordance with the legislation of the RK;
+
+4.1.5. provide necessary medical assistance in accordance with the legislation of the Republic of Kazakhstan and international treaties ratified by the RK in the event of the necessity to provide emergency medical assistance to the Patient to prevent significant harm to health and/or eliminate a threat to life.
+
+4.2. The Patient shall:
+
+4.2.1. comply with the rules defining the order and regime of operation established by the Provider;
+
+4.2.2. prior to receiving medical services, review and sign the informed consent, consent to the collection and processing of personal data (link for review), as well as the Patient's Confirmation of the Choice of Medical Care on a Paid Basis (Appendix 2 to the Agreement);
+
+4.2.3. comply with the legislation of the Republic of Kazakhstan when receiving medical services under the Agreement;
+
+4.2.4. inform the Provider of the refusal to receive a medical service or part of a medical service at least 24 hours before the date of the medical service provision;
+
+4.2.5. provide reliable information about personal data, health status, past illnesses, and allergic reactions, and upload necessary medical documents prior to the start of online consultations;
+
+4.2.6. timely pay for the medical service using any method provided by the Provider (cashless or cash payment);
+
+4.2.7. prior to the provision of medical services, provide the Provider with reliable information on the existence of a valid IMI agreement or any other type of insurance.
+
+5. RIGHTS OF THE PARTIES
+5.1. The Patient has the right to:
+
+5.1.1. receive reliable information about their health status, the procedure and regime for rendering the medical service, as well as the potential risks and consequences of the ongoing treatment;
+
+5.1.2. refuse the provision of medical services. In this case, the Provider shall refund the funds in accordance with Clauses 3.12 and 3.13 of the Agreement;
+
+5.1.3. receive the medical documents upon completion of treatment specified in Clause 2.8 of the Agreement;
+
+5.1.4. obtain copies of their medical documents in the manner and within the timelines established by the legislation of the RK and the Provider's internal rules;
+
+5.1.5. choose the attending physician from among the physicians providing paid medical services (assistance), as well as the right to an expert assessment of the quality of the treatment performed;
+
+5.1.6. conclude an IMI agreement or any other type of insurance prior to receiving medical services;
+
+5.1.7. unilaterally terminate the agreement in accordance with Section 9 of the Agreement.
+
+5.2. The Provider has the right to:
+
+5.2.1. early termination of treatment in the cases specified in Section 9 of the Agreement;
+
+5.2.2. engage third parties (other clinics) as subcontractors to render services, if necessary;
+
+5.2.3. replace the assigned Physician or specialist in case of illness, force majeure circumstances, or other valid reasons, with prior notification of the Patient and provision of a physician of equivalent qualification;
+
+5.2.4. unilaterally refuse to perform the Agreement and render services (both in offline and online formats) if the Patient is in a state of alcoholic, narcotic, or toxic intoxication, displays aggression, insults the medical staff, and/or violates the Provider's internal regulations.
+
+5.3. By accepting this Offer, the Patient provides unconditional consent to the collection, processing, and storage of their personal data in accordance with the legislation of the RK.
+
+5.4. ATTENTION! The Provider does not collect or request passwords, SMS codes, PIN codes, or CVV codes from the back of a bank card from the Patient!
+
+6. LIABILITY OF THE PARTIES
+
+6.1. In case of non-fulfillment or improper fulfillment of obligations stipulated by this Agreement, the parties shall bear liability in accordance with the laws of the Republic of Kazakhstan.
+
+6.2. The Provider shall be liable for committed violations in the provision of medical services in accordance with Order of the Minister of Health No. ҚР ДСМ-170/2020 dated October 29, 2020.
+
+6.3. In the event of a breach of Clauses 3.5 and 3.6 of the Agreement by the Patient, the Provider shall withhold a penalty in the amount of 0.5% of the final calculation amount for each day of delay.
+
+6.4. The Patient shall be liable for violating the terms of the Agreement, including untimely payment for the Services. In case of refusal of the Services, the Patient undertakes to reimburse all actual costs incurred by the Provider.
+
+6.5. All disputes shall be resolved in accordance with the legislation of the RK with a mandatory pre-trial procedure. Claims shall be sent in writing: to the Provider's legal address, to its e-mail, or through the contacts specified on the web portal. The review period for a written claim is 15 (fifteen) business days from the date of receipt.
+
+6.6. This Agreement is governed and construed in accordance with the legislation of the RK. All disputes and disagreements arising from or in connection with this Agreement shall be resolved through negotiations. If an agreement cannot be reached, the dispute shall be resolved in the judicial bodies of the city of Astana in accordance with the current legislation of the Republic of Kazakhstan.
+
+6.7. Electronic documents on the web portal, as well as SMS messages and messenger notifications from the GC, have the same legal force as paper documents.
+
+6.8. The medical documents specified in Clause 2.8 of the Agreement issued by the Provider within the framework of this Agreement shall be executed in accordance with the requirements of the legislation of the RK. The Provider is not responsible for the recognition of these documents in the territory of the Patient's country of residence/stay.
+
+7. CONFIDENTIALITY AND PERSONAL DATA PROTECTION
+
+7.1. The Patient confirms that they have been informed that their personal data will be processed by the Provider in accordance with the terms set forth herein and in the information consents provided to the Provider.
+
+7.2. The Patient's personal data may be disclosed to official authorities only in the event of their official request in accordance with due legal procedure and in situations where disclosure to official authorities is mandatory under the legislation of the RK.
+
+7.3. To protect the Patient's confidentiality, the GC undertakes to use secure systems and store data in certified information systems using encryption and security tools.
+
+7.4. The Provider hereby also undertakes to keep the confidential information provided to it in strict secrecy and not to disclose it, as well as to take all necessary measures and exercise full diligence to ensure and maintain confidentiality, preventing all or any part of the confidential information from entering the public domain, its unauthorized use, or disclosure to third parties.
+
+8. FORCE MAJEURE
+
+8.1. Neither Party shall be liable for full or partial failure to fulfill any of its obligations if such failure is the consequence of force majeure circumstances arising after the conclusion of this Agreement by the Parties, namely: fire, flood, earthquake, epidemic, military actions, acts of terrorism, freight embargoes, unusually severe weather conditions, power outages, failures in telecommunication or internet backbones, internet service provider failures, or other similar causes beyond the control of the Parties, etc.
+
+8.2. The period for fulfilling obligations under the Agreement shall be postponed in proportion to the time during which the force majeure circumstances, as well as the consequences caused by these circumstances, were in effect.
+
+8.3. The Party for which it became impossible to fulfill obligations under this Agreement must inform the other Party about the occurrence of these circumstances and their causes within 1 or more business days from the date of their onset.
+
+8.4. Upon the occurrence of force majeure circumstances, the Provider shall notify the Patient by any available means: on the web portal, via SMS, or through messengers.
+
+8.5. Failure to notify or untimely notification deprives the Party of the right to refer to any of the above circumstances as a ground exempting it from liability for failure to fulfill obligations under the Agreement.
+
+8.6. If the impossibility of full or partial fulfillment of obligations by the Parties continues for more than 60 calendar days, each of the Parties shall have the right to refuse further fulfillment of obligations under this Agreement. In such a case, neither Party shall demand reimbursement of losses from the other party.
+
+9. GROUNDS FOR TERMINATION OF THE PUBLIC OFFER AGREEMENT
+
+9.1. The Provider has the right to unilaterally and extrajudicially terminate the Agreement early, including blocking the Patient's access to the web portal and stopping the provision of medical services, by notifying the Patient via the web portal, by written notice, or via SMS message (including via a messenger) in the following cases:
+
+9.1.1. If the Patient refuses to follow medical recommendations or prescriptions, if such refusal makes the further provision of medical services impossible or poses a threat to the life and health of the Patient or other persons;
+
+9.1.2. If the Patient is in a state of alcoholic, narcotic, or toxic intoxication;
+
+9.1.3. If the Patient applies physical violence, threats, insults, or other aggressive behavior towards medical workers, the Provider's employees, other patients, or other persons;
+
+9.1.4. If the Patient violates the internal regulations, treatment regime, or stay regime within the GC.
+
+9.2. Upon the occurrence of the cases specified in Clauses 9.1.1, 9.1.2, 9.1.3, and 9.1.4 of the Agreement, as well as upon the occurrence of the cases specified in Clause 4.1.5 of the Agreement, the Patient shall reimburse the Provider for the amount of expenses actually incurred, based on the calculation provided by the Provider.
+
+9.3. The Patient has the right to unilaterally terminate the Agreement by sending a corresponding written application to the Provider (including via the account on the Web Portal or by email) 5 (five) calendar days prior to the date of termination.
+
+9.4. The Patient is obliged to reimburse the Provider for expenses actually incurred by the Provider in connection with the fulfillment of obligations under this Agreement until the moment of termination of the Agreement (including the cost of services actually rendered, consumed medications, consumables, bed-days spent, and documents prepared), based on the calculation provided by the Provider.
+
+9.5. The Agreement is not subject to unilateral termination (either at the initiative of the Patient or at the initiative of the Provider) and is not considered terminated until the Parties have fully settled all mutual accounts, including payment for services actually rendered, expenses actually incurred by the Provider, as well as payment of applicable penalties and deductions provided for by this Agreement.
+
+10. FINAL PROVISIONS
+
+10.1. The Agreement enters into force from the moment of its Acceptance by the Patient and is valid until the Parties fully fulfill their obligations.
+
+10.2. The Provider reserves the right to unilaterally amend the Agreement in accordance with the legislation of the RK by publishing a new version on the Platform at least 10 (ten) calendar days before its entry into force.
+
+10.3. The Patient agrees and acknowledges that making changes to the offer entails making these changes to the Agreement concluded and effective between the Parties, and these changes to the Agreement enter into force simultaneously with the entry into force of such changes in the offer. Hereby, the Patient confirms that they possess all legal rights and authorities necessary to conclude the Agreement.
+
+10.4. The Patient's application for a service to the Provider after making changes to the Agreement (to the public offer) is unambiguously understood by the Provider and the Patient as agreement with the changes made.
+
+10.5. After the changes to the terms of the agreement enter into force, they do not have retroactive effect. Services that have already been paid for by the Patient or are in the process of being rendered (within the framework of the agreed treatment plan) at the moment the changes enter into force shall be governed by the terms of the Agreement in effect on the date of payment or commencement of the provision of such Services.
+
+10.6. In all matters not provided for by this Agreement, the Parties shall be guided by the current legislation of the RK.
+
+10.7. The Agreement is drawn up in the state language, English, Chinese, and Russian languages. In the event of discrepancies or disputes, the text in the state language shall prevail.
+
+Appendix No. 1 to the Public Agreement
+
+Web Portal Operating Conditions
+
+(USER AGREEMENT)
+
+A step-by-step video registration guide is available at this link.
+
+1. Registration and Account Management
+
+1.1. In case of reviewing and agreeing to the terms of this Agreement and the informed consent, in order to fully utilize the Provider's Services, the Patient must register on the Web Portal.
+
+1.2. The registration process begins by clicking the corresponding icon in the upper right corner labeled "Registration," where the Patient must provide their last name, first name, patronymic (if any), email address, country of residence, phone number, preferred language, and time zone. Afterward, click the "Continue" button, and in the next window, provide passport details and create a password. The Patient must review the User Agreement and the Privacy Policy. In case of agreement, the Patient must check the box next to "I agree with the User Agreement and Privacy Policy" and then click the "Register" button. The Patient will proceed to the next working window containing a notification that a message will be sent to the specified email address. To activate the account, the Patient must open the message.
+
+1.3. Upon completing registration, the Patient shall be deemed to have accepted the terms of this Public Offer Agreement.
+
+1.4. Login is carried out by specifying the email address or phone number and the password chosen during registration.
+
+1.5. The Patient's email address and phone number are unique upon registration, meaning that the same email address or phone number cannot be used by two different patients during registration.
+
+1.6. The password to the email address or phone number for logging into the Web Portal is known only to the Patient. The Web Portal and the Provider are not liable for unauthorized access that may occur as a result of disclosure or theft of the password through the Patient's fault, nor are they liable for errors/problems arising from user errors related to the use of the password. Users who have forgotten their password will be redirected to the "Forgot Password" section and prompted to complete security steps to set a new password..
+
+2. Technical Security, Risk Allocation
+
+2.1. The Patient bears independent responsibility for using modern web browsers and the best commercially available software for encryption, antivirus protection, spyware protection, and internet security. The Patient is also responsible for obtaining internet services through a chosen internet provider, all fees charged by such internet provider, and any related communication service payments. The Patient acknowledges that there are certain security risks, data corruption, transmission errors, and availability risks associated with using open networks such as the Internet, and the Patient hereby explicitly accepts such risks. In addition, the Patient acknowledges responsibility for the data security of their systems used to access the Web Portal Services, as well as for transmitting and receiving information using such systems. The Patient acknowledges that the Provider and the Web Portal are not liable for any errors or problems arising from internet or Patient system malfunctions or failures.
+
+For its part, the Provider will take all measures to ensure the operability of the equipment and software used by the physician, as well as to ensure the security, encryption, and confidentiality of all medical data transmitted during the online consultation.
+
+3. Prohibited Actions on the Platform
+
+3.1. While using the Web Portal, the Patient is prohibited from:
+
+3.1.1. Sending or otherwise transmitting through the web portal any illegal, copyright-infringing, harmful, offensive, defamatory, threatening, hateful, or otherwise objectionable materials of any kind, any materials that may harm or cause a delay to the Web Portal, as well as any unsolicited advertising, offers, or promotional materials;
+
+3.1.2. Any distortion of Personal Data;
+
+3.1.3. Restricting or hindering any person from using the medical services of the Web Portal, disclosing personal information obtained within the framework of the Web Portal's medical services, or collecting information about other service users;
+
+3.1.4. Performing reverse engineering, decompilation, or disassembly of any section or technology of the Web Portal, or attempting to commit any of the above actions;
+
+3.1.5. Gaining unauthorized access to the Web Portal services, other users' accounts, their names, personal data, or other information, as well as to other computers or web portals connected or linked to the Web Portal services;
+
+3.1.6. Sending or otherwise transmitting through the Web Portal chain letters, unsolicited messages, so-called "spam messages" or "phishing messages," as well as messages advertising goods and services;
+
+3.1.7. Posting, transmitting, or otherwise distributing any viruses, worms, spyware, or any other computer code, file, or program that can or is intended to damage or hijack the operation of any hardware, software, or telecommunications equipment;
+
+3.1.8. Committing inappropriate actions, including exhibiting rudeness, hostility, threats, or aggression, using foul language, posting rude or inappropriate personal and hostile content towards the Provider's medical staff.
+
+4. Blocking and Termination of Access
+
+4.1. In the event of a violation by the Patient of the terms of this Agreement, the Provider has the right to suspend or terminate access to the web portal. If signs of extremist, terrorist, or other illegal activities are detected in the Patient's actions, the Provider reserves the right to immediately block the Patient's access to the Web Portal and transfer the relevant materials to law enforcement and other authorized state bodies of the RK without prior notice to the Patient.
+
+Appendix No. 2 to the Public Agreement
+
+PATIENT'S CONFIRMATION
+
+OF THE CHOICE OF MEDICAL CARE ON A PAID BASIS
+
+SAMPLE
+
+I, ___________________________________________________________________________
+
+(Full name of the patient / legal representative)
+
+Date of birth: «____» _____________ ______ г.
+
+Passport number / Identity document: ___________________________________,
+
+confirm my voluntary decision to receive medical care (medical services) on a paid basis at
+
+_____________________________________________________________________________
+
+(Name of the Provider)
+
+1. Information on the Planned Medical Service
+Type of medical care:
+
+☐ Outpatient ☐ Inpatient ☐ Replacement (Day) hospital
+
+Preliminary diagnosis / medical indications::
+
+_________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+Planned scope of medical care:
+
+(marked by a medical professional (physician) in accordance with medical indications and the examination and treatment plan)
+
+☐ Consultation with a physician (specialist);
+
+☐ Comprehensive preventive examination (Check-up);
+
+☐ Diagnostic examinations (laboratory, instrumental, functional, etc.);
+
+☐ Drug therapy;
+
+☐ Surgical intervention:
+
+☐ Physiotherapy treatment;
+
+☐ Other medical measures: ______________________________________________.
+
+Note: The specific list and sequence of medical measures are determined taking into account the patient's health status, medical indications, and examination results.
+
+Diagnostic examinations planned:
+
+(marked by a medical professional (physician) in accordance with medical indications and the examination and treatment plan)
+
+☐ Laboratory tests, including general clinical, biochemical, hormonal, immunological, serological, microbiological, molecular-genetic studies, tumor markers, and other types of laboratory diagnostics;
+
+☐ Instrumental examinations, including electrocardiography (ECG), echocardiography (EchoCG), ultrasound examinations (ultrasound), X-ray examinations, mammography, computed tomography (CT), magnetic resonance imaging (MRI), endoscopic examinations, and other types of instrumental diagnostics;
+
+☐ Functional examinations;
+
+☐ Morphological and pathomorphological studies, including cytological and histological studies;
+
+☐ Other diagnostic examinations: ___________________________________________
+
+____________________________________________________________________________
+
+Note: The complete list of diagnostic examinations is determined by medical indications and the patient's examination and treatment plan.
+
+2. Patient's Confirmation
+
+I confirm that:
+
+2.1. I have voluntarily chosen to receive the specified medical care on a paid basis and confirm that this decision was made independently by me.
+
+2.2. It has been explained to me that the final scope, sequence, and methods of examination and treatment are determined by medical professionals taking into account my health status, examination results, and medical indications.
+
+2.3. It has been explained to me that in the process of examination and treatment, a medical necessity may arise to perform additional diagnostic and therapeutic measures, of which I will be notified and have the right to independently decide whether to consent to or refuse their implementation.
+
+2.4. I understand that the preliminarily determined cost of medical care may change depending on medical indications and the actually rendered volume of medical services. The final cost is determined based on the actually rendered volume of medical services in accordance with the Provider's current price list.
+
+2.5. I confirm the reliability of the information provided by me regarding my health status and undertake to inform medical professionals of information relevant to the safe provision of medical care.
+
+3. Payment Method and Procedure
+
+3.1. On the day of receiving medical services (care), the Patient shall make a payment/prepayment in the amount of _______________________ tenge to the Provider's cash desk or by transferring funds to the Provider's settlement account in accordance with clauses 3.4, 3.5, and 3.6 of the Public Offer Agreement for examination and treatment.
+
+3.2. The final amount shall be paid by the Patient or their representative in accordance with the calculation upon completion of treatment for the services actually rendered on the day of the Patient's discharge.
+
+4. Confirmation of Intent
+
+4.1. It has been explained to me that this Confirmation is signed prior to the commencement of the provision of medical care (medical services) on a paid basis.
+
+4.2. I am informed that this Confirmation is an addition to the informed voluntary consent to the provision of medical care (medical services).
+
+4.3. I have fully reviewed, understand, and accept these conditions, as well as all terms of the Public Offer Agreement for the provision of paid medical services.
+
+4.4. I have fully reviewed and understand that the terms, procedures, and rules for rendering medical services not explicitly stated or regulated in this Confirmation are determined and regulated by the provisions of the Provider's Public Offer Agreement and the current legislation of the Republic of Kazakhstan.
+
+Patient / Legal Representative:
+
+Full Name_______________________________________________________________________
+
+Signature ___________________________
+
+Date: "_" __________________ 20 Time:
+
+Provider's Authorized Representative by Power of Attorney:
+
+Full Name ____________________________________________

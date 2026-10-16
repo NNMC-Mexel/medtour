@@ -66,6 +66,7 @@ const buildPages = (doctors) => {
   const simple = [
     ['/', 'home'], ['/doctors', 'doctors'], ['/prices', 'prices'], ['/tourism', 'tourism'],
     ['/blog', 'blog'], ['/privacy', 'privacy'], ['/terms', 'terms'],
+    ['/documents', 'documents'], ['/documents/offer', 'offer'], ['/documents/consent', 'consent'],
   ].map(([pagePath, key]) => ({
     path: pagePath,
     meta: (lang) => ({ title: locales[lang][`${key}_title`], description: locales[lang][`${key}_description`] }),

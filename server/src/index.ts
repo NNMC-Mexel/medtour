@@ -3,6 +3,8 @@ import { decryptUserPII, encryptUserPII, isPiiEncryptionEnabled } from './utils/
 import { importPriceCatalog } from './utils/price-catalog-import';
 import { GLOBAL_DEFAULTS } from './utils/global-defaults';
 import { backfillDoctorSpecializations, repairDoctorPrimarySpecializations } from './utils/doctor-specializations-backfill';
+import offerSeed from './api/legal-document/seed/offer.json';
+import consentSeed from './api/legal-document/seed/consent.json';
 
 // Все запросы сводки аналитики фильтруют по дню, а таблица растёт с каждым
 // визитом. Strapi индексы по полям schema.json не создаёт — ставим сами.
@@ -475,6 +477,9 @@ const roleDefinitions = {
       'api::global.global.find',
       'api::global.global.findOne',
       'api::global.global.update',
+      // Правовые документы (оферта, согласия) — правка текстов
+      'api::legal-document.legal-document.findForEdit',
+      'api::legal-document.legal-document.updateBySlug',
       'api::about.about.find',
       'api::about.about.findOne',
       'api::about.about.update',
@@ -581,6 +586,22 @@ async function ensureGlobal(strapi: Core.Strapi) {
     strapi.log.info('[bootstrap] Global settings record created.');
   } catch (error: any) {
     strapi.log.warn(`[bootstrap] Global settings record was not created: ${error?.message}`);
+  }
+}
+
+// Оферта и согласия: создаём из seed/*.json, если документа ещё нет. Правки
+// админа не перезаписываем — новая редакция от юристов вносится в админке.
+async function ensureLegalDocuments(strapi: Core.Strapi) {
+  for (const seed of [offerSeed, consentSeed] as any[]) {
+    try {
+      const existing = await strapi.documents('api::legal-document.legal-document' as any)
+        .findFirst({ filters: { slug: seed.slug } } as any);
+      if (existing) continue;
+      await strapi.documents('api::legal-document.legal-document' as any).create({ data: seed } as any);
+      strapi.log.info(`[bootstrap] Legal document "${seed.slug}" created.`);
+    } catch (error: any) {
+      strapi.log.warn(`[bootstrap] Legal document "${seed.slug}" was not created: ${error?.message}`);
+    }
   }
 }
 
@@ -929,6 +950,7 @@ export default {
     await seedSpecializations(strapi);
     await seedClinics(strapi);
     await ensureGlobal(strapi);
+    await ensureLegalDocuments(strapi);
     try {
       await backfillDoctorSpecializations(strapi);
       await repairDoctorPrimarySpecializations(strapi);
