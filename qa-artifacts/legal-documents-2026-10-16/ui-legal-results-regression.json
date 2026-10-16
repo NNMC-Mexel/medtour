@@ -1,0 +1,590 @@
+[
+ {
+  "id": "setup.login",
+  "name": "вход QA-админа и QA-пациента",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.list",
+  "name": "список: оферта и согласие, 4 языка, без текстов документов",
+  "ok": true,
+  "detail": "{\"data\":[{\"slug\":\"offer\",\"title\":{\"ru\":\"Публичный договор-оферта\",\"kk\":\"Жария шарт-оферта\",\"en\":\"Public Offer Agreement\",\"zh\":\"公开要约合同\"},\"revisionDate\":\"2026-09-24\",\"updatedAt\":\"2026-10-16T14:46:24.064Z\",\"languages\":[\"ru\",\"kk\",\"en\",\"zh\"]},{\"slug\":\"consent\",\"title\":{\"ru\":\"Согласие на обработку данных "
+ },
+ {
+  "id": "A.get.offer.ru",
+  "name": "offer (ru): текст = исходный, заголовок на языке",
+  "ok": true,
+  "detail": "{\"status\":200,\"lang\":\"ru\",\"len\":39872}"
+ },
+ {
+  "id": "A.get.offer.kk",
+  "name": "offer (kk): текст = исходный, заголовок на языке",
+  "ok": true,
+  "detail": "{\"status\":200,\"lang\":\"kk\",\"len\":39433}"
+ },
+ {
+  "id": "A.get.offer.en",
+  "name": "offer (en): текст = исходный, заголовок на языке",
+  "ok": true,
+  "detail": "{\"status\":200,\"lang\":\"en\",\"len\":40166}"
+ },
+ {
+  "id": "A.get.offer.zh",
+  "name": "offer (zh): текст = исходный, заголовок на языке",
+  "ok": true,
+  "detail": "{\"status\":200,\"lang\":\"zh\",\"len\":12421}"
+ },
+ {
+  "id": "A.get.consent.ru",
+  "name": "consent (ru): текст = исходный, заголовок на языке",
+  "ok": true,
+  "detail": "{\"status\":200,\"lang\":\"ru\",\"len\":31705}"
+ },
+ {
+  "id": "A.get.consent.kk",
+  "name": "consent (kk): текст = исходный, заголовок на языке",
+  "ok": true,
+  "detail": "{\"status\":200,\"lang\":\"kk\",\"len\":29741}"
+ },
+ {
+  "id": "A.get.consent.en",
+  "name": "consent (en): текст = исходный, заголовок на языке",
+  "ok": true,
+  "detail": "{\"status\":200,\"lang\":\"en\",\"len\":31863}"
+ },
+ {
+  "id": "A.get.consent.zh",
+  "name": "consent (zh): текст = исходный, заголовок на языке",
+  "ok": true,
+  "detail": "{\"status\":200,\"lang\":\"zh\",\"len\":10064}"
+ },
+ {
+  "id": "A.fallback",
+  "name": "неизвестный язык → русская версия",
+  "ok": true,
+  "detail": "ru"
+ },
+ {
+  "id": "A.404.nope",
+  "name": "несуществующий документ nope → 404",
+  "ok": true,
+  "detail": "404"
+ },
+ {
+  "id": "A.404...%2Fglobal",
+  "name": "несуществующий документ ../global → 404",
+  "ok": true,
+  "detail": "404"
+ },
+ {
+  "id": "A.404.offer%27--",
+  "name": "несуществующий документ offer'-- → 404",
+  "ok": true,
+  "detail": "404"
+ },
+ {
+  "id": "A.acl.anon",
+  "name": "anon: редактор и сохранение закрыты (401/403)",
+  "ok": true,
+  "detail": "403/403"
+ },
+ {
+  "id": "A.acl.patient",
+  "name": "patient: редактор и сохранение закрыты (401/403)",
+  "ok": true,
+  "detail": "403/403"
+ },
+ {
+  "id": "A.noCrud",
+  "name": "даже админ не может создать или удалить документ через API",
+  "ok": true,
+  "detail": "405/405"
+ },
+ {
+  "id": "A.edit.admin",
+  "name": "админ получает все 4 языка для редактора",
+  "ok": true,
+  "detail": "200"
+ },
+ {
+  "id": "A.validate.lang",
+  "name": "некорректная правка (lang) → 400",
+  "ok": true,
+  "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"body: unsupported language \\\"fr\\\"\",\"details\":{}}}"
+ },
+ {
+  "id": "A.validate.type",
+  "name": "некорректная правка (type) → 400",
+  "ok": true,
+  "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"body.ru must be a string\",\"details\":{}}}"
+ },
+ {
+  "id": "A.validate.size",
+  "name": "некорректная правка (size) → 400",
+  "ok": true,
+  "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"body.ru is longer than 400000 characters\",\"detail"
+ },
+ {
+  "id": "A.validate.date",
+  "name": "некорректная правка (date) → 400",
+  "ok": true,
+  "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"revisionDate must be YYYY-MM-DD or null\",\"details"
+ },
+ {
+  "id": "A.validate.empty",
+  "name": "некорректная правка (empty) → 400",
+  "ok": true,
+  "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"Nothing to update\",\"details\":{}}}"
+ },
+ {
+  "id": "A.validate.allEmpty",
+  "name": "некорректная правка (allEmpty) → 400",
+  "ok": true,
+  "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"Document must keep text in at least one language\""
+ },
+ {
+  "id": "A.validate.untouched",
+  "name": "после отклонённых правок текст не изменился",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.conflict",
+  "name": "правка поверх чужой (устаревший updatedAt) → 409",
+  "ok": true,
+  "detail": "409"
+ },
+ {
+  "id": "A.ignoreFields",
+  "name": "slug/id в теле игнорируются — документ остаётся по своему адресу",
+  "ok": true,
+  "detail": "200/200"
+ },
+ {
+  "id": "A.partial",
+  "name": "правка одного языка не трогает остальные",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.hub.ru",
+  "name": "/documents (ru): 4 карточки — оферта, согласие, политика, условия",
+  "ok": true,
+  "detail": "[\"/documents/offer\",\"/documents/consent\",\"/privacy\",\"/terms\"]"
+ },
+ {
+  "id": "B.hub.en",
+  "name": "/documents (en): 4 карточки — оферта, согласие, политика, условия",
+  "ok": true,
+  "detail": "[\"/documents/offer\",\"/documents/consent\",\"/privacy\",\"/terms\"]"
+ },
+ {
+  "id": "B.hub.kk",
+  "name": "/documents (kk): 4 карточки — оферта, согласие, политика, условия",
+  "ok": true,
+  "detail": "[\"/documents/offer\",\"/documents/consent\",\"/privacy\",\"/terms\"]"
+ },
+ {
+  "id": "B.doc.offer.ru.390",
+  "name": "offer.ru.390: заголовок, язык документа = языку сайта, все части, 4 языка, дата редакции",
+  "ok": true,
+  "detail": "{\"h1\":\"Публичный договор-оферта\",\"articleLang\":\"ru\",\"parts\":3,\"expected\":3,\"langButtons\":[\"Русский\",\"Қазақша\",\"English\",\"中文\"],\"revision\":true}"
+ },
+ {
+  "id": "B.overflow.offer.ru.390",
+  "name": "offer.ru.390: нет горизонтального скролла (длинные «____» переносятся)",
+  "ok": true,
+  "detail": "+0"
+ },
+ {
+  "id": "B.errors.offer.ru.390",
+  "name": "offer.ru.390: нет ошибок JS",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.doc.offer.ru.1366",
+  "name": "offer.ru.1366: заголовок, язык документа = языку сайта, все части, 4 языка, дата редакции",
+  "ok": true,
+  "detail": "{\"h1\":\"Публичный договор-оферта\",\"articleLang\":\"ru\",\"parts\":3,\"expected\":3,\"langButtons\":[\"Русский\",\"Қазақша\",\"English\",\"中文\"],\"revision\":true}"
+ },
+ {
+  "id": "B.overflow.offer.ru.1366",
+  "name": "offer.ru.1366: нет горизонтального скролла (длинные «____» переносятся)",
+  "ok": true,
+  "detail": "+0"
+ },
+ {
+  "id": "B.errors.offer.ru.1366",
+  "name": "offer.ru.1366: нет ошибок JS",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.doc.offer.en.390",
+  "name": "offer.en.390: заголовок, язык документа = языку сайта, все части, 4 языка, дата редакции",
+  "ok": true,
+  "detail": "{\"h1\":\"Public Offer Agreement\",\"articleLang\":\"en\",\"parts\":3,\"expected\":3,\"langButtons\":[\"Русский\",\"Қазақша\",\"English\",\"中文\"],\"revision\":true}"
+ },
+ {
+  "id": "B.overflow.offer.en.390",
+  "name": "offer.en.390: нет горизонтального скролла (длинные «____» переносятся)",
+  "ok": true,
+  "detail": "+0"
+ },
+ {
+  "id": "B.errors.offer.en.390",
+  "name": "offer.en.390: нет ошибок JS",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.doc.offer.en.1366",
+  "name": "offer.en.1366: заголовок, язык документа = языку сайта, все части, 4 языка, дата редакции",
+  "ok": true,
+  "detail": "{\"h1\":\"Public Offer Agreement\",\"articleLang\":\"en\",\"parts\":3,\"expected\":3,\"langButtons\":[\"Русский\",\"Қазақша\",\"English\",\"中文\"],\"revision\":true}"
+ },
+ {
+  "id": "B.overflow.offer.en.1366",
+  "name": "offer.en.1366: нет горизонтального скролла (длинные «____» переносятся)",
+  "ok": true,
+  "detail": "+0"
+ },
+ {
+  "id": "B.errors.offer.en.1366",
+  "name": "offer.en.1366: нет ошибок JS",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.doc.offer.kk.390",
+  "name": "offer.kk.390: заголовок, язык документа = языку сайта, все части, 4 языка, дата редакции",
+  "ok": true,
+  "detail": "{\"h1\":\"Жария шарт-оферта\",\"articleLang\":\"kk\",\"parts\":3,\"expected\":3,\"langButtons\":[\"Русский\",\"Қазақша\",\"English\",\"中文\"],\"revision\":true}"
+ },
+ {
+  "id": "B.overflow.offer.kk.390",
+  "name": "offer.kk.390: нет горизонтального скролла (длинные «____» переносятся)",
+  "ok": true,
+  "detail": "+0"
+ },
+ {
+  "id": "B.errors.offer.kk.390",
+  "name": "offer.kk.390: нет ошибок JS",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.doc.offer.kk.1366",
+  "name": "offer.kk.1366: заголовок, язык документа = языку сайта, все части, 4 языка, дата редакции",
+  "ok": true,
+  "detail": "{\"h1\":\"Жария шарт-оферта\",\"articleLang\":\"kk\",\"parts\":3,\"expected\":3,\"langButtons\":[\"Русский\",\"Қазақша\",\"English\",\"中文\"],\"revision\":true}"
+ },
+ {
+  "id": "B.overflow.offer.kk.1366",
+  "name": "offer.kk.1366: нет горизонтального скролла (длинные «____» переносятся)",
+  "ok": true,
+  "detail": "+0"
+ },
+ {
+  "id": "B.errors.offer.kk.1366",
+  "name": "offer.kk.1366: нет ошибок JS",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.doc.consent.ru.390",
+  "name": "consent.ru.390: заголовок, язык документа = языку сайта, все части, 4 языка, дата редакции",
+  "ok": true,
+  "detail": "{\"h1\":\"Согласие на обработку данных и информированное согласие\",\"articleLang\":\"ru\",\"parts\":5,\"expected\":5,\"langButtons\":[\"Русский\",\"Қазақша\",\"English\",\"中文\"],\"revision\":true}"
+ },
+ {
+  "id": "B.overflow.consent.ru.390",
+  "name": "consent.ru.390: нет горизонтального скролла (длинные «____» переносятся)",
+  "ok": true,
+  "detail": "+0"
+ },
+ {
+  "id": "B.errors.consent.ru.390",
+  "name": "consent.ru.390: нет ошибок JS",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.doc.consent.ru.1366",
+  "name": "consent.ru.1366: заголовок, язык документа = языку сайта, все части, 4 языка, дата редакции",
+  "ok": true,
+  "detail": "{\"h1\":\"Согласие на обработку данных и информированное согласие\",\"articleLang\":\"ru\",\"parts\":5,\"expected\":5,\"langButtons\":[\"Русский\",\"Қазақша\",\"English\",\"中文\"],\"revision\":true}"
+ },
+ {
+  "id": "B.overflow.consent.ru.1366",
+  "name": "consent.ru.1366: нет горизонтального скролла (длинные «____» переносятся)",
+  "ok": true,
+  "detail": "+0"
+ },
+ {
+  "id": "B.errors.consent.ru.1366",
+  "name": "consent.ru.1366: нет ошибок JS",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.doc.consent.en.390",
+  "name": "consent.en.390: заголовок, язык документа = языку сайта, все части, 4 языка, дата редакции",
+  "ok": true,
+  "detail": "{\"h1\":\"Consent to Data Processing and Informed Consent\",\"articleLang\":\"en\",\"parts\":5,\"expected\":5,\"langButtons\":[\"Русский\",\"Қазақша\",\"English\",\"中文\"],\"revision\":true}"
+ },
+ {
+  "id": "B.overflow.consent.en.390",
+  "name": "consent.en.390: нет горизонтального скролла (длинные «____» переносятся)",
+  "ok": true,
+  "detail": "+0"
+ },
+ {
+  "id": "B.errors.consent.en.390",
+  "name": "consent.en.390: нет ошибок JS",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.doc.consent.en.1366",
+  "name": "consent.en.1366: заголовок, язык документа = языку сайта, все части, 4 языка, дата редакции",
+  "ok": true,
+  "detail": "{\"h1\":\"Consent to Data Processing and Informed Consent\",\"articleLang\":\"en\",\"parts\":5,\"expected\":5,\"langButtons\":[\"Русский\",\"Қазақша\",\"English\",\"中文\"],\"revision\":true}"
+ },
+ {
+  "id": "B.overflow.consent.en.1366",
+  "name": "consent.en.1366: нет горизонтального скролла (длинные «____» переносятся)",
+  "ok": true,
+  "detail": "+0"
+ },
+ {
+  "id": "B.errors.consent.en.1366",
+  "name": "consent.en.1366: нет ошибок JS",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.doc.consent.kk.390",
+  "name": "consent.kk.390: заголовок, язык документа = языку сайта, все части, 4 языка, дата редакции",
+  "ok": true,
+  "detail": "{\"h1\":\"Деректерді өңдеуге келісім және ақпараттандырылған келісім\",\"articleLang\":\"kk\",\"parts\":5,\"expected\":5,\"langButtons\":[\"Русский\",\"Қазақша\",\"English\",\"中文\"],\"revision\":true}"
+ },
+ {
+  "id": "B.overflow.consent.kk.390",
+  "name": "consent.kk.390: нет горизонтального скролла (длинные «____» переносятся)",
+  "ok": true,
+  "detail": "+0"
+ },
+ {
+  "id": "B.errors.consent.kk.390",
+  "name": "consent.kk.390: нет ошибок JS",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.doc.consent.kk.1366",
+  "name": "consent.kk.1366: заголовок, язык документа = языку сайта, все части, 4 языка, дата редакции",
+  "ok": true,
+  "detail": "{\"h1\":\"Деректерді өңдеуге келісім және ақпараттандырылған келісім\",\"articleLang\":\"kk\",\"parts\":5,\"expected\":5,\"langButtons\":[\"Русский\",\"Қазақша\",\"English\",\"中文\"],\"revision\":true}"
+ },
+ {
+  "id": "B.overflow.consent.kk.1366",
+  "name": "consent.kk.1366: нет горизонтального скролла (длинные «____» переносятся)",
+  "ok": true,
+  "detail": "+0"
+ },
+ {
+  "id": "B.errors.consent.kk.1366",
+  "name": "consent.kk.1366: нет ошибок JS",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.zh.switch",
+  "name": "中文: ?docLang=zh в адресе, текст на китайском, <… lang=\"zh\">",
+  "ok": true,
+  "detail": "http://localhost:1342/documents/offer?docLang=zh zh"
+ },
+ {
+  "id": "B.zh.reload",
+  "name": "после перезагрузки выбранный язык документа сохраняется (из адреса)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.anchor.sample-inpatient",
+  "name": "/documents/consent#sample-inpatient: страница открывается на нужной части",
+  "ok": true,
+  "detail": "top=112.09375"
+ },
+ {
+  "id": "B.anchor.appendix-2",
+  "name": "/documents/offer#appendix-2: страница открывается на нужной части",
+  "ok": true,
+  "detail": "top=112.59375"
+ },
+ {
+  "id": "B.anchor.personal-data",
+  "name": "/documents/consent?docLang=zh#personal-data: страница открывается на нужной части",
+  "ok": true,
+  "detail": "top=111.59375"
+ },
+ {
+  "id": "B.links.offer",
+  "name": "в оферте рабочие ссылки: прейскурант и согласие (ПД, ИС), без target=_blank для своих страниц",
+  "ok": true,
+  "detail": "[{\"href\":\"/prices\",\"text\":\"Нажмите на ссылку\",\"target\":\"\"},{\"href\":\"/documents/consent#informed-consent\",\"text\":\"ссылка для ознакомления\",\"target\":\"\"},{\"href\":\"/documents/consent#personal-data\",\"text\":\"ссылка для ознакомления\",\"target\":\"\"},{\"href\":\"/documents/consent#personal-data\",\"text\":\"ссылка для ознакомления\",\"target\":\"\"}]"
+ },
+ {
+  "id": "B.links.crossDoc",
+  "name": "клик «ссылка для ознакомления» в оферте → согласие, сразу на нужной части",
+  "ok": true,
+  "detail": "top=111.59375"
+ },
+ {
+  "id": "B.toc",
+  "name": "оглавление: переход к части и подсветка текущего пункта",
+  "ok": true,
+  "detail": "top=111.78125 current=#sample-day-hospital"
+ },
+ {
+  "id": "B.toc.mobile",
+  "name": "390: «Содержание» раскрывается, после выбора пункта сворачивается и ведёт к части",
+  "ok": true,
+  "detail": "opened=true closed=true top=111.59375"
+ },
+ {
+  "id": "B.notFound",
+  "name": "/documents/nope: «Документ не найден» и ссылка на все документы",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "B.print",
+  "name": "печать: без шапки, подвала и оглавления; части документа на месте",
+  "ok": true,
+  "detail": "{\"header\":\"none\",\"footer\":\"none\",\"toc\":\"none\",\"partVisible\":\"block\"}"
+ },
+ {
+  "id": "B.footer",
+  "name": "подвал: ссылки «Правовые документы» и «Публичная оферта»",
+  "ok": true,
+  "detail": "[\"/treatments/heart-institute\",\"/treatments/neurosurgery\",\"/treatments/therapy\",\"/#specializations\",\"/#process\",\"/tourism\",\"/blog\",\"/documents\",\"tel:+77172572009\",\"tel:+77000853144\",\"https://wa.me/77000853144\",\"https://t.me/+77000853144\",\"tel:+77172577440\",\"mailto:support@nnmc.kz\",\"https://www.nnmc.kz/\",\"/documents/offer\",\"/privacy\",\"/terms\"]"
+ },
+ {
+  "id": "B.register.ru",
+  "name": "регистрация (ru): галочка ссылается на оферту, согласие и политику, открываются в новой вкладке",
+  "ok": true,
+  "detail": "{\"hrefs\":[{\"href\":\"/documents/offer\",\"target\":\"_blank\"},{\"href\":\"/documents/consent\",\"target\":\"_blank\"},{\"href\":\"/privacy\",\"target\":\"_blank\"}],\"text\":\"Я принимаю условия публичной оферты, даю согласие на обработку персональных данных и информированное согласие и соглашаюсь с политикой конфиденциальности\"}"
+ },
+ {
+  "id": "B.register.en",
+  "name": "регистрация (en): галочка ссылается на оферту, согласие и политику, открываются в новой вкладке",
+  "ok": true,
+  "detail": "{\"hrefs\":[{\"href\":\"/documents/offer\",\"target\":\"_blank\"},{\"href\":\"/documents/consent\",\"target\":\"_blank\"},{\"href\":\"/privacy\",\"target\":\"_blank\"}],\"text\":\"I accept the Public Offer Agreement, give my consent to data processing and informed consent, and agree to the Privacy Policy\"}"
+ },
+ {
+  "id": "B.register.kk",
+  "name": "регистрация (kk): галочка ссылается на оферту, согласие и политику, открываются в новой вкладке",
+  "ok": true,
+  "detail": "{\"hrefs\":[{\"href\":\"/documents/offer\",\"target\":\"_blank\"},{\"href\":\"/documents/consent\",\"target\":\"_blank\"},{\"href\":\"/privacy\",\"target\":\"_blank\"}],\"text\":\"Мен жария оферта шарттарын қабылдаймын, дербес деректерді өңдеуге келісім мен ақпараттандырылған келісім беремін және құпиялылық саясатымен келісемін\"}"
+ },
+ {
+  "id": "C.open",
+  "name": "сайдбар → «Правовые документы»: вкладки двух документов и 4 языков",
+  "ok": true,
+  "detail": "[\"Публичный договор-оферта\",\"Согласие на обработку данных и информированное согласие\",\"Русский\",\"Қазақша\",\"English\",\"中文\"]"
+ },
+ {
+  "id": "C.saveDisabled",
+  "name": "без изменений «Сохранить» неактивна",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "C.preview",
+  "name": "предпросмотр рядом с редактором обновляется сразу",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "C.dirty",
+  "name": "появилась пометка «Есть несохранённые изменения»",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "C.save.api",
+  "name": "сохранение: новый текст и дата редакции на сервере, остальные языки не тронуты",
+  "ok": true,
+  "detail": "2026-10-20"
+ },
+ {
+  "id": "C.save.site",
+  "name": "сайт: правка и новая дата редакции видны сразу",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "C.reset",
+  "name": "«Отменить изменения» возвращает сохранённый текст",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "C.anchorWarning",
+  "name": "kk без якоря {#appendix-1}: предупреждение о сломанных ссылках",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "C.emptyLang.marker",
+  "name": "пустой язык помечен «(нет текста)» и есть пояснение",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "C.emptyLang.site",
+  "name": "без китайского текста: ?lang=zh → русский, в списке языков нет zh",
+  "ok": true,
+  "detail": "[\"ru\",\"kk\",\"en\"]"
+ },
+ {
+  "id": "C.conflict",
+  "name": "вторая вкладка сохранила раньше → первая получает понятное сообщение и не затирает чужую правку",
+  "ok": true,
+  "detail": "toast=1 date=2026-11-01"
+ },
+ {
+  "id": "C.xss",
+  "name": "HTML и javascript:/data:-ссылки в тексте выводятся как текст и не исполняются",
+  "ok": true,
+  "detail": "xss=undefined bad=0 literal=true"
+ },
+ {
+  "id": "C.contentPointer",
+  "name": "«Контент сайта → Правовые документы»: ссылка на редактор оферты и согласий",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "C.ui.en",
+  "name": "редактор на en: кнопки и вкладки переведены",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "C.ui.kk",
+  "name": "редактор на kk: кнопки и вкладки переведены",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "C.errors",
+  "name": "админка: нет ошибок JS",
+  "ok": true,
+  "detail": ""
+ }
+]

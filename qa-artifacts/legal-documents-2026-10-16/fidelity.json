@@ -1,0 +1,98 @@
+{
+ "offer.ru": {
+  "sourceWords": 4920,
+  "pageWords": 4920,
+  "missing": [
+   "образец"
+  ],
+  "extra": [
+   "образец"
+  ]
+ },
+ "offer.kk": {
+  "sourceWords": 4747,
+  "pageWords": 4747,
+  "missing": [
+   "үлгі"
+  ],
+  "extra": [
+   "үлгі"
+  ]
+ },
+ "offer.en": {
+  "sourceWords": 6197,
+  "pageWords": 6197,
+  "missing": [
+   "sample"
+  ],
+  "extra": [
+   "sample"
+  ]
+ },
+ "offer.zh": {
+  "sourceWords": 9104,
+  "pageWords": 9104,
+  "missing": [
+   "样 本"
+  ],
+  "extra": [
+   "样 本"
+  ]
+ },
+ "consent.ru": {
+  "sourceWords": 3558,
+  "pageWords": 3558,
+  "missing": [
+   "образец",
+   "образец",
+   "образец"
+  ],
+  "extra": [
+   "образец",
+   "образец",
+   "образец"
+  ]
+ },
+ "consent.kk": {
+  "sourceWords": 3260,
+  "pageWords": 3260,
+  "missing": [
+   "үлгі",
+   "үлгі",
+   "үлгі"
+  ],
+  "extra": [
+   "үлгі",
+   "үлгі",
+   "үлгі"
+  ]
+ },
+ "consent.en": {
+  "sourceWords": 4494,
+  "pageWords": 4494,
+  "missing": [
+   "sample",
+   "sample",
+   "sample"
+  ],
+  "extra": [
+   "sample",
+   "sample",
+   "sample"
+  ]
+ },
+ "consent.zh": {
+  "sourceWords": 6768,
+  "pageWords": 6768,
+  "missing": [
+   "样 本",
+   "样 本",
+   "样 本"
+  ],
+  "extra": [
+   "样 本",
+   "样 本",
+   "样 本"
+  ]
+ }
+}
