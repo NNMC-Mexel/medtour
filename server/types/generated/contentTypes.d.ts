@@ -1046,6 +1046,7 @@ export interface ApiDoctorDoctor extends Struct.CollectionTypeSchema {
     bio: Schema.Attribute.RichText;
     breakEnd: Schema.Attribute.String;
     breakStart: Schema.Attribute.String;
+    certificates: Schema.Attribute.Media<'images' | 'files', true>;
     clinic: Schema.Attribute.Relation<'manyToOne', 'api::clinic.clinic'>;
     consultationDuration: Schema.Attribute.Integer &
       Schema.Attribute.DefaultTo<30>;
@@ -2508,18 +2509,21 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
       }>;
+    failedLoginCount: Schema.Attribute.Integer & Schema.Attribute.Private;
     fullName: Schema.Attribute.String;
     gender: Schema.Attribute.Enumeration<['male', 'female']>;
     i18n: Schema.Attribute.JSON;
     iin: Schema.Attribute.String;
     isVerified: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     language: Schema.Attribute.String & Schema.Attribute.DefaultTo<'en'>;
+    lastFailedLoginAt: Schema.Attribute.DateTime & Schema.Attribute.Private;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
       'plugin::users-permissions.user'
     > &
       Schema.Attribute.Private;
+    loginLockedUntil: Schema.Attribute.DateTime & Schema.Attribute.Private;
     managed_medical_cases: Schema.Attribute.Relation<
       'oneToMany',
       'api::medical-case.medical-case'
@@ -2547,6 +2551,8 @@ export interface PluginUsersPermissionsUser
     provider: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     resetPasswordToken: Schema.Attribute.String & Schema.Attribute.Private;
+    resetPasswordTokenExpiresAt: Schema.Attribute.DateTime &
+      Schema.Attribute.Private;
     reviews: Schema.Attribute.Relation<'oneToMany', 'api::review.review'>;
     role: Schema.Attribute.Relation<
       'manyToOne',
