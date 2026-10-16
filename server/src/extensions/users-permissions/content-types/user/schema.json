@@ -190,6 +190,26 @@
       "type": "datetime",
       "private": true,
       "configurable": false
+    },
+    "resetPasswordTokenExpiresAt": {
+      "type": "datetime",
+      "private": true,
+      "configurable": false
+    },
+    "failedLoginCount": {
+      "type": "integer",
+      "private": true,
+      "configurable": false
+    },
+    "lastFailedLoginAt": {
+      "type": "datetime",
+      "private": true,
+      "configurable": false
+    },
+    "loginLockedUntil": {
+      "type": "datetime",
+      "private": true,
+      "configurable": false
     }
   }
 }

@@ -48,13 +48,11 @@ setInterval(() => {
   }
 }, 30 * 60 * 1000)
 
-function getClientIp(ctx, trustProxy: boolean) {
-  if (trustProxy) {
-    const forwardedFor = ctx.get('x-forwarded-for')
-    const firstForwardedIp = forwardedFor?.split(',')[0]?.trim()
-    if (firstForwardedIp) return firstForwardedIp
-  }
-
+// Адрес клиента берём у Koa: за прокси (server.proxy.koa) он учитывает только
+// адреса, которые дописали наши прокси (maxIpsCount). Раньше здесь брался
+// первый адрес X-Forwarded-For — его присылает сам клиент, и подставляя каждый
+// раз новый, можно было обойти лимит входа полностью.
+function getClientIp(ctx) {
   return ctx.request.ip || ctx.ip || 'unknown'
 }
 
@@ -64,7 +62,6 @@ export default (config = {}, { strapi }) => {
     ...((config as any).limits || {}),
   }
   const prefixLimits: PrefixRateLimitRule[] = (config as any).prefixLimits || DEFAULT_PREFIX_LIMITS
-  const trustProxy = Boolean((config as any).trustProxy)
 
   return async (ctx, next) => {
     if (ctx.method === 'OPTIONS') return next()
@@ -84,7 +81,7 @@ export default (config = {}, { strapi }) => {
 
     if (!limit) return next()
 
-    const ip = getClientIp(ctx, trustProxy)
+    const ip = getClientIp(ctx)
     const key = `${ip}:${bucket}`
     const now = Date.now()
     const entry = store.get(key)

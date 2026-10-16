@@ -19,6 +19,8 @@ function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
+  // Ссылка истекла или уже использована — показываем путь к новой ссылке.
+  const [isLinkInvalid, setIsLinkInvalid] = useState(false)
   const [isReset, setIsReset] = useState(false)
 
   const handleSubmit = async (e) => {
@@ -36,6 +38,7 @@ function ResetPasswordPage() {
 
     setIsLoading(true)
     setError(null)
+    setIsLinkInvalid(false)
 
     try {
       await api.post('/api/auth/reset-password', {
@@ -45,8 +48,16 @@ function ResetPasswordPage() {
       })
       setIsReset(true)
     } catch (err) {
-      const message = err.response?.data?.error?.message || t('auth_flow.reset_error')
-      setError(message)
+      const apiError = err.response?.data?.error
+      const message = apiError?.message || t('auth_flow.reset_error')
+      if (message === 'reset_link_expired' || message === 'Incorrect code provided') {
+        setIsLinkInvalid(true)
+        setError(t('auth_flow.reset_invalid_desc'))
+      } else if (apiError?.details?.i18nKey) {
+        setError(t(apiError.details.i18nKey, message))
+      } else {
+        setError(message)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -142,8 +153,13 @@ function ResetPasswordPage() {
                 />
 
                 {error && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-600">
+                  <div role="alert" className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-600">
                     {error}
+                    {isLinkInvalid && (
+                      <Link to="/forgot-password" className="mt-2 block font-medium text-teal-700 hover:underline">
+                        {t('auth_flow.reset_request_new')}
+                      </Link>
+                    )}
                   </div>
                 )}
 

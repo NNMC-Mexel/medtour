@@ -25,7 +25,16 @@ export default ({ env }) => {
       providerOptions: {
         host: env('SMTP_HOST', 'smtp.yandex.ru'),
         port: env.int('SMTP_PORT', 465),
-        secure: true,
+        // 465 — сразу TLS, 587 — STARTTLS. Жёсткое secure: true на 587 вешало
+        // соединение до таймаута.
+        secure: env.bool('SMTP_SECURE', env.int('SMTP_PORT', 465) === 465),
+        // Без таймаутов nodemailer ждёт соединения 2 минуты, а сокет — 10:
+        // если исходящий SMTP недоступен, регистрация и «Забыли пароль?»
+        // висели на «Загрузка…». Теперь сбой почты виден через ~15 с, а эти
+        // формы его обрабатывают (аккаунт создаётся, ответ — как обычно).
+        connectionTimeout: env.int('SMTP_CONNECTION_TIMEOUT_MS', 10_000),
+        greetingTimeout: env.int('SMTP_GREETING_TIMEOUT_MS', 10_000),
+        socketTimeout: env.int('SMTP_SOCKET_TIMEOUT_MS', 20_000),
         auth: {
           user: env('SMTP_USER'),
           pass: env('SMTP_PASS'),

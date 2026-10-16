@@ -19,6 +19,49 @@
 import { maskUserPIIForRole } from '../../utils/pii-crypto';
 import { issueUserJwt, revokeUserSessions } from '../../utils/user-session';
 import { rejectWeakPassword } from '../../utils/password-policy';
+import {
+  findPasswordTarget,
+  sendAccountLockedEmail,
+  sendAdminPasswordChangedEmail,
+  sendAdminPasswordResetEmail,
+} from '../../utils/admin-password';
+import crypto from 'crypto';
+import {
+  LOCKOUT_THRESHOLD,
+  LOGIN_PROTECTION_FIELDS,
+  clearedLoginProtection,
+  failureWindowStart,
+  isResetTokenExpired,
+  lockRemainingSeconds,
+  lockUntil,
+  needsLoginProtectionReset,
+  reachesLockout,
+  resetTokenExpiry,
+} from '../../utils/login-protection';
+
+const USER_UID = 'plugin::users-permissions.user';
+
+// Служебные поля входа пишет только сервер. Иначе админ мог задать
+// пользователю известный ему токен сброса и сменить пароль мимо журнала, а
+// «откатив» tokenValidAfter — оживить уже отозванные сессии.
+const PROTECTED_USER_FIELDS = [
+  'resetPasswordToken',
+  'confirmationToken',
+  'tokenValidAfter',
+  ...LOGIN_PROTECTION_FIELDS,
+];
+
+// Журнал безопасности — JSON-строки в логе, как остальные audit-события.
+// IP берём у Koa: за прокси он учитывает только адреса, которые дописали
+// наши прокси (server.proxy), а не первый адрес X-Forwarded-For от клиента.
+const auditLog = (ctx: any, event: string, fields: Record<string, unknown> = {}) => {
+  strapi.log.info(JSON.stringify({
+    audit: event,
+    ...fields,
+    ip: ctx?.request?.ip || null,
+    ts: new Date().toISOString(),
+  }));
+};
 
 export default (plugin) => {
   // Сохраняем оригинальную factory-функцию контроллера auth
@@ -106,6 +149,74 @@ export default (plugin) => {
     return body;
   };
 
+  // Аккаунт, в который пытаются войти, — так же, как его ищет Strapi (email
+  // без учёта регистра или логин). Нужен для счётчика неудач и блокировки.
+  const findLoginAccount = async (identifier: unknown) => {
+    const value = typeof identifier === 'string' ? identifier.trim() : '';
+    if (!value) return null;
+    return strapi.query(USER_UID).findOne({
+      where: { provider: 'local', $or: [{ email: value.toLowerCase() }, { username: value }] },
+      select: ['id', 'email', 'fullName', 'language', 'blocked', 'failedLoginCount', 'lastFailedLoginAt', 'loginLockedUntil'],
+    });
+  };
+
+  // Неудачный вход: считаем на аккаунте, на десятой подряд закрываем вход и
+  // пишем владельцу. Лимит по IP не спасает от подбора с сотни адресов.
+  //
+  // Счётчик меняется атомарно в SQL. «Прочитал — прибавил — записал» терял
+  // приращения: десять параллельных попыток давали +1, и подбор пачками
+  // запросов не упирался в блокировку никогда.
+  const userColumns = () => {
+    const meta: any = strapi.db.metadata.get(USER_UID);
+    const column = (attribute: string) => meta.attributes[attribute]?.columnName || attribute;
+    return {
+      table: meta.tableName,
+      count: column('failedLoginCount'),
+      last: column('lastFailedLoginAt'),
+      locked: column('loginLockedUntil'),
+      token: column('resetPasswordToken'),
+    };
+  };
+
+  const recordLoginFailure = async (ctx: any, account: any) => {
+    auditLog(ctx, 'LOGIN_FAILURE', { userId: account?.id ?? null, reason: 'invalid_credentials' });
+    if (!account) return;
+
+    const knex = strapi.db.connection;
+    const c = userColumns();
+    const now = new Date();
+    // Ошибки старше окна не копятся. Условие в WHERE: параллельный запрос,
+    // уже записавший свежую ошибку, не обнулит счёт за другим.
+    await knex(c.table)
+      .where('id', account.id)
+      .andWhere((q: any) => q.whereNull(c.last).orWhere(c.last, '<', failureWindowStart(now)))
+      .update({ [c.count]: 0 });
+    await knex(c.table)
+      .where('id', account.id)
+      .update({ [c.count]: knex.raw('COALESCE(??, 0) + 1', [c.count]), [c.last]: now });
+
+    const current = await knex(c.table).where('id', account.id).first(c.count);
+    if (!reachesLockout(current?.[c.count])) return;
+    // Закрывает вход ровно один запрос — он же пишет в журнал и шлёт письмо.
+    const until = lockUntil(now);
+    const locked = await knex(c.table)
+      .where('id', account.id)
+      .andWhere(c.count, '>=', LOCKOUT_THRESHOLD)
+      .andWhere((q: any) => q.whereNull(c.locked).orWhere(c.locked, '<=', now))
+      .update({ [c.locked]: until, [c.count]: 0 });
+    if (!locked) return;
+
+    auditLog(ctx, 'ACCOUNT_LOCKED', { userId: account.id, until: until.toISOString() });
+    if (account.email && !account.blocked) {
+      try {
+        await sendAccountLockedEmail(strapi, account);
+      } catch (mailError) {
+        const msg = mailError instanceof Error ? mailError.message : String(mailError);
+        strapi.log.error(`[auth.callback] lock notice to user ${account.id} failed: ${msg}`);
+      }
+    }
+  };
+
   const sanitizeProfilePayload = (body: any) => {
     const allowedFields = [
       'fullName',
@@ -136,8 +247,105 @@ export default (plugin) => {
     return enrichPhoneNormalized(data);
   };
 
+  // Тело смотрим целиком: и верхний уровень, и обёртку {data: …}. Штатный
+  // контроллер Strapi пишет поля верхнего уровня, поэтому проверка только
+  // data пропускала {"data":{}, "password":"…"} мимо всех запретов.
+  const bodyLayers = (ctx: any) => {
+    const body = ctx.request?.body;
+    if (!body || typeof body !== 'object') return [];
+    return body.data && typeof body.data === 'object' ? [body, body.data] : [body];
+  };
+  const bodyHas = (ctx: any, field: string) =>
+    bodyLayers(ctx).some((layer) => Object.prototype.hasOwnProperty.call(layer, field));
+
+  const rejectProtectedFields = (ctx: any) => {
+    const fields = PROTECTED_USER_FIELDS.filter((field) => bodyHas(ctx, field));
+    if (fields.length === 0) return false;
+    ctx.badRequest('protected_user_fields', { code: 'protected_user_fields', fields });
+    return true;
+  };
+
+  const isAdminActor = (user: any) => user?.role?.type === 'admin' || user?.userRole === 'admin';
+
+  /** Цель действия админа над паролем или null, если ответ уже записан в ctx. */
+  const resolvePasswordTarget = async (ctx: any) => {
+    if (!isAdminActor(ctx.state?.user)) {
+      ctx.forbidden('Forbidden');
+      return null;
+    }
+    const target = await findPasswordTarget(strapi, ctx.params?.id);
+    if (!target) {
+      ctx.notFound('user_not_found');
+      return null;
+    }
+    return target;
+  };
+
   plugin.controllers.user = {
     ...originalUserController,
+
+    // POST /users/:id/password-reset — письмо со ссылкой на установку пароля.
+    // Прежний пароль действует, пока пользователь не перейдёт по ссылке.
+    async adminSendPasswordReset(ctx) {
+      const target = await resolvePasswordTarget(ctx);
+      if (!target) return;
+      if (!target.email) return ctx.badRequest('user_has_no_email');
+      if (target.blocked) return ctx.badRequest('user_blocked');
+
+      try {
+        await sendAdminPasswordResetEmail(strapi, target);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        strapi.log.error(`[user.adminSendPasswordReset] email to user ${target.id} failed: ${msg}`);
+        auditLog(ctx, 'PASSWORD_RESET_REQUESTED', { via: 'admin', userId: target.id, by: ctx.state.user.id, result: 'email_failed' });
+        // Админ должен узнать, что письмо не ушло: в отличие от публичной
+        // формы, тут нечего скрывать — аккаунт он и так видит.
+        ctx.status = 502;
+        ctx.body = { data: null, error: { status: 502, name: 'EmailError', message: 'email_send_failed' } };
+        return;
+      }
+
+      auditLog(ctx, 'PASSWORD_RESET_REQUESTED', { via: 'admin', userId: target.id, by: ctx.state.user.id });
+      ctx.body = { ok: true, email: target.email };
+    },
+
+    // PUT /users/:id/password — админ задаёт пароль сам.
+    async adminSetPassword(ctx) {
+      const target = await resolvePasswordTarget(ctx);
+      if (!target) return;
+      // Свой пароль — из профиля, с вводом текущего: так украденная сессия
+      // админа не сменит пароль без его ведома.
+      if (target.id === ctx.state.user.id) return ctx.badRequest('use_profile_for_own_password');
+
+      const password = normalizeContentApiBody(ctx.request?.body || {})?.password;
+      if (rejectWeakPassword(ctx, password)) return;
+
+      // edit() хэширует пароль. Старая ссылка сброса гаснет, блокировка после
+      // подбора снимается, все прежние сессии завершаются.
+      await strapi.plugin('users-permissions').service('user').edit(target.id, { password });
+      await strapi.query(USER_UID).update({
+        where: { id: target.id },
+        data: {
+          resetPasswordToken: null,
+          resetPasswordTokenExpiresAt: null,
+          tokenValidAfter: new Date().toISOString(),
+          ...clearedLoginProtection(),
+        },
+      });
+      auditLog(ctx, 'PASSWORD_CHANGED', { via: 'admin', userId: target.id, by: ctx.state.user.id });
+
+      let notified = false;
+      if (target.email && !target.blocked) {
+        try {
+          await sendAdminPasswordChangedEmail(strapi, target);
+          notified = true;
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          strapi.log.error(`[user.adminSetPassword] notice to user ${target.id} failed: ${msg}`);
+        }
+      }
+      ctx.body = { ok: true, notified };
+    },
 
     // Mask iin/passportNumber for callers who are not allowed the full value
     // (patient/doctor see ****1234; admin/manager/coordinator see full).
@@ -150,6 +358,7 @@ export default (plugin) => {
     async create(ctx) {
       try {
         const sourceBody = normalizeContentApiBody(ctx.request?.body || {});
+        if (rejectProtectedFields(ctx)) return;
         if (rejectWeakPassword(ctx, sourceBody.password)) return;
         await assignRoleFromUserRole(sourceBody);
         enrichPhoneNormalized(sourceBody);
@@ -162,11 +371,15 @@ export default (plugin) => {
       return originalUserController.create(ctx);
     },
 
-    // Admin edits of an account (PUT /users/:id): a new password follows the
-    // same policy as self-service registration.
+    // Admin edits of an account (PUT /users/:id).
     async update(ctx) {
       const sourceBody = normalizeContentApiBody(ctx.request?.body || {});
-      if (sourceBody.password !== undefined && sourceBody.password !== '' && rejectWeakPassword(ctx, sourceBody.password)) return;
+      // Пароль существующего аккаунта меняется только через PUT
+      // /users/:id/password: там политика паролей, разрыв сессий и письмо.
+      if (bodyHas(ctx, 'password')) {
+        return ctx.badRequest('password_change_not_allowed_here', { code: 'password_change_not_allowed_here' });
+      }
+      if (rejectProtectedFields(ctx)) return;
 
       // Role change by an admin. The role is stored twice — the `role` relation
       // (server permissions) and `userRole` (which cabinet the UI opens) — and
@@ -267,18 +480,19 @@ export default (plugin) => {
   plugin.routes['content-api'] = (strapi) => {
     const router = originalContentApiRoutes(strapi);
     const routes = Array.isArray(router) ? router : router.routes;
-    const updateMeRoute = {
-      method: 'PUT',
-      path: '/users/me',
-      handler: 'user.updateMe',
-      config: { prefix: '' },
-    };
+    // PUT /users/me должен стоять перед PUT /users/:id, иначе «me» разберётся
+    // как идентификатор. Маршруты паролей — рядом, по той же причине.
+    const extraRoutes = [
+      { method: 'PUT', path: '/users/me', handler: 'user.updateMe', config: { prefix: '' } },
+      { method: 'POST', path: '/users/:id/password-reset', handler: 'user.adminSendPasswordReset', config: { prefix: '' } },
+      { method: 'PUT', path: '/users/:id/password', handler: 'user.adminSetPassword', config: { prefix: '' } },
+    ];
     const userUpdateIndex = routes.findIndex((route: any) => route.method === 'PUT' && route.path === '/users/:id');
     const nextRoutes = userUpdateIndex === -1
-      ? [...routes, updateMeRoute]
+      ? [...routes, ...extraRoutes]
       : [
           ...routes.slice(0, userUpdateIndex),
-          updateMeRoute,
+          ...extraRoutes,
           ...routes.slice(userUpdateIndex),
         ];
 
@@ -384,13 +598,53 @@ export default (plugin) => {
           }
         }
 
-        await originalCallback(ctx);
+        // Аккаунт закрыт после серии неудачных входов: пароль не проверяем
+        // вовсе, иначе подбор продолжался бы и во время блокировки.
+        const account = await findLoginAccount(ctx.request.body?.identifier ?? identifier);
+        const lockedFor = lockRemainingSeconds(account);
+        if (account && lockedFor > 0) {
+          auditLog(ctx, 'LOGIN_FAILURE', { userId: account.id, reason: 'account_locked' });
+          ctx.set('Retry-After', String(lockedFor));
+          ctx.status = 429;
+          ctx.body = {
+            data: null,
+            error: {
+              status: 429,
+              name: 'TooManyRequests',
+              message: 'account_locked',
+              details: { retryAfterSeconds: lockedFor },
+            },
+          };
+          return;
+        }
+
+        // Неверные учётные данные контроллер Strapi не возвращает, а бросает
+        // ValidationError. Считаем только их: «почта не подтверждена» и
+        // «заблокирован» Strapi бросает уже после верного пароля.
+        try {
+          await originalCallback(ctx);
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          if (/invalid identifier or password/i.test(msg)) {
+            await recordLoginFailure(ctx, account);
+          }
+          throw error;
+        }
+
+        const responseBody: any = ctx.response?.body || ctx.body;
+        if (responseBody?.jwt && account && needsLoginProtectionReset(account)) {
+          await strapi.query(USER_UID).update({ where: { id: account.id }, data: clearedLoginProtection() });
+        }
         await reissueJwt(ctx);
       },
 
       // Сбой почты не должен давать 500: иначе ответ для существующего email
       // отличается от ответа для несуществующего и раскрывает наличие аккаунта.
       async forgotPassword(ctx) {
+        const email = String(normalizeContentApiBody(ctx.request?.body || {})?.email || '').trim().toLowerCase();
+        const before = email
+          ? await strapi.query(USER_UID).findOne({ where: { email }, select: ['id', 'resetPasswordToken'] })
+          : null;
         try {
           await originalForgotPassword(ctx);
         } catch (error) {
@@ -401,16 +655,89 @@ export default (plugin) => {
           ctx.status = 200;
           ctx.body = { ok: true };
         }
+
+        // Штатный Strapi выдаёт ссылку без срока. Ставим срок сразу после
+        // выдачи (токен записывается до отправки письма, так что и при сбое
+        // почты он уже в базе). Только если токен действительно новый:
+        // заблокированному Strapi токен не выдаёт, и срок, поставленный его
+        // старому бессрочному токену, «оживил» бы ссылку.
+        if (before) {
+          const user = await strapi.query(USER_UID).findOne({
+            where: { id: before.id },
+            select: ['id', 'resetPasswordToken'],
+          });
+          if (user?.resetPasswordToken && user.resetPasswordToken !== before.resetPasswordToken) {
+            await strapi.query(USER_UID).update({
+              where: { id: user.id },
+              data: { resetPasswordTokenExpiresAt: resetTokenExpiry('self') },
+            });
+            auditLog(ctx, 'PASSWORD_RESET_REQUESTED', { via: 'self', userId: user.id });
+          }
+        }
       },
 
       // Сброс пароля по ссылке из письма обрывает все прежние сессии.
       async resetPassword(ctx) {
-        if (rejectWeakPassword(ctx, normalizeContentApiBody(ctx.request?.body || {}).password)) return;
+        const sourceBody = normalizeContentApiBody(ctx.request?.body || {});
+        if (rejectWeakPassword(ctx, sourceBody.password)) return;
+
+        // Истёкшая ссылка: токен гасим, чтобы им нельзя было воспользоваться и
+        // позже. Ссылки без срока, выданные до появления сроков, тоже истекли.
+        // Чужие типы (объекты, массивы) отклонит валидация Strapi.
+        if (typeof sourceBody?.code === 'string' && sourceBody.code) {
+          const owner = await strapi.query(USER_UID).findOne({
+            where: { resetPasswordToken: sourceBody.code },
+            select: ['id', 'blocked', 'resetPasswordTokenExpiresAt'],
+          });
+          if (owner && isResetTokenExpired(owner)) {
+            await strapi.query(USER_UID).update({
+              where: { id: owner.id },
+              data: { resetPasswordToken: null, resetPasswordTokenExpiresAt: null },
+            });
+            return ctx.badRequest('reset_link_expired');
+          }
+          // Заблокированный не меняет пароль даже по ссылке, выданной до
+          // блокировки. Ответ — как на неверный код.
+          if (owner?.blocked) {
+            await strapi.query(USER_UID).update({ where: { id: owner.id }, data: { resetPasswordToken: null } });
+            return ctx.badRequest('Incorrect code provided');
+          }
+          if (owner) {
+            if (sourceBody.password !== sourceBody.passwordConfirmation) {
+              return ctx.badRequest('Passwords do not match');
+            }
+            // Ссылка одноразовая: забираем токен атомарно. Из параллельных
+            // запросов с одной ссылкой дальше проходит ровно один, остальные
+            // получают «неверный код» от штатного Strapi.
+            const c = userColumns();
+            const claimed = `${sourceBody.code}.${crypto.randomBytes(16).toString('hex')}`;
+            const won = await strapi.db.connection(c.table)
+              .where(c.token, sourceBody.code)
+              .update({ [c.token]: claimed });
+            if (won && ctx.request.body && typeof ctx.request.body === 'object') {
+              if (ctx.request.body.data && typeof ctx.request.body.data === 'object') ctx.request.body.data.code = claimed;
+              else ctx.request.body.code = claimed;
+            }
+          }
+        }
+
         await originalResetPassword(ctx);
         const userId = (ctx.response?.body as any)?.user?.id;
         if (userId) {
+          // Ссылка пришла на почту пользователя — значит, адрес подтверждён.
+          // Новый пароль снимает и блокировку после серии неудачных входов.
+          await strapi.query(USER_UID).update({
+            where: { id: userId },
+            data: {
+              confirmed: true,
+              confirmationToken: null,
+              resetPasswordTokenExpiresAt: null,
+              ...clearedLoginProtection(),
+            },
+          });
           await revokeUserSessions(strapi, userId);
           await reissueJwt(ctx);
+          auditLog(ctx, 'PASSWORD_CHANGED', { via: 'reset_link', userId });
         }
       },
 
@@ -421,7 +748,13 @@ export default (plugin) => {
         await originalChangePassword(ctx);
         const userId = ctx.state?.user?.id;
         if (userId && (ctx.response?.body as any)?.jwt) {
+          // Ссылка сброса, выданная до смены, больше не нужна — гасим её.
+          await strapi.query(USER_UID).update({
+            where: { id: userId },
+            data: { resetPasswordToken: null, resetPasswordTokenExpiresAt: null },
+          });
           await revokeUserSessions(strapi, userId);
+          auditLog(ctx, 'PASSWORD_CHANGED', { via: 'profile', userId });
           await reissueJwt(ctx);
         }
       },

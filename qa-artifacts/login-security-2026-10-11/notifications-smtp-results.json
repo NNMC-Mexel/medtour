@@ -1,0 +1,62 @@
+[
+  {
+    "name": "admin bell shows only own notifications",
+    "ok": true,
+    "detail": "admin-2,admin-1"
+  },
+  {
+    "name": "patient bell shows only own notifications",
+    "ok": true,
+    "detail": "patient-3,patient-2,patient-1"
+  },
+  {
+    "name": "admin cannot widen the list with a user filter",
+    "ok": true,
+    "detail": "2"
+  },
+  {
+    "name": "admin cannot mark or delete someone else's notification",
+    "ok": true,
+    "detail": "403/403"
+  },
+  {
+    "name": "...and the recipient's notification stays unread",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "mark all read: admin list has no unread afterwards (what the 30 s poll sees)",
+    "ok": true,
+    "detail": "[true,true]"
+  },
+  {
+    "name": "mark all read by admin does not touch the patient's",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "patient mark all read works too",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "unread-count agrees",
+    "ok": true,
+    "detail": "{\"data\":{\"count\":0}}"
+  },
+  {
+    "name": "SMTP unreachable: forgot-password answers 200 within 25 s (was up to minutes)",
+    "ok": true,
+    "detail": "200 10026 ms"
+  },
+  {
+    "name": "SMTP unreachable: register finishes within 45 s and keeps the account",
+    "ok": true,
+    "detail": "200 20118 ms {\"user\":{\"id\":17,\"email\":\"qa-reg-smtp@qa.invalid\",\"confirmed\":false,\"blocked\":false,\"userRole\":\"patient\",\"fullName\":\"QA Reg\",\"phone\":null,\"country\":null,\"langua"
+  },
+  {
+    "name": "SMTP unreachable: admin reset link -> 502 within 25 s",
+    "ok": true,
+    "detail": "502 10023 ms"
+  }
+]

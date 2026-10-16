@@ -1,0 +1,372 @@
+[
+  {
+    "name": "seed logins work",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "LOGIN_FAILURE logged with proxy-appended IP, not the client-supplied one",
+    "ok": true,
+    "detail": "[2026-10-11 01:18:49.841] \u001b[32minfo\u001b[39m: {\"audit\":\"LOGIN_FAILURE\",\"userId\":null,\"reason\":\"invalid_credentials\",\"ip\":\"10.99.0.1\",\"ts\":\"2026-10-10T20:18:49.841Z\"}"
+  },
+  {
+    "name": "login limit holds while the client rotates the first X-Forwarded-For entry",
+    "ok": true,
+    "detail": "400,400,400,400,400,400,400,400,400,400,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429,429"
+  },
+  {
+    "name": "another client behind the same proxy is not limited",
+    "ok": true,
+    "detail": "400"
+  },
+  {
+    "name": "9 failures: still 400 invalid credentials",
+    "ok": true,
+    "detail": "400"
+  },
+  {
+    "name": "counter is stored on the account",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "10th failure locks the account",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "correct password during lock -> 429 account_locked",
+    "ok": true,
+    "detail": "{\"data\":null,\"error\":{\"status\":429,\"name\":\"TooManyRequests\",\"message\":\"account_locked\",\"details\":{\"retryAfterSeconds\":900}}}"
+  },
+  {
+    "name": "Retry-After header present",
+    "ok": true,
+    "detail": "900"
+  },
+  {
+    "name": "lock email sent in the user language (kk)",
+    "ok": true,
+    "detail": "Аккаунтқа кіру уақытша жабылды — MedTour"
+  },
+  {
+    "name": "ACCOUNT_LOCKED in the audit log",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "forgot-password 200",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "reset email carries a code",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "self-service link expires in ~60 min",
+    "ok": true,
+    "detail": "59.990883333333336"
+  },
+  {
+    "name": "reset with valid link 200 + jwt",
+    "ok": true,
+    "detail": "{\"jwt\":\"<jwt>\",\"user\":{\"id\":6,\"documentId\":\"ean5760yvpaljlidmvuso5nn"
+  },
+  {
+    "name": "reset clears lock, counter, token and expiry",
+    "ok": true,
+    "detail": "{\"c\":0,\"l\":null,\"t\":null,\"e\":null}"
+  },
+  {
+    "name": "login with new password after unlock",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "used link cannot be reused",
+    "ok": true,
+    "detail": "400"
+  },
+  {
+    "name": "3 failures counted",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "successful login resets the counter",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "unknown account: plain 400, no crash",
+    "ok": true,
+    "detail": "400"
+  },
+  {
+    "name": "weak password via link -> 400 policy",
+    "ok": true,
+    "detail": "{\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"Password must contain an uppercase letter.\",\"details\":{\"code\":\"password_needs_uppercase\",\"i18nKey\":\"password_policy.needs_uppercase\"}}}"
+  },
+  {
+    "name": "weak attempt does not burn the link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "expired link -> 400 reset_link_expired",
+    "ok": true,
+    "detail": "{\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"reset_link_expired\",\"details\":{}}}"
+  },
+  {
+    "name": "expired token is erased",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "legacy link without expiry counts as expired",
+    "ok": true,
+    "detail": "{\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"reset_link_expired\",\"details\":{}}}"
+  },
+  {
+    "name": "operator object as code rejected",
+    "ok": true,
+    "detail": "400"
+  },
+  {
+    "name": "a newer link invalidates the older one",
+    "ok": true,
+    "detail": "400"
+  },
+  {
+    "name": "newest link works",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "reset by link revokes earlier sessions",
+    "ok": true,
+    "detail": "401"
+  },
+  {
+    "name": "PUT /users/:id rejects resetPasswordToken",
+    "ok": true,
+    "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"protected_user_fields\",\"details\":{\"code\":\"protected_user_fields\",\"fields\":[\"resetPasswordToken\"]}}}"
+  },
+  {
+    "name": "PUT /users/:id rejects confirmationToken",
+    "ok": true,
+    "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"protected_user_fields\",\"details\":{\"code\":\"protected_user_fields\",\"fields\":[\"confirmationToken\"]}}}"
+  },
+  {
+    "name": "PUT /users/:id rejects tokenValidAfter",
+    "ok": true,
+    "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"protected_user_fields\",\"details\":{\"code\":\"protected_user_fields\",\"fields\":[\"tokenValidAfter\"]}}}"
+  },
+  {
+    "name": "PUT /users/:id rejects failedLoginCount",
+    "ok": true,
+    "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"protected_user_fields\",\"details\":{\"code\":\"protected_user_fields\",\"fields\":[\"failedLoginCount\"]}}}"
+  },
+  {
+    "name": "PUT /users/:id rejects loginLockedUntil",
+    "ok": true,
+    "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"protected_user_fields\",\"details\":{\"code\":\"protected_user_fields\",\"fields\":[\"loginLockedUntil\"]}}}"
+  },
+  {
+    "name": "PUT /users/:id rejects resetPasswordTokenExpiresAt",
+    "ok": true,
+    "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"protected_user_fields\",\"details\":{\"code\":\"protected_user_fields\",\"fields\":[\"resetPasswordTokenExpiresAt\"]}}}"
+  },
+  {
+    "name": "planted token was not written",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "PUT with {data:{…}} wrapper also rejected",
+    "ok": true,
+    "detail": "400"
+  },
+  {
+    "name": "PUT /users/:id no longer accepts password",
+    "ok": true,
+    "detail": "{\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"password_change_not_allowed_here\",\"details\":{\"code\":\"password_change_not_allowed_here\"}}}"
+  },
+  {
+    "name": "ordinary admin edit still works",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "POST /users with weak password -> 400",
+    "ok": true,
+    "detail": "400"
+  },
+  {
+    "name": "POST /users with resetPasswordToken -> 400",
+    "ok": true,
+    "detail": "{\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"protected_user_fields\",\"details\":{\"code\":\"protected_user_fields\",\"fields\":[\"resetPasswordToken\"]}}}"
+  },
+  {
+    "name": "GET /users/:id does not expose private fields",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "filtering by resetPasswordToken is not an oracle",
+    "ok": true,
+    "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"ValidationError\",\"message\":\"Invalid key resetPasswordToken\",\"details\":{\"key\":\"resetPasswordToken\",\"path\":\"resetPasswordToken\",\"source\":\"query\",\"param\":\"filters\"}}}"
+  },
+  {
+    "name": "manager cannot use admin password endpoints",
+    "ok": true,
+    "detail": "403/403"
+  },
+  {
+    "name": "patient cannot use admin password endpoints",
+    "ok": true,
+    "detail": "403/403"
+  },
+  {
+    "name": "anonymous cannot use admin password endpoints",
+    "ok": true,
+    "detail": "403/403"
+  },
+  {
+    "name": "admin sends reset link -> 200",
+    "ok": true,
+    "detail": "{\"ok\":true,\"email\":\"qa-pat-en@qa.invalid\"}"
+  },
+  {
+    "name": "link email in English",
+    "ok": true,
+    "detail": "Set a new password — MedTour"
+  },
+  {
+    "name": "HTML in the user name is escaped in the email (HTML part)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "admin link expires in ~24 h",
+    "ok": true,
+    "detail": "23.999848055555557"
+  },
+  {
+    "name": "old password still works until the link is used",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "session survives sending a link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "admin set weak password -> 400",
+    "ok": true,
+    "detail": "400"
+  },
+  {
+    "name": "admin sets password -> 200 notified",
+    "ok": true,
+    "detail": "{\"ok\":true,\"notified\":true}"
+  },
+  {
+    "name": "change notice sent, without the password",
+    "ok": true,
+    "detail": "Your password was changed by an administrator — MedTour"
+  },
+  {
+    "name": "user sessions revoked",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "old password no longer works",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "new password works",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "admin-set password kills the outstanding reset link",
+    "ok": true,
+    "detail": "400"
+  },
+  {
+    "name": "admin cannot set own password here",
+    "ok": true,
+    "detail": "{\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"use_profile_for_own_password\",\"details\":{}}}"
+  },
+  {
+    "name": "blocked user: no link",
+    "ok": true,
+    "detail": "{\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"user_blocked\",\"details\":{}}}"
+  },
+  {
+    "name": "unknown/garbage id \"999999\" -> 404",
+    "ok": true,
+    "detail": "404"
+  },
+  {
+    "name": "unknown/garbage id \"abc\" -> 404",
+    "ok": true,
+    "detail": "404"
+  },
+  {
+    "name": "unknown/garbage id \"1 OR 1=1\" -> 404",
+    "ok": true,
+    "detail": "404"
+  },
+  {
+    "name": "unknown/garbage id \"-1\" -> 404",
+    "ok": true,
+    "detail": "404"
+  },
+  {
+    "name": "admin2 locked",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "admin-set password unlocks the account",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "PASSWORD_CHANGED via admin logged",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "PASSWORD_RESET_REQUESTED via admin logged",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "no test password appears in the server log",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "profile change-password 200",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "profile change clears an outstanding reset link",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "old session revoked, new token works",
+    "ok": true,
+    "detail": ""
+  }
+]

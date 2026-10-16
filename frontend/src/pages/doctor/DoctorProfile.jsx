@@ -12,8 +12,10 @@ import {
     Camera,
     Loader2,
     Languages,
+    Award,
 } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/Card";
+import { DoctorCertificatesEditor } from "../../components/doctors/DoctorCertificates";
 import Button from "../../components/ui/Button";
 import Input from "../../components/ui/Input";
 import Avatar from "../../components/ui/Avatar";
@@ -169,6 +171,15 @@ function DoctorProfile() {
         } finally {
             setIsSaving(false);
         }
+    };
+
+    // Сертификаты сохраняются сразу при добавлении или удалении, как фото.
+    const saveCertificates = async (next) => {
+        if (!doctor?.documentId) return;
+        await api.put(`/api/doctors/${doctor.documentId}`, {
+            data: { certificates: next.map((file) => file.id) },
+        });
+        setDoctor((prev) => ({ ...prev, certificates: next }));
     };
 
     const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -378,6 +389,24 @@ function DoctorProfile() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {doctor?.documentId && (
+                        <Card>
+                            <CardContent>
+                                <h3 className='font-semibold text-slate-900 mb-1 flex items-center gap-2'>
+                                    <Award className='w-5 h-5 text-teal-600' />
+                                    {t('doctor_certificates.title')}
+                                </h3>
+                                <p className='text-sm text-slate-500 mb-4'>
+                                    {t('doctor_certificates.profile_hint')}
+                                </p>
+                                <DoctorCertificatesEditor
+                                    value={doctor.certificates || []}
+                                    onChange={saveCertificates}
+                                />
+                            </CardContent>
+                        </Card>
+                    )}
 
                     <Card>
                         <CardContent>

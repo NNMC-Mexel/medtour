@@ -1,0 +1,290 @@
+[
+  {
+    "id": "S0",
+    "name": "seed logins",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "A1.1",
+    "name": "PUT {data:{}, password} is rejected and password unchanged",
+    "ok": true,
+    "detail": "400 changed=false {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"password_change_not_allowed_here\",\"details\":{\"code\":\"password_change_not_allowed_here\"}}}"
+  },
+  {
+    "id": "A1.2",
+    "name": "PUT {data:{…}, resetPasswordToken} is rejected and token not planted",
+    "ok": true,
+    "detail": "400 token=null"
+  },
+  {
+    "id": "A1.3",
+    "name": "PUT {data:{}, tokenValidAfter} is rejected",
+    "ok": true,
+    "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"protected_user_fields\",\"details\":{\"code\":\"protected_user_fields\",\"fields\":[\"tokenValidAft"
+  },
+  {
+    "id": "A1.4",
+    "name": "PUT {data:{password}} is rejected",
+    "ok": true,
+    "detail": "400"
+  },
+  {
+    "id": "A1.5",
+    "name": "POST {data:{…}, resetPasswordToken}: token never stored",
+    "ok": true,
+    "detail": "null"
+  },
+  {
+    "id": "A2.1",
+    "name": "10 parallel wrong logins lock the account (no lost updates)",
+    "ok": true,
+    "detail": "bursts=1 count=0 locked=2026-10-11T01:34:04.023"
+  },
+  {
+    "id": "A2.2",
+    "name": "parallel burst sends exactly one lock email",
+    "ok": true,
+    "detail": "1"
+  },
+  {
+    "id": "A2.3",
+    "name": "30 more parallel attempts during the lock: all 429, no 500",
+    "ok": true,
+    "detail": "429"
+  },
+  {
+    "id": "A3.1",
+    "name": "forgot-password for a blocked user does not give the old token a fresh expiry",
+    "ok": true,
+    "detail": "expires=null"
+  },
+  {
+    "id": "A3.2",
+    "name": "legacy token of a blocked user cannot be used",
+    "ok": true,
+    "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"BadRequestError\",\"message\":\"reset_link_expired\",\"details\":{}}}"
+  },
+  {
+    "id": "A4.1",
+    "name": "blocked user cannot use a link issued before the block (or gets no working session)",
+    "ok": true,
+    "detail": "reset=400 me=no-jwt"
+  },
+  {
+    "id": "A4.2",
+    "name": "blocked user: link rejected outright (no password change while blocked)",
+    "ok": true,
+    "detail": "reset=400"
+  },
+  {
+    "id": "A5.1",
+    "name": "one link, three parallel resets: no 500",
+    "ok": true,
+    "detail": "200,400,400"
+  },
+  {
+    "id": "A5.2",
+    "name": "one link, three parallel resets: exactly one succeeds",
+    "ok": true,
+    "detail": "200,400,400"
+  },
+  {
+    "id": "A6.1",
+    "name": "failures via phone / 8-prefix / username / UPPER email / email share one counter and lock",
+    "ok": true,
+    "detail": "count=0 locked=2026-10-11T01:34:05.813"
+  },
+  {
+    "id": "A6.2",
+    "name": "locked account refuses every identifier form",
+    "ok": true,
+    "detail": "429,429,429,429,429"
+  },
+  {
+    "id": "A8.1",
+    "name": "malformed login bodies: 4xx, never 500 or 200",
+    "ok": true,
+    "detail": "400,400,400,400,400,400,400,400"
+  },
+  {
+    "id": "A8.2",
+    "name": "broken JSON: 4xx",
+    "ok": true,
+    "detail": "400"
+  },
+  {
+    "id": "A9.1",
+    "name": "unconfirmed + correct password: refused, not counted",
+    "ok": true,
+    "detail": "400 count=null"
+  },
+  {
+    "id": "A9.2",
+    "name": "unconfirmed + wrong password: counted",
+    "ok": true,
+    "detail": "1"
+  },
+  {
+    "id": "A10.1",
+    "name": "unknown account never answers account_locked",
+    "ok": true,
+    "detail": "400,400,400,400,400,400,400,400,400,400,400"
+  },
+  {
+    "id": "A11.1",
+    "name": "non-string / empty / padded / >72 bytes passwords -> 400",
+    "ok": true,
+    "detail": "400,400,400,400,400,400,400"
+  },
+  {
+    "id": "A11.2",
+    "name": "2 MB body rejected without 500",
+    "ok": true,
+    "detail": "413"
+  },
+  {
+    "id": "A11.3",
+    "name": "stored as bcrypt hash",
+    "ok": true,
+    "detail": "$2a$10$"
+  },
+  {
+    "id": "A11.4",
+    "name": "documentId in path -> 404 (endpoints take numeric id)",
+    "ok": true,
+    "detail": "404"
+  },
+  {
+    "id": "A11.5",
+    "name": "doctor cannot use admin password endpoint",
+    "ok": true,
+    "detail": "403"
+  },
+  {
+    "id": "A12.1",
+    "name": "admin link with mail down -> 502 email_send_failed",
+    "ok": true,
+    "detail": "502 {\"data\":null,\"error\":{\"status\":502,\"name\":\"EmailError\",\"message\":\"email_send_failed\"}}"
+  },
+  {
+    "id": "A12.2",
+    "name": "forgot-password with mail down still 200 (no account oracle)",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "id": "A12.3",
+    "name": "...and the issued token still gets an expiry",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "id": "A12.4",
+    "name": "forgot-password: same answer for unknown email",
+    "ok": true,
+    "detail": "{\"ok\":true} vs {\"ok\":true}"
+  },
+  {
+    "id": "A12.5",
+    "name": "lock still happens with mail down; 10th answer is a normal 400",
+    "ok": true,
+    "detail": "400 locked=2026-10-11T01:34:07.264"
+  },
+  {
+    "id": "A12.6",
+    "name": "admin set-password with mail down: 200, notified=false",
+    "ok": true,
+    "detail": "{\"ok\":true,\"notified\":false}"
+  },
+  {
+    "id": "A13.1",
+    "name": "PUT /users/me ignores server-only fields",
+    "ok": true,
+    "detail": "200 t=null l=null"
+  },
+  {
+    "id": "A13.2",
+    "name": "register with resetPasswordToken: not stored",
+    "ok": true,
+    "detail": "400 null"
+  },
+  {
+    "id": "A14",
+    "name": "admin filters failedLoginCount: no oracle",
+    "ok": true,
+    "detail": "400 n=null total=16"
+  },
+  {
+    "id": "A14",
+    "name": "admin filters loginLockedUntil: no oracle",
+    "ok": true,
+    "detail": "400 n=null total=16"
+  },
+  {
+    "id": "A14",
+    "name": "admin filters resetPasswordTokenExpiresAt: no oracle",
+    "ok": true,
+    "detail": "400 n=null total=16"
+  },
+  {
+    "id": "A14",
+    "name": "admin filters password $startsWith: no oracle",
+    "ok": true,
+    "detail": "400 n=null total=16"
+  },
+  {
+    "id": "A14",
+    "name": "fields/sort on private fields: rejected (400) or values never returned",
+    "ok": true,
+    "detail": "{\"data\":null,\"error\":{\"status\":400,\"name\":\"ValidationError\",\"message\":\"Invalid key loginLockedUntil\",\"details\":{\"key\":\"loginLockedUntil\",\"path\":\"loginLockedUnti"
+  },
+  {
+    "id": "A14",
+    "name": "anonymous populate of doctor user: rejected or private fields absent",
+    "ok": true,
+    "detail": "400 {\"data\":null,\"error\":{\"status\":400,\"name\":\"ValidationError\",\"message\":\"Invalid key failedLoginCount\",\"details\":{\"key\":\"failedLoginCount\",\"path\":\"failedLoginCoun"
+  },
+  {
+    "id": "A14",
+    "name": "anonymous filter by doctor user failedLoginCount: rejected or ignored",
+    "ok": true,
+    "detail": "400"
+  },
+  {
+    "id": "A15.1",
+    "name": "odd X-Forwarded-For values: no 500",
+    "ok": true,
+    "detail": "400,400,400,400,400,400,400"
+  },
+  {
+    "id": "A15.2",
+    "name": "IPv6 client address recorded as-is",
+    "ok": true,
+    "detail": "[2026-10-11 01:19:08.099] \u001b[32minfo\u001b[39m: {\"audit\":\"LOGIN_FAILURE\",\"userId\":null,\"reason\":\"invalid_credentials\",\"ip\":\"2001:db8::7\",\"ts\":\"2026-10-10T20:19:08.099Z\"}"
+  },
+  {
+    "id": "A16.1",
+    "name": "expired lock: correct password works and lock is cleared",
+    "ok": true,
+    "detail": "200 l=null"
+  },
+  {
+    "id": "A16.2",
+    "name": "9 old failures (>60 min) + 1 new = count 1, no lock",
+    "ok": true,
+    "detail": "c=1 l=null"
+  },
+  {
+    "id": "A16.3",
+    "name": "9 recent failures + 1 = lock",
+    "ok": true,
+    "detail": "c=0 l=2026-10-11T01:34:08.653"
+  },
+  {
+    "id": "A16.4",
+    "name": "lock lasts ~15 min",
+    "ok": true,
+    "detail": "14.998916666666666"
+  }
+]

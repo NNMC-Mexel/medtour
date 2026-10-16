@@ -72,6 +72,14 @@
         "audios"
       ]
     },
+    "certificates": {
+      "type": "media",
+      "multiple": true,
+      "allowedTypes": [
+        "images",
+        "files"
+      ]
+    },
     "price": {
       "type": "integer",
       "default": 0,

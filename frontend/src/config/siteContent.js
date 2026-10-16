@@ -2,10 +2,11 @@
 //
 // Всё хранится в Global.landingConfig одним документом:
 //   {
-//     version: 2,
+//     version: 3,
 //     siteTheme: { paletteId, accentColor },
 //     landing:   { ru: { heroTitle: '…', … }, en: {…}, kk: {…} },   // только изменённые тексты
-//     contacts:  { phone, email, website, whatsapp, telegram, instagram, address: {ru,en,kk}, hours: {ru,en,kk} },
+//     contacts:  { phone, coordinatorMobile, coordinatorPhone, email, website, whatsapp, telegram, instagram,
+//                  address: {ru,en,kk}, hours: {ru,en,kk} },
 //     navigation:{ items: { home: { visible, label: {ru,en,kk} }, … } },
 //     legal:     { privacy: {ru,en,kk}, terms: {ru,en,kk} },        // текст разметкой (см. parseLegalText)
 //     seo:       { ru: { title, description }, en: {…}, kk: {…} },
@@ -121,6 +122,7 @@ export const LANDING_SECTIONS = [
       { key: 'ctaTitle', type: 'text', label: { ru: 'Заголовок', en: 'Title', kk: 'Тақырып' } },
       { key: 'ctaText', type: 'textarea', rows: 3, label: { ru: 'Текст', en: 'Text', kk: 'Мәтін' } },
       { key: 'ctaButton', type: 'text', label: { ru: 'Кнопка', en: 'Button', kk: 'Батырма' } },
+      { key: 'ctaContactsTitle', type: 'text', label: { ru: 'Заголовок над контактами', en: 'Heading above contacts', kk: 'Байланыс үстіндегі тақырып' } },
     ],
   },
 ]
@@ -175,16 +177,39 @@ export const NAV_ITEMS = [
   { id: 'contacts', href: '#contact', labelKey: 'nav.contacts', isAnchor: true },
 ]
 
+const CONTENT_VERSION = 3
+
+// phone — call-центр ННМЦ; coordinatorMobile — мобильный координатора
+// (он же WhatsApp и Telegram); coordinatorPhone — городской координатора.
+export const CONTACT_FIELDS = ['phone', 'coordinatorMobile', 'coordinatorPhone', 'email', 'website', 'whatsapp', 'telegram', 'instagram']
+const PHONE_FIELDS = new Set(['phone', 'coordinatorMobile', 'coordinatorPhone'])
+
+/** Поле контактов → kind для contactHref: все номера — 'phone'. */
+export const contactKind = (key) => (PHONE_FIELDS.has(key) ? 'phone' : key)
+
 export const DEFAULT_CONTACTS = Object.freeze({
-  phone: '',
+  phone: '+7 (7172) 57-20-09',
+  coordinatorMobile: '+7 (700) 085-31-44',
+  coordinatorPhone: '+7 (7172) 57-74-40',
   email: 'support@nnmc.kz',
   website: 'https://www.nnmc.kz/',
-  whatsapp: '',
-  telegram: '',
+  whatsapp: '+7 (700) 085-31-44',
+  telegram: 'https://t.me/+77000853144',
   instagram: '',
   address: {},
   hours: {},
 })
+
+// До версии 3 у этих полей не было значений по умолчанию, и админка
+// сохраняла их пустыми. В таком конфиге пустое = «не заполнено», а не «скрыть».
+const FIELDS_WITHOUT_LEGACY_DEFAULT = new Set(['phone', 'whatsapp', 'telegram'])
+
+function readContactField(contacts, key, version) {
+  const value = contacts[key]
+  if (typeof value !== 'string') return DEFAULT_CONTACTS[key]
+  if (!value.trim() && version < CONTENT_VERSION && FIELDS_WITHOUT_LEGACY_DEFAULT.has(key)) return DEFAULT_CONTACTS[key]
+  return value
+}
 
 const localizedMap = (value) => {
   if (!isPlainObject(value)) return {}
@@ -199,15 +224,13 @@ export function readSiteContent(raw) {
   const navItems = isPlainObject(stored.navigation?.items) ? stored.navigation.items : {}
   const legal = isPlainObject(stored.legal) ? stored.legal : {}
   const seo = isPlainObject(stored.seo) ? stored.seo : {}
+  const version = Number(stored.version) || 0
 
   return {
     siteTheme: isPlainObject(stored.siteTheme) ? stored.siteTheme : null,
     landing: Object.fromEntries(CONTENT_LANGS.map((lang) => [lang, isPlainObject(landing[lang]) ? landing[lang] : {}])),
     contacts: {
-      ...DEFAULT_CONTACTS,
-      ...Object.fromEntries(['phone', 'email', 'website', 'whatsapp', 'telegram', 'instagram']
-        .filter((key) => typeof contacts[key] === 'string')
-        .map((key) => [key, contacts[key]])),
+      ...Object.fromEntries(CONTACT_FIELDS.map((key) => [key, readContactField(contacts, key, version)])),
       address: localizedMap(contacts.address),
       hours: localizedMap(contacts.hours),
     },
@@ -254,16 +277,11 @@ export function compactSiteContent(content) {
   }
   const contacts = content.contacts || DEFAULT_CONTACTS
   return {
-    version: 2,
+    version: CONTENT_VERSION,
     siteTheme: content.siteTheme || null,
     landing,
     contacts: {
-      phone: str(contacts.phone).trim(),
-      email: str(contacts.email).trim(),
-      website: str(contacts.website).trim(),
-      whatsapp: str(contacts.whatsapp).trim(),
-      telegram: str(contacts.telegram).trim(),
-      instagram: str(contacts.instagram).trim(),
+      ...Object.fromEntries(CONTACT_FIELDS.map((key) => [key, str(contacts[key]).trim()])),
       address: localizedMap(contacts.address),
       hours: localizedMap(contacts.hours),
     },
@@ -319,12 +337,25 @@ export function legalSectionsToText(sections) {
   ].filter(Boolean).join('\n')).join('\n\n')
 }
 
+const digits = (value) => str(value).replace(/\D/g, '')
+
+/** WhatsApp и Telegram, которые ведут на этот же номер, — чтобы подписать их рядом с ним. */
+export function messengersOnNumber(contacts, number) {
+  const own = digits(number)
+  if (!own) return []
+  return [['whatsapp', 'WhatsApp'], ['telegram', 'Telegram']]
+    .filter(([kind]) => digits(contacts[kind]) === own && contactHref(kind, contacts[kind]))
+    .map(([kind, label]) => ({ kind, label, href: contactHref(kind, contacts[kind]) }))
+}
+
 /** Безопасная ссылка из контакта: только http(s), mailto, tel. */
 export function contactHref(kind, value) {
   const text = str(value).trim()
   if (!text) return ''
   // Любая схема, кроме http(s) («javascript:», «data:»…), — не ссылка.
   if (/^[a-z][a-z0-9+.-]*:/i.test(text) && !/^https?:\/\//i.test(text) && !['phone', 'email', 'whatsapp'].includes(kind)) return ''
+  // Номер без цифр («звоните нам») — не ссылка; короткие номера вроде 103 допустимы.
+  if ((kind === 'phone' || kind === 'whatsapp') && digits(text).length < 3) return ''
   if (kind === 'phone') return `tel:${text.replace(/[^\d+]/g, '')}`
   if (kind === 'email') return `mailto:${text}`
   if (kind === 'whatsapp') return `https://wa.me/${text.replace(/\D/g, '')}`

@@ -10,6 +10,7 @@ import Select from '../../components/ui/Select'
 import SearchableSelect from '../../components/ui/SearchableSelect'
 import Avatar from '../../components/ui/Avatar'
 import LocalizedFields from '../../components/admin/LocalizedFields'
+import { DoctorCertificatesEditor } from '../../components/doctors/DoctorCertificates'
 import Modal from '../../components/ui/Modal'
 import Badge from '../../components/ui/Badge'
 import ImageCropModal from '../../components/ui/ImageCropModal'
@@ -44,6 +45,8 @@ const defaultForm = {
   slotDuration: '30',
   scheduleConfig: null,
   i18n: readI18n(null),
+  // Файлы Strapi; загружаются сразу, привязываются к врачу при сохранении.
+  certificates: [],
 }
 
 // Поля карточки врача, которые переводятся во вкладках модалки (doctor.i18n).
@@ -112,6 +115,7 @@ function toPayload(form, clinics, schedulePayload) {
     bio: form.bio || '',
     education: form.education || '',
     i18n: compactI18n(form.i18n, TRANSLATED_FIELDS),
+    certificates: (form.certificates || []).map((file) => file.id),
     isActive: Boolean(form.isActive),
     ...schedulePayload,
   }
@@ -309,6 +313,7 @@ function AdminDoctors({ readonly = false }) {
       slotDuration: String(doctor.slotDuration || 30),
       scheduleConfig: getDoctorScheduleConfig(doctor),
       i18n: readI18n(doctor.i18n),
+      certificates: Array.isArray(doctor.certificates) ? doctor.certificates : [],
     })
     const photoUrl = getMediaUrl(doctor.photo) || ''
     setPhotoFile(null)
@@ -439,10 +444,13 @@ function AdminDoctors({ readonly = false }) {
             fullName: form.fullName.trim(),
             phone: form.phone.trim() || null,
           }
-          if (form.password) {
-            userPayload.password = form.password
-          }
           await api.put(`/api/users/${userId}`, userPayload)
+          // Пароль — отдельным запросом: сервер проверит политику, завершит
+          // старые сессии врача и пришлёт ему уведомление (PUT /users/:id
+          // пароль больше не принимает).
+          if (form.password) {
+            await api.put(`/api/users/${userId}/password`, { password: form.password })
+          }
         } else {
           const createdUser = await createDoctorUser()
           userId = createdUser.id
@@ -477,7 +485,10 @@ function AdminDoctors({ readonly = false }) {
       await loadData()
     } catch (error) {
       console.error('Error saving doctor:', error)
-      const message = error?.response?.data?.error?.message || error?.message || t('admin_doc.err_save')
+      const code = error?.response?.data?.error?.details?.code
+      const message = String(code || '').startsWith('certificates_')
+        ? t(`doctor_certificates.${code}`)
+        : error?.response?.data?.error?.message || error?.message || t('admin_doc.err_save')
       toast.error(t('admin_doc.err_save_msg', { message }))
     } finally {
       setIsSaving(false)
@@ -755,6 +766,16 @@ function AdminDoctors({ readonly = false }) {
             getValue={formLocaleGetter(form)}
             setValue={formLocaleSetter(setForm)}
           />
+
+          <div>
+            <p className='mb-1 text-sm font-medium text-slate-700'>{t('doctor_certificates.title')}</p>
+            <p className='mb-2 text-xs text-slate-500'>{t('doctor_certificates.admin_hint')}</p>
+            <DoctorCertificatesEditor
+              value={form.certificates}
+              onChange={(certificates) => setForm((prev) => ({ ...prev, certificates }))}
+              busy={isSaving}
+            />
+          </div>
 
           <SearchableSelect
             multiple

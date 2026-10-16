@@ -30,6 +30,17 @@ interface CaseRef {
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://medtour.nnmc.kz';
 const BRAND_COLOR = '#0d9488'; // teal-600
 
+// Имена и номера кейса вводят люди (пациент — при регистрации). В HTML письма
+// они попадают только экранированными: иначе разметка или ссылка из ФИО
+// пациента оказалась бы внутри официального письма MedTour менеджерам.
+const escapeHtml = (value: unknown): string =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 function htmlWrapper(body: string, lang = 'ru'): string {
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -83,14 +94,14 @@ function btnHtml(href: string, label: string): string {
 }
 
 function greeting(name?: string | null, lang = 'ru'): string {
-  const n = name || (lang === 'kk' ? 'Сізге' : lang === 'en' ? 'Patient' : 'пациент');
+  const n = escapeHtml(name || (lang === 'kk' ? 'Сізге' : lang === 'en' ? 'Patient' : 'пациент'));
   if (lang === 'kk') return `Құрметті ${n},`;
   if (lang === 'en') return `Dear ${n},`;
   return `Уважаемый(-ая) ${n},`;
 }
 
 function caseNumLine(ref: CaseRef, lang = 'ru'): string {
-  const num = ref.caseNumber || ref.documentId || '—';
+  const num = escapeHtml(ref.caseNumber || ref.documentId || '—');
   if (lang === 'en') return `<p style="font-size:13px;color:#64748b;margin:8px 0 0;">Case: <strong style="color:#0f172a;">${num}</strong></p>`;
   if (lang === 'kk') return `<p style="font-size:13px;color:#64748b;margin:8px 0 0;">Кейс: <strong style="color:#0f172a;">${num}</strong></p>`;
   return `<p style="font-size:13px;color:#64748b;margin:8px 0 0;">Кейс: <strong style="color:#0f172a;">${num}</strong></p>`;
@@ -150,7 +161,7 @@ function templates(lang: string): Record<string, Template> {
               : l === 'kk' ? 'Сіздің кейсіңізге дәрігер тағайындалды — MedTour'
               : 'Врач назначен для вашего кейса — MedTour',
       html: (ref) => {
-        const docName = ref.doctor?.fullName;
+        const docName = ref.doctor?.fullName ? escapeHtml(ref.doctor.fullName) : '';
         return htmlWrapper(`
           <h2 style="margin:0 0 8px;font-size:20px;color:#0f172a;">👨‍⚕️ ${
             l === 'en' ? 'Doctor assigned' : l === 'kk' ? 'Дәрігер тағайындалды' : 'Врач назначен'
@@ -363,8 +374,8 @@ function templates(lang: string): Record<string, Template> {
 // ── Staff notification template ────────────────────────────────────────────
 
 function newLeadEmailForManager(ref: CaseRef): { subject: string; html: string } {
-  const caseLabel = ref.caseNumber || ref.documentId || 'Unknown';
-  const patientName = ref.patient?.fullName || ref.patient?.email || 'Unknown patient';
+  const caseLabel = escapeHtml(ref.caseNumber || ref.documentId || 'Unknown');
+  const patientName = escapeHtml(ref.patient?.fullName || ref.patient?.email || 'Unknown patient');
   return {
     subject: `🆕 Новая заявка: ${caseLabel} — MedTour`,
     html: htmlWrapper(`
@@ -385,14 +396,14 @@ function slaOverdueEmailForStaff(
   slaHours: number,
   recipientName?: string | null,
 ): { subject: string; html: string } {
-  const caseLabel = ref.caseNumber || ref.documentId || 'Unknown';
+  const caseLabel = escapeHtml(ref.caseNumber || ref.documentId || 'Unknown');
   return {
     subject: `⚠️ SLA нарушен: ${caseLabel} (${status}) — MedTour`,
     html: htmlWrapper(`
       <h2 style="margin:0 0 8px;font-size:20px;color:#dc2626;">⚠️ SLA нарушен</h2>
       <p style="font-size:13px;color:#64748b;margin:8px 0 0;">Кейс: <strong style="color:#0f172a;">${caseLabel}</strong></p>
       <p style="margin:16px 0 0;font-size:15px;line-height:1.6;color:#334155;">
-        Здравствуйте${recipientName ? `, <strong>${recipientName}</strong>` : ''},<br/><br/>
+        Здравствуйте${recipientName ? `, <strong>${escapeHtml(recipientName)}</strong>` : ''},<br/><br/>
         Кейс находится в статусе <strong>${status}</strong> уже более <strong>${slaHours}ч</strong> без движения.<br/>
         Пожалуйста, обновите статус или свяжитесь с пациентом.
       </p>

@@ -37,6 +37,7 @@ import {
 } from "../utils/schedule";
 import { getKazakhstanCalendarToday } from "../utils/kazakhstanTime";
 import useSeo from '../components/seo/useSeo'
+import { DoctorCertificatesGallery } from "../components/doctors/DoctorCertificates";
 
 // Сводка графика для карточки: часы приёма, перерывы между интервалами,
 // рабочие дни (ISO 1..7) и текущий отпуск.
@@ -381,6 +382,20 @@ function DoctorProfilePage() {
                                     )}
                                 </CardContent>
                             </Card>
+
+                            {Array.isArray(doctor.certificates) && doctor.certificates.length > 0 && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className='flex items-center gap-2 text-lg'>
+                                            <Award className='w-5 h-5 text-teal-600' />
+                                            {t('doctor_certificates.public_title')}
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <DoctorCertificatesGallery certificates={doctor.certificates} />
+                                    </CardContent>
+                                </Card>
+                            )}
 
                             {/* Languages - показываем только если есть */}
                             {doctor.languages &&

@@ -28,6 +28,10 @@ function getAuthErrorMessage(error, fallback = 'Ошибка входа') {
   const message = error.response?.data?.error?.message || ''
   const normalized = String(message).toLowerCase()
 
+  // Серия неудачных входов закрыла аккаунт на время (сервер, login-protection).
+  if (message === 'account_locked') {
+    return i18n.t('auth.login.error_account_locked')
+  }
   if (status === 429 || name === 'TooManyRequests') {
     return i18n.t('auth.login.error_too_many')
   }

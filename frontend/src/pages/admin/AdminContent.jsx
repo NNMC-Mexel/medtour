@@ -23,11 +23,13 @@ import { contentAPI, normalizeResponse } from '../../services/api'
 import { landingCopy } from '../../data/landingCopy'
 import { privacyCopy, termsCopy } from '../../data/legalCopy'
 import {
+  CONTACT_FIELDS,
   CONTENT_LANGS,
   LANDING_SECTIONS,
   NAV_ITEMS,
   compactSiteContent,
   contactHref,
+  contactKind,
   fieldToText,
   legalSectionsToText,
   readSiteContent,
@@ -83,7 +85,7 @@ const copyByLanguage = {
     accentReset: 'Цвет палитры', accentInvalid: 'Цвет в формате #RRGGBB',
     openSection: 'Открыть на сайте', resetField: 'Вернуть текст по умолчанию',
     linesHint: 'Каждый пункт — с новой строки', pairsHint: 'Каждый этап с новой строки: «Заголовок | Текст»',
-    phone: 'Телефон', email: 'Email', website: 'Сайт', whatsapp: 'WhatsApp (номер)', telegram: 'Telegram (@username или ссылка)', instagram: 'Instagram (@username или ссылка)',
+    phone: 'Call-центр', coordinatorMobile: 'Координатор — мобильный', coordinatorPhone: 'Координатор — городской', email: 'Email', website: 'Сайт', whatsapp: 'WhatsApp (номер)', telegram: 'Telegram (@username или ссылка)', instagram: 'Instagram (@username или ссылка)',
     address: 'Адрес', hours: 'Часы работы', contactsHint: 'Пустое поле не показывается на сайте.', contactInvalid: 'Это не ссылка — поле не покажется на сайте',
     navVisible: 'Показывать', navLabel: 'Подпись', navHidden: 'Скрыт', navHint: 'Пустая подпись — стандартная для языка.',
     privacy: 'Политика конфиденциальности', terms: 'Пользовательское соглашение',
@@ -113,7 +115,7 @@ const copyByLanguage = {
     accentReset: 'Palette colour', accentInvalid: 'Use the #RRGGBB format',
     openSection: 'Open on site', resetField: 'Restore default text',
     linesHint: 'One item per line', pairsHint: 'One step per line: “Title | Text”',
-    phone: 'Phone', email: 'Email', website: 'Website', whatsapp: 'WhatsApp (number)', telegram: 'Telegram (@username or link)', instagram: 'Instagram (@username or link)',
+    phone: 'Call center', coordinatorMobile: 'Coordinator — mobile', coordinatorPhone: 'Coordinator — landline', email: 'Email', website: 'Website', whatsapp: 'WhatsApp (number)', telegram: 'Telegram (@username or link)', instagram: 'Instagram (@username or link)',
     address: 'Address', hours: 'Opening hours', contactsHint: 'Empty fields are not shown on the site.', contactInvalid: 'Not a link — this field will not be shown',
     navVisible: 'Show', navLabel: 'Label', navHidden: 'Hidden', navHint: 'An empty label uses the standard one for the language.',
     privacy: 'Privacy policy', terms: 'Terms of use',
@@ -143,7 +145,7 @@ const copyByLanguage = {
     accentReset: 'Палитра түсі', accentInvalid: '#RRGGBB форматындағы түс',
     openSection: 'Сайтта ашу', resetField: 'Әдепкі мәтінді қайтару',
     linesHint: 'Әр тармақ жаңа жолдан', pairsHint: 'Әр кезең жаңа жолдан: «Тақырып | Мәтін»',
-    phone: 'Телефон', email: 'Email', website: 'Сайт', whatsapp: 'WhatsApp (нөмір)', telegram: 'Telegram (@username немесе сілтеме)', instagram: 'Instagram (@username немесе сілтеме)',
+    phone: 'Call-орталық', coordinatorMobile: 'Үйлестіруші — ұялы', coordinatorPhone: 'Үйлестіруші — қалалық', email: 'Email', website: 'Сайт', whatsapp: 'WhatsApp (нөмір)', telegram: 'Telegram (@username немесе сілтеме)', instagram: 'Instagram (@username немесе сілтеме)',
     address: 'Мекенжай', hours: 'Жұмыс уақыты', contactsHint: 'Бос өріс сайтта көрсетілмейді.', contactInvalid: 'Бұл сілтеме емес — өріс сайтта көрсетілмейді',
     navVisible: 'Көрсету', navLabel: 'Атауы', navHidden: 'Жасырын', navHint: 'Бос атау — тілдің стандартты атауы.',
     privacy: 'Құпиялылық саясаты', terms: 'Пайдаланушы келісімі',
@@ -564,17 +566,20 @@ function AdminContent() {
         <div className='space-y-6'>
           <Panel title={copy.sections.contacts} description={copy.contactsHint}>
             <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
-              {['phone', 'email', 'website', 'whatsapp', 'telegram', 'instagram'].map((key) => (
-                <Input
-                  key={key}
-                  label={copy[key]}
-                  type={key === 'email' ? 'email' : key === 'phone' || key === 'whatsapp' ? 'tel' : 'text'}
-                  value={contacts[key] || ''}
-                  onChange={(event) => setContacts((current) => ({ ...current, [key]: event.target.value }))}
-                  placeholder={key === 'phone' ? '+7 7172 00 00 00' : key === 'website' ? 'https://www.nnmc.kz/' : ''}
-                  error={String(contacts[key] || '').trim() && !contactHref(key, contacts[key]) ? copy.contactInvalid : undefined}
-                />
-              ))}
+              {CONTACT_FIELDS.map((key) => {
+                const kind = contactKind(key)
+                return (
+                  <Input
+                    key={key}
+                    label={copy[key]}
+                    type={kind === 'email' ? 'email' : kind === 'phone' || kind === 'whatsapp' ? 'tel' : 'text'}
+                    value={contacts[key] || ''}
+                    onChange={(event) => setContacts((current) => ({ ...current, [key]: event.target.value }))}
+                    placeholder={kind === 'phone' ? '+7 (7172) 00-00-00' : kind === 'website' ? 'https://www.nnmc.kz/' : ''}
+                    error={String(contacts[key] || '').trim() && !contactHref(kind, contacts[key]) ? copy.contactInvalid : undefined}
+                  />
+                )
+              })}
             </div>
           </Panel>
           <Panel title={`${copy.address} · ${copy.hours}`}>

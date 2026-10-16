@@ -1,0 +1,102 @@
+[
+  {
+    "name": "login page explains the lock",
+    "ok": true,
+    "detail": "На главную\nРус\nДобро пожаловать\n\nВойдите в свой аккаунт для доступа к личному кабинету\n\nПациент\nВрач\nEmail или телефон*\nПароль*\nЗапомнить меня\nЗабыли пароль?\nСлишком много неудачных попыток входа. Вход в аккаунт закрыт на 15 минут. Чтобы войти сразу, восстановите пароль.\nВойти\n\nНет аккаунта? Зарегис"
+  },
+  {
+    "name": "invalid reset link: explanation + \"request new link\"",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "HTML in a user name is shown as text, not executed",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "password modal opens with the user name",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "send link -> confirmation with email",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "weak password blocked in the modal",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "mismatch blocked in the modal",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "password set -> toast, modal closes",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "new password works via API",
+    "ok": true,
+    "detail": "200"
+  },
+  {
+    "name": "own account: form with the current password",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "edit modal has no password inputs",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "edit modal \"Password\" opens the password modal",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "edit save toast is translated (\"Сохранено\", not common.saved)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "own password: wrong current password -> clear message",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "own password: changed, toast shown",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "own password: still signed in after the change (new token kept)",
+    "ok": true,
+    "detail": "http://localhost:1343/admin/doctors"
+  },
+  {
+    "name": "own password: old fails, new works",
+    "ok": true,
+    "detail": "400/200"
+  },
+  {
+    "name": "login lock message in en (mobile)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "login lock message in kk (mobile)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "mobile: modal fits without horizontal scroll",
+    "ok": true,
+    "detail": "0"
+  }
+]
