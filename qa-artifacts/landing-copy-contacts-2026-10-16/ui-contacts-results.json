@@ -1,0 +1,908 @@
+[
+ {
+  "id": "A.overflow.ru-390",
+  "name": "нет горизонтального скролла (ru-390)",
+  "ok": true,
+  "detail": "+0px"
+ },
+ {
+  "id": "A.hero.ru-390",
+  "name": "заголовок первого экрана = landingCopy (ru-390)",
+  "ok": true,
+  "detail": "\"Приезжайте в Казахстан на лечение. Об остальном позаботимся мы.\""
+ },
+ {
+  "id": "A.heroText.ru-390",
+  "name": "надзаголовок и текст первого экрана (ru-390)",
+  "ok": true,
+  "detail": "Медицинский туризм в Казахстане Приезжайте в Казахстан на лечение. Об остальном позаботимся мы. Мы организуем вашу поездку к здоровью: от подбора врачей и планирования лечения до проживания, трансфера и досуга. Вам остаётся сосредоточиться на главном — своём здоровье. Получить план лечения Посмотрет"
+ },
+ {
+  "id": "A.process.ru-390",
+  "name": "«Путь пациента»: заголовок, текст и 6 шагов (ru-390)",
+  "ok": true,
+  "detail": "missing: "
+ },
+ {
+  "id": "A.med.ru-390",
+  "name": "«Лечение и диагностика»: заголовок и текст (ru-390)",
+  "ok": true,
+  "detail": "ЛЕЧЕНИЕ И ДИАГНОСТИКА С чего начать? Расскажите о своей ситуации или выберите подходящее медицинское направление. Мы поможем сориентироваться и подскажем, какой шаг сделать первым. Поиск направления Н"
+ },
+ {
+  "id": "A.contact.ru-390",
+  "name": "блок «Контакты»: заголовок, 3 номера, адрес (ru-390)",
+  "ok": true,
+  "detail": "о добавить документы и общаться с координатором. Медицинские документы загружаются только после входа в защищённый кабинет. Удобнее позвонить или написать? CALL-ЦЕНТР +7 (7172) 57-20-09 КООРДИНАТОР +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 г. Астана, просп. Абылай хана, 42 Что вас беспокоит? Текст помогает сформулировать запрос и не отправляется с этой страницы. Продолжить в кабинете"
+ },
+ {
+  "id": "A.footer.ru-390",
+  "name": "подвал: подписи и 3 номера (ru-390)",
+  "ok": true,
+  "detail": "MedTour Медицинский туризм Глобальная платформа медицинского туризма для лечения в Казахстане под ключ. Лечение Институт сердца Нейрохирургия Check-up Все направления Навигация Процесс Туризм Блог / Статьи Политика конфиденциальности Контакты CALL-ЦЕНТР +7 (7172) 57-20-09 КООРДИНАТОР +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 support@nnmc.kz www.nnmc.kz г. Астана, просп. Абылай хана, "
+ },
+ {
+  "id": "A.old.ru-390",
+  "name": "старые формулировки не остались (ru-390)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.errors.ru-390",
+  "name": "нет ошибок JS (ru-390)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.overflow.ru-768",
+  "name": "нет горизонтального скролла (ru-768)",
+  "ok": true,
+  "detail": "+0px"
+ },
+ {
+  "id": "A.hero.ru-768",
+  "name": "заголовок первого экрана = landingCopy (ru-768)",
+  "ok": true,
+  "detail": "\"Приезжайте в Казахстан на лечение. Об остальном позаботимся мы.\""
+ },
+ {
+  "id": "A.heroText.ru-768",
+  "name": "надзаголовок и текст первого экрана (ru-768)",
+  "ok": true,
+  "detail": "Медицинский туризм в Казахстане Приезжайте в Казахстан на лечение. Об остальном позаботимся мы. Мы организуем вашу поездку к здоровью: от подбора врачей и планирования лечения до проживания, трансфера и досуга. Вам остаётся сосредоточиться на главном — своём здоровье. Получить план лечения Посмотрет"
+ },
+ {
+  "id": "A.process.ru-768",
+  "name": "«Путь пациента»: заголовок, текст и 6 шагов (ru-768)",
+  "ok": true,
+  "detail": "missing: "
+ },
+ {
+  "id": "A.med.ru-768",
+  "name": "«Лечение и диагностика»: заголовок и текст (ru-768)",
+  "ok": true,
+  "detail": "ЛЕЧЕНИЕ И ДИАГНОСТИКА С чего начать? Расскажите о своей ситуации или выберите подходящее медицинское направление. Мы поможем сориентироваться и подскажем, какой шаг сделать первым. Поиск направления Н"
+ },
+ {
+  "id": "A.contact.ru-768",
+  "name": "блок «Контакты»: заголовок, 3 номера, адрес (ru-768)",
+  "ok": true,
+  "detail": "о добавить документы и общаться с координатором. Медицинские документы загружаются только после входа в защищённый кабинет. Удобнее позвонить или написать? CALL-ЦЕНТР +7 (7172) 57-20-09 КООРДИНАТОР +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 г. Астана, просп. Абылай хана, 42 Что вас беспокоит? Текст помогает сформулировать запрос и не отправляется с этой страницы. Продолжить в кабинете"
+ },
+ {
+  "id": "A.footer.ru-768",
+  "name": "подвал: подписи и 3 номера (ru-768)",
+  "ok": true,
+  "detail": "MedTour Медицинский туризм Глобальная платформа медицинского туризма для лечения в Казахстане под ключ. Лечение Институт сердца Нейрохирургия Check-up Все направления Навигация Процесс Туризм Блог / Статьи Политика конфиденциальности Контакты CALL-ЦЕНТР +7 (7172) 57-20-09 КООРДИНАТОР +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 support@nnmc.kz www.nnmc.kz г. Астана, просп. Абылай хана, "
+ },
+ {
+  "id": "A.old.ru-768",
+  "name": "старые формулировки не остались (ru-768)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.errors.ru-768",
+  "name": "нет ошибок JS (ru-768)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.overflow.ru-1366",
+  "name": "нет горизонтального скролла (ru-1366)",
+  "ok": true,
+  "detail": "+0px"
+ },
+ {
+  "id": "A.hero.ru-1366",
+  "name": "заголовок первого экрана = landingCopy (ru-1366)",
+  "ok": true,
+  "detail": "\"Приезжайте в Казахстан на лечение. Об остальном позаботимся мы.\""
+ },
+ {
+  "id": "A.heroText.ru-1366",
+  "name": "надзаголовок и текст первого экрана (ru-1366)",
+  "ok": true,
+  "detail": "Медицинский туризм в Казахстане Приезжайте в Казахстан на лечение. Об остальном позаботимся мы. Мы организуем вашу поездку к здоровью: от подбора врачей и планирования лечения до проживания, трансфера и досуга. Вам остаётся сосредоточиться на главном — своём здоровье. Получить план лечения Посмотрет"
+ },
+ {
+  "id": "A.process.ru-1366",
+  "name": "«Путь пациента»: заголовок, текст и 6 шагов (ru-1366)",
+  "ok": true,
+  "detail": "missing: "
+ },
+ {
+  "id": "A.med.ru-1366",
+  "name": "«Лечение и диагностика»: заголовок и текст (ru-1366)",
+  "ok": true,
+  "detail": "ЛЕЧЕНИЕ И ДИАГНОСТИКА С чего начать? Расскажите о своей ситуации или выберите подходящее медицинское направление. Мы поможем сориентироваться и подскажем, какой шаг сделать первым. Поиск направления Н"
+ },
+ {
+  "id": "A.contact.ru-1366",
+  "name": "блок «Контакты»: заголовок, 3 номера, адрес (ru-1366)",
+  "ok": true,
+  "detail": "о добавить документы и общаться с координатором. Медицинские документы загружаются только после входа в защищённый кабинет. Удобнее позвонить или написать? CALL-ЦЕНТР +7 (7172) 57-20-09 КООРДИНАТОР +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 г. Астана, просп. Абылай хана, 42 Что вас беспокоит? Текст помогает сформулировать запрос и не отправляется с этой страницы. Продолжить в кабинете"
+ },
+ {
+  "id": "A.footer.ru-1366",
+  "name": "подвал: подписи и 3 номера (ru-1366)",
+  "ok": true,
+  "detail": "MedTour Медицинский туризм Глобальная платформа медицинского туризма для лечения в Казахстане под ключ. Лечение Институт сердца Нейрохирургия Check-up Все направления Навигация Процесс Туризм Блог / Статьи Политика конфиденциальности Контакты CALL-ЦЕНТР +7 (7172) 57-20-09 КООРДИНАТОР +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 support@nnmc.kz www.nnmc.kz г. Астана, просп. Абылай хана, "
+ },
+ {
+  "id": "A.old.ru-1366",
+  "name": "старые формулировки не остались (ru-1366)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.errors.ru-1366",
+  "name": "нет ошибок JS (ru-1366)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.overflow.en-390",
+  "name": "нет горизонтального скролла (en-390)",
+  "ok": true,
+  "detail": "+0px"
+ },
+ {
+  "id": "A.hero.en-390",
+  "name": "заголовок первого экрана = landingCopy (en-390)",
+  "ok": true,
+  "detail": "\"Come to Kazakhstan for treatment. We will take care of the rest.\""
+ },
+ {
+  "id": "A.heroText.en-390",
+  "name": "надзаголовок и текст первого экрана (en-390)",
+  "ok": true,
+  "detail": "Medical tourism in Kazakhstan Come to Kazakhstan for treatment. We will take care of the rest. We organize your journey to better health: from finding the right specialists and planning treatment to accommodation, transfers and leisure. All you need to focus on is your health. Get a treatment plan E"
+ },
+ {
+  "id": "A.process.en-390",
+  "name": "«Путь пациента»: заголовок, текст и 6 шагов (en-390)",
+  "ok": true,
+  "detail": "missing: "
+ },
+ {
+  "id": "A.med.en-390",
+  "name": "«Лечение и диагностика»: заголовок и текст (en-390)",
+  "ok": true,
+  "detail": "TREATMENT AND DIAGNOSTICS Where do I start? Tell us about your situation or choose a medical specialty. We will help you find your way and suggest the right first step. Search specialties Neurosurgery"
+ },
+ {
+  "id": "A.contact.en-390",
+  "name": "блок «Контакты»: заголовок, 3 номера, адрес (en-390)",
+  "ok": true,
+  "detail": "you can add records and contact a coordinator. Medical records are uploaded only after signing in to your secure account. Prefer to call or message us? CALL CENTER +7 (7172) 57-20-09 COORDINATOR +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 Astana, Abylai Khan Ave., 42 What concerns you? This text helps you formulate the request and is not sent from this page. Continue to patient account"
+ },
+ {
+  "id": "A.footer.en-390",
+  "name": "подвал: подписи и 3 номера (en-390)",
+  "ok": true,
+  "detail": "MedTour Medical tourism Global medical tourism platform for managed treatment in Kazakhstan. Treatments Heart Institute Neurosurgery Check-up All specialties Navigation Process Tourism Blog / Articles Privacy Policy Contacts CALL CENTER +7 (7172) 57-20-09 COORDINATOR +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 support@nnmc.kz www.nnmc.kz Astana, Abylai Khan Ave., 42 © 2026 MedTour. Pri"
+ },
+ {
+  "id": "A.old.en-390",
+  "name": "старые формулировки не остались (en-390)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.errors.en-390",
+  "name": "нет ошибок JS (en-390)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.overflow.en-768",
+  "name": "нет горизонтального скролла (en-768)",
+  "ok": true,
+  "detail": "+0px"
+ },
+ {
+  "id": "A.hero.en-768",
+  "name": "заголовок первого экрана = landingCopy (en-768)",
+  "ok": true,
+  "detail": "\"Come to Kazakhstan for treatment. We will take care of the rest.\""
+ },
+ {
+  "id": "A.heroText.en-768",
+  "name": "надзаголовок и текст первого экрана (en-768)",
+  "ok": true,
+  "detail": "Medical tourism in Kazakhstan Come to Kazakhstan for treatment. We will take care of the rest. We organize your journey to better health: from finding the right specialists and planning treatment to accommodation, transfers and leisure. All you need to focus on is your health. Get a treatment plan E"
+ },
+ {
+  "id": "A.process.en-768",
+  "name": "«Путь пациента»: заголовок, текст и 6 шагов (en-768)",
+  "ok": true,
+  "detail": "missing: "
+ },
+ {
+  "id": "A.med.en-768",
+  "name": "«Лечение и диагностика»: заголовок и текст (en-768)",
+  "ok": true,
+  "detail": "TREATMENT AND DIAGNOSTICS Where do I start? Tell us about your situation or choose a medical specialty. We will help you find your way and suggest the right first step. Search specialties Neurosurgery"
+ },
+ {
+  "id": "A.contact.en-768",
+  "name": "блок «Контакты»: заголовок, 3 номера, адрес (en-768)",
+  "ok": true,
+  "detail": "you can add records and contact a coordinator. Medical records are uploaded only after signing in to your secure account. Prefer to call or message us? CALL CENTER +7 (7172) 57-20-09 COORDINATOR +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 Astana, Abylai Khan Ave., 42 What concerns you? This text helps you formulate the request and is not sent from this page. Continue to patient account"
+ },
+ {
+  "id": "A.footer.en-768",
+  "name": "подвал: подписи и 3 номера (en-768)",
+  "ok": true,
+  "detail": "MedTour Medical tourism Global medical tourism platform for managed treatment in Kazakhstan. Treatments Heart Institute Neurosurgery Check-up All specialties Navigation Process Tourism Blog / Articles Privacy Policy Contacts CALL CENTER +7 (7172) 57-20-09 COORDINATOR +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 support@nnmc.kz www.nnmc.kz Astana, Abylai Khan Ave., 42 © 2026 MedTour. Pri"
+ },
+ {
+  "id": "A.old.en-768",
+  "name": "старые формулировки не остались (en-768)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.errors.en-768",
+  "name": "нет ошибок JS (en-768)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.overflow.en-1366",
+  "name": "нет горизонтального скролла (en-1366)",
+  "ok": true,
+  "detail": "+0px"
+ },
+ {
+  "id": "A.hero.en-1366",
+  "name": "заголовок первого экрана = landingCopy (en-1366)",
+  "ok": true,
+  "detail": "\"Come to Kazakhstan for treatment. We will take care of the rest.\""
+ },
+ {
+  "id": "A.heroText.en-1366",
+  "name": "надзаголовок и текст первого экрана (en-1366)",
+  "ok": true,
+  "detail": "Medical tourism in Kazakhstan Come to Kazakhstan for treatment. We will take care of the rest. We organize your journey to better health: from finding the right specialists and planning treatment to accommodation, transfers and leisure. All you need to focus on is your health. Get a treatment plan E"
+ },
+ {
+  "id": "A.process.en-1366",
+  "name": "«Путь пациента»: заголовок, текст и 6 шагов (en-1366)",
+  "ok": true,
+  "detail": "missing: "
+ },
+ {
+  "id": "A.med.en-1366",
+  "name": "«Лечение и диагностика»: заголовок и текст (en-1366)",
+  "ok": true,
+  "detail": "TREATMENT AND DIAGNOSTICS Where do I start? Tell us about your situation or choose a medical specialty. We will help you find your way and suggest the right first step. Search specialties Neurosurgery"
+ },
+ {
+  "id": "A.contact.en-1366",
+  "name": "блок «Контакты»: заголовок, 3 номера, адрес (en-1366)",
+  "ok": true,
+  "detail": "you can add records and contact a coordinator. Medical records are uploaded only after signing in to your secure account. Prefer to call or message us? CALL CENTER +7 (7172) 57-20-09 COORDINATOR +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 Astana, Abylai Khan Ave., 42 What concerns you? This text helps you formulate the request and is not sent from this page. Continue to patient account"
+ },
+ {
+  "id": "A.footer.en-1366",
+  "name": "подвал: подписи и 3 номера (en-1366)",
+  "ok": true,
+  "detail": "MedTour Medical tourism Global medical tourism platform for managed treatment in Kazakhstan. Treatments Heart Institute Neurosurgery Check-up All specialties Navigation Process Tourism Blog / Articles Privacy Policy Contacts CALL CENTER +7 (7172) 57-20-09 COORDINATOR +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 support@nnmc.kz www.nnmc.kz Astana, Abylai Khan Ave., 42 © 2026 MedTour. Pri"
+ },
+ {
+  "id": "A.old.en-1366",
+  "name": "старые формулировки не остались (en-1366)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.errors.en-1366",
+  "name": "нет ошибок JS (en-1366)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.overflow.kk-390",
+  "name": "нет горизонтального скролла (kk-390)",
+  "ok": true,
+  "detail": "+0px"
+ },
+ {
+  "id": "A.hero.kk-390",
+  "name": "заголовок первого экрана = landingCopy (kk-390)",
+  "ok": true,
+  "detail": "\"Қазақстанға емделуге келіңіз. Қалғанын біз ұйымдастырамыз.\""
+ },
+ {
+  "id": "A.heroText.kk-390",
+  "name": "надзаголовок и текст первого экрана (kk-390)",
+  "ok": true,
+  "detail": "Қазақстандағы медициналық туризм Қазақстанға емделуге келіңіз. Қалғанын біз ұйымдастырамыз. Денсаулыққа апаратын сапарыңызды ұйымдастырамыз: мамандарды таңдау мен емдеуді жоспарлаудан бастап тұру, трансфер және демалысқа дейін. Сізге ең бастысына — денсаулығыңызға көңіл бөлу ғана қалады. Емдеу жоспа"
+ },
+ {
+  "id": "A.process.kk-390",
+  "name": "«Путь пациента»: заголовок, текст и 6 шагов (kk-390)",
+  "ok": true,
+  "detail": "missing: "
+ },
+ {
+  "id": "A.med.kk-390",
+  "name": "«Лечение и диагностика»: заголовок и текст (kk-390)",
+  "ok": true,
+  "detail": "ЕМДЕУ ЖӘНЕ ДИАГНОСТИКА Неден бастау керек? Жағдайыңыз туралы айтып беріңіз немесе қажетті медициналық бағытты таңдаңыз. Бағдар алуға көмектесіп, алғашқы қадамды ұсынамыз. Бағытты іздеу Нейрохирургия М"
+ },
+ {
+  "id": "A.contact.kk-390",
+  "name": "блок «Контакты»: заголовок, 3 номера, адрес (kk-390)",
+  "ok": true,
+  "detail": "ысуға болатын қорғалған кабинетте өтеді. Медициналық құжаттар қорғалған кабинетке кіргеннен кейін ғана жүктеледі. Қоңырау шалу немесе жазу ыңғайлырақ па? CALL-ОРТАЛЫҚ +7 (7172) 57-20-09 ҮЙЛЕСТІРУШІ +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 Астана қ., Абылай хан д-лы, 42 Сізді не мазалайды? Бұл мәтін сұранысты тұжырымдауға көмектеседі және осы беттен жіберілмейді. Кабинетте жалғастыру"
+ },
+ {
+  "id": "A.footer.kk-390",
+  "name": "подвал: подписи и 3 номера (kk-390)",
+  "ok": true,
+  "detail": "MedTour Медициналық туризм Білікті дәрігерлермен онлайн кеңес беруге арналған заманауи телемедицина платформасы. Емдеу Жүрек институты Нейрохирургия Check-up Барлық бағыттар Навигация Процесс Туризм Блог / Мақалалар Құпиялылық саясаты Байланыс CALL-ОРТАЛЫҚ +7 (7172) 57-20-09 ҮЙЛЕСТІРУШІ +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 support@nnmc.kz www.nnmc.kz Астана қ., Абылай хан д-лы, "
+ },
+ {
+  "id": "A.old.kk-390",
+  "name": "старые формулировки не остались (kk-390)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.errors.kk-390",
+  "name": "нет ошибок JS (kk-390)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.overflow.kk-768",
+  "name": "нет горизонтального скролла (kk-768)",
+  "ok": true,
+  "detail": "+0px"
+ },
+ {
+  "id": "A.hero.kk-768",
+  "name": "заголовок первого экрана = landingCopy (kk-768)",
+  "ok": true,
+  "detail": "\"Қазақстанға емделуге келіңіз. Қалғанын біз ұйымдастырамыз.\""
+ },
+ {
+  "id": "A.heroText.kk-768",
+  "name": "надзаголовок и текст первого экрана (kk-768)",
+  "ok": true,
+  "detail": "Қазақстандағы медициналық туризм Қазақстанға емделуге келіңіз. Қалғанын біз ұйымдастырамыз. Денсаулыққа апаратын сапарыңызды ұйымдастырамыз: мамандарды таңдау мен емдеуді жоспарлаудан бастап тұру, трансфер және демалысқа дейін. Сізге ең бастысына — денсаулығыңызға көңіл бөлу ғана қалады. Емдеу жоспа"
+ },
+ {
+  "id": "A.process.kk-768",
+  "name": "«Путь пациента»: заголовок, текст и 6 шагов (kk-768)",
+  "ok": true,
+  "detail": "missing: "
+ },
+ {
+  "id": "A.med.kk-768",
+  "name": "«Лечение и диагностика»: заголовок и текст (kk-768)",
+  "ok": true,
+  "detail": "ЕМДЕУ ЖӘНЕ ДИАГНОСТИКА Неден бастау керек? Жағдайыңыз туралы айтып беріңіз немесе қажетті медициналық бағытты таңдаңыз. Бағдар алуға көмектесіп, алғашқы қадамды ұсынамыз. Бағытты іздеу Нейрохирургия М"
+ },
+ {
+  "id": "A.contact.kk-768",
+  "name": "блок «Контакты»: заголовок, 3 номера, адрес (kk-768)",
+  "ok": true,
+  "detail": "ысуға болатын қорғалған кабинетте өтеді. Медициналық құжаттар қорғалған кабинетке кіргеннен кейін ғана жүктеледі. Қоңырау шалу немесе жазу ыңғайлырақ па? CALL-ОРТАЛЫҚ +7 (7172) 57-20-09 ҮЙЛЕСТІРУШІ +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 Астана қ., Абылай хан д-лы, 42 Сізді не мазалайды? Бұл мәтін сұранысты тұжырымдауға көмектеседі және осы беттен жіберілмейді. Кабинетте жалғастыру"
+ },
+ {
+  "id": "A.footer.kk-768",
+  "name": "подвал: подписи и 3 номера (kk-768)",
+  "ok": true,
+  "detail": "MedTour Медициналық туризм Білікті дәрігерлермен онлайн кеңес беруге арналған заманауи телемедицина платформасы. Емдеу Жүрек институты Нейрохирургия Check-up Барлық бағыттар Навигация Процесс Туризм Блог / Мақалалар Құпиялылық саясаты Байланыс CALL-ОРТАЛЫҚ +7 (7172) 57-20-09 ҮЙЛЕСТІРУШІ +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 support@nnmc.kz www.nnmc.kz Астана қ., Абылай хан д-лы, "
+ },
+ {
+  "id": "A.old.kk-768",
+  "name": "старые формулировки не остались (kk-768)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.errors.kk-768",
+  "name": "нет ошибок JS (kk-768)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.overflow.kk-1366",
+  "name": "нет горизонтального скролла (kk-1366)",
+  "ok": true,
+  "detail": "+0px"
+ },
+ {
+  "id": "A.hero.kk-1366",
+  "name": "заголовок первого экрана = landingCopy (kk-1366)",
+  "ok": true,
+  "detail": "\"Қазақстанға емделуге келіңіз. Қалғанын біз ұйымдастырамыз.\""
+ },
+ {
+  "id": "A.heroText.kk-1366",
+  "name": "надзаголовок и текст первого экрана (kk-1366)",
+  "ok": true,
+  "detail": "Қазақстандағы медициналық туризм Қазақстанға емделуге келіңіз. Қалғанын біз ұйымдастырамыз. Денсаулыққа апаратын сапарыңызды ұйымдастырамыз: мамандарды таңдау мен емдеуді жоспарлаудан бастап тұру, трансфер және демалысқа дейін. Сізге ең бастысына — денсаулығыңызға көңіл бөлу ғана қалады. Емдеу жоспа"
+ },
+ {
+  "id": "A.process.kk-1366",
+  "name": "«Путь пациента»: заголовок, текст и 6 шагов (kk-1366)",
+  "ok": true,
+  "detail": "missing: "
+ },
+ {
+  "id": "A.med.kk-1366",
+  "name": "«Лечение и диагностика»: заголовок и текст (kk-1366)",
+  "ok": true,
+  "detail": "ЕМДЕУ ЖӘНЕ ДИАГНОСТИКА Неден бастау керек? Жағдайыңыз туралы айтып беріңіз немесе қажетті медициналық бағытты таңдаңыз. Бағдар алуға көмектесіп, алғашқы қадамды ұсынамыз. Бағытты іздеу Нейрохирургия М"
+ },
+ {
+  "id": "A.contact.kk-1366",
+  "name": "блок «Контакты»: заголовок, 3 номера, адрес (kk-1366)",
+  "ok": true,
+  "detail": "ысуға болатын қорғалған кабинетте өтеді. Медициналық құжаттар қорғалған кабинетке кіргеннен кейін ғана жүктеледі. Қоңырау шалу немесе жазу ыңғайлырақ па? CALL-ОРТАЛЫҚ +7 (7172) 57-20-09 ҮЙЛЕСТІРУШІ +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 Астана қ., Абылай хан д-лы, 42 Сізді не мазалайды? Бұл мәтін сұранысты тұжырымдауға көмектеседі және осы беттен жіберілмейді. Кабинетте жалғастыру"
+ },
+ {
+  "id": "A.footer.kk-1366",
+  "name": "подвал: подписи и 3 номера (kk-1366)",
+  "ok": true,
+  "detail": "MedTour Медициналық туризм Білікті дәрігерлермен онлайн кеңес беруге арналған заманауи телемедицина платформасы. Емдеу Жүрек институты Нейрохирургия Check-up Барлық бағыттар Навигация Процесс Туризм Блог / Мақалалар Құпиялылық саясаты Байланыс CALL-ОРТАЛЫҚ +7 (7172) 57-20-09 ҮЙЛЕСТІРУШІ +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 support@nnmc.kz www.nnmc.kz Астана қ., Абылай хан д-лы, "
+ },
+ {
+  "id": "A.old.kk-1366",
+  "name": "старые формулировки не остались (kk-1366)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.errors.kk-1366",
+  "name": "нет ошибок JS (kk-1366)",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "A.tel.#contact.callCenter",
+  "name": "#contact: +7 (7172) 57-20-09 → tel:+77172572009",
+  "ok": true,
+  "detail": "[{\"href\":\"tel:+77172572009\",\"text\":\"+7 (7172) 57-20-09\",\"target\":\"\",\"rel\":\"\",\"label\":null},{\"href\":\"tel:+77000853144\",\"text\":\"+7 (700) 085-31-44\",\"target\":\"\",\"rel\":\"\",\"label\":null},{\"href\":\"tel:+77172577440\",\"text\":\"+7 (7172) 57-74-40\",\"target\":\"\",\"rel\":\"\",\"label\":null}]"
+ },
+ {
+  "id": "A.tel.#contact.coordMobile",
+  "name": "#contact: +7 (700) 085-31-44 → tel:+77000853144",
+  "ok": true,
+  "detail": "[{\"href\":\"tel:+77172572009\",\"text\":\"+7 (7172) 57-20-09\",\"target\":\"\",\"rel\":\"\",\"label\":null},{\"href\":\"tel:+77000853144\",\"text\":\"+7 (700) 085-31-44\",\"target\":\"\",\"rel\":\"\",\"label\":null},{\"href\":\"tel:+77172577440\",\"text\":\"+7 (7172) 57-74-40\",\"target\":\"\",\"rel\":\"\",\"label\":null}]"
+ },
+ {
+  "id": "A.tel.#contact.coordPhone",
+  "name": "#contact: +7 (7172) 57-74-40 → tel:+77172577440",
+  "ok": true,
+  "detail": "[{\"href\":\"tel:+77172572009\",\"text\":\"+7 (7172) 57-20-09\",\"target\":\"\",\"rel\":\"\",\"label\":null},{\"href\":\"tel:+77000853144\",\"text\":\"+7 (700) 085-31-44\",\"target\":\"\",\"rel\":\"\",\"label\":null},{\"href\":\"tel:+77172577440\",\"text\":\"+7 (7172) 57-74-40\",\"target\":\"\",\"rel\":\"\",\"label\":null}]"
+ },
+ {
+  "id": "A.wa.#contact",
+  "name": "#contact: подпись WhatsApp у мобильного координатора → https://wa.me/77000853144, новая вкладка",
+  "ok": true,
+  "detail": "{\"href\":\"https://wa.me/77000853144\",\"text\":\"WhatsApp\",\"target\":\"_blank\",\"rel\":\"noreferrer\",\"label\":null}"
+ },
+ {
+  "id": "A.tg.#contact",
+  "name": "#contact: подпись Telegram → https://t.me/+77000853144, новая вкладка",
+  "ok": true,
+  "detail": "{\"href\":\"https://t.me/+77000853144\",\"text\":\"Telegram\",\"target\":\"_blank\",\"rel\":\"noreferrer\",\"label\":null}"
+ },
+ {
+  "id": "A.tel.footer.callCenter",
+  "name": "footer: +7 (7172) 57-20-09 → tel:+77172572009",
+  "ok": true,
+  "detail": "[{\"href\":\"tel:+77172572009\",\"text\":\"+7 (7172) 57-20-09\",\"target\":\"\",\"rel\":\"\",\"label\":null},{\"href\":\"tel:+77000853144\",\"text\":\"+7 (700) 085-31-44\",\"target\":\"\",\"rel\":\"\",\"label\":null},{\"href\":\"tel:+77172577440\",\"text\":\"+7 (7172) 57-74-40\",\"target\":\"\",\"rel\":\"\",\"label\":null}]"
+ },
+ {
+  "id": "A.tel.footer.coordMobile",
+  "name": "footer: +7 (700) 085-31-44 → tel:+77000853144",
+  "ok": true,
+  "detail": "[{\"href\":\"tel:+77172572009\",\"text\":\"+7 (7172) 57-20-09\",\"target\":\"\",\"rel\":\"\",\"label\":null},{\"href\":\"tel:+77000853144\",\"text\":\"+7 (700) 085-31-44\",\"target\":\"\",\"rel\":\"\",\"label\":null},{\"href\":\"tel:+77172577440\",\"text\":\"+7 (7172) 57-74-40\",\"target\":\"\",\"rel\":\"\",\"label\":null}]"
+ },
+ {
+  "id": "A.tel.footer.coordPhone",
+  "name": "footer: +7 (7172) 57-74-40 → tel:+77172577440",
+  "ok": true,
+  "detail": "[{\"href\":\"tel:+77172572009\",\"text\":\"+7 (7172) 57-20-09\",\"target\":\"\",\"rel\":\"\",\"label\":null},{\"href\":\"tel:+77000853144\",\"text\":\"+7 (700) 085-31-44\",\"target\":\"\",\"rel\":\"\",\"label\":null},{\"href\":\"tel:+77172577440\",\"text\":\"+7 (7172) 57-74-40\",\"target\":\"\",\"rel\":\"\",\"label\":null}]"
+ },
+ {
+  "id": "A.wa.footer",
+  "name": "footer: подпись WhatsApp у мобильного координатора → https://wa.me/77000853144, новая вкладка",
+  "ok": true,
+  "detail": "{\"href\":\"https://wa.me/77000853144\",\"text\":\"WhatsApp\",\"target\":\"_blank\",\"rel\":\"noreferrer\",\"label\":null}"
+ },
+ {
+  "id": "A.tg.footer",
+  "name": "footer: подпись Telegram → https://t.me/+77000853144, новая вкладка",
+  "ok": true,
+  "detail": "{\"href\":\"https://t.me/+77000853144\",\"text\":\"Telegram\",\"target\":\"_blank\",\"rel\":\"noreferrer\",\"label\":null}"
+ },
+ {
+  "id": "A.footer.noDuplicateIcons",
+  "name": "подвал: WhatsApp/Telegram не дублируются иконками, раз подписаны у номера",
+  "ok": true,
+  "detail": "[]"
+ },
+ {
+  "id": "A.nav.desktop",
+  "name": "меню «Контакты» (1366): после перехода номер call-центра на экране",
+  "ok": true,
+  "detail": "{\"x\":139,\"y\":680.8468017578125,\"width\":147.265625,\"height\":21}"
+ },
+ {
+  "id": "A.nav.mobile",
+  "name": "меню «Контакты» (390): переход к блоку контактов",
+  "ok": true,
+  "detail": "hash= y=15767 callCenterBox={\"x\":72,\"y\":811.0875244140625,\"width\":147.265625,\"height\":21} inView=true"
+ },
+ {
+  "id": "A.legal.ru/privacy",
+  "name": "/privacy (ru): номер call-центра, без заглушки 123-456",
+  "ok": true,
+  "detail": "Телефон: +7 (7172) 57-20-09"
+ },
+ {
+  "id": "A.legal.ru/terms",
+  "name": "/terms (ru): номер call-центра, без заглушки 123-456",
+  "ok": true,
+  "detail": "ur.kz или позвоните по номеру +7 (7172) 57-20-09, указав номер запис"
+ },
+ {
+  "id": "A.legal.en/privacy",
+  "name": "/privacy (en): номер call-центра, без заглушки 123-456",
+  "ok": true,
+  "detail": "Phone: +7 (7172) 57-20-09"
+ },
+ {
+  "id": "A.legal.en/terms",
+  "name": "/terms (en): номер call-центра, без заглушки 123-456",
+  "ok": true,
+  "detail": "Email info@medtour.kz or call +7 (7172) 57-20-09 with the appointmen"
+ },
+ {
+  "id": "A.legal.kk/privacy",
+  "name": "/privacy (kk): номер call-центра, без заглушки 123-456",
+  "ok": true,
+  "detail": "Телефон: +7 (7172) 57-20-09"
+ },
+ {
+  "id": "A.legal.kk/terms",
+  "name": "/terms (kk): номер call-центра, без заглушки 123-456",
+  "ok": true,
+  "detail": "kz мекенжайына жазыңыз немесе +7 (7172) 57-20-09 нөміріне қоңырау ша"
+ },
+ {
+  "id": "A.contrast.medtour.#contact.label",
+  "name": "контраст #contact label (medtour, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "4.9:1"
+ },
+ {
+  "id": "A.contrast.medtour.#contact.number",
+  "name": "контраст #contact number (medtour, 16px) ≥ 4.5",
+  "ok": true,
+  "detail": "4.9:1"
+ },
+ {
+  "id": "A.contrast.medtour.#contact.tag",
+  "name": "контраст #contact tag (medtour, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "4.9:1"
+ },
+ {
+  "id": "A.contrast.medtour.footer.label",
+  "name": "контраст footer label (medtour, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "6.98:1"
+ },
+ {
+  "id": "A.contrast.medtour.footer.number",
+  "name": "контраст footer number (medtour, 14px) ≥ 4.5",
+  "ok": true,
+  "detail": "12.36:1"
+ },
+ {
+  "id": "A.contrast.medtour.footer.tag",
+  "name": "контраст footer tag (medtour, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "6.17:1"
+ },
+ {
+  "id": "A.contrast.electric.#contact.label",
+  "name": "контраст #contact label (electric, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "7.43:1"
+ },
+ {
+  "id": "A.contrast.electric.#contact.number",
+  "name": "контраст #contact number (electric, 16px) ≥ 4.5",
+  "ok": true,
+  "detail": "7.43:1"
+ },
+ {
+  "id": "A.contrast.electric.#contact.tag",
+  "name": "контраст #contact tag (electric, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "7.43:1"
+ },
+ {
+  "id": "A.contrast.electric.footer.label",
+  "name": "контраст footer label (electric, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "7.1:1"
+ },
+ {
+  "id": "A.contrast.electric.footer.number",
+  "name": "контраст footer number (electric, 14px) ≥ 4.5",
+  "ok": true,
+  "detail": "12.56:1"
+ },
+ {
+  "id": "A.contrast.electric.footer.tag",
+  "name": "контраст footer tag (electric, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "6:1"
+ },
+ {
+  "id": "A.contrast.navy-gold.#contact.label",
+  "name": "контраст #contact label (navy-gold, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "7.09:1"
+ },
+ {
+  "id": "A.contrast.navy-gold.#contact.number",
+  "name": "контраст #contact number (navy-gold, 16px) ≥ 4.5",
+  "ok": true,
+  "detail": "7.09:1"
+ },
+ {
+  "id": "A.contrast.navy-gold.#contact.tag",
+  "name": "контраст #contact tag (navy-gold, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "7.09:1"
+ },
+ {
+  "id": "A.contrast.navy-gold.footer.label",
+  "name": "контраст footer label (navy-gold, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "6.63:1"
+ },
+ {
+  "id": "A.contrast.navy-gold.footer.number",
+  "name": "контраст footer number (navy-gold, 14px) ≥ 4.5",
+  "ok": true,
+  "detail": "11.72:1"
+ },
+ {
+  "id": "A.contrast.navy-gold.footer.tag",
+  "name": "контраст footer tag (navy-gold, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "5.49:1"
+ },
+ {
+  "id": "A.contrast.lavender.#contact.label",
+  "name": "контраст #contact label (lavender, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "7.1:1"
+ },
+ {
+  "id": "A.contrast.lavender.#contact.number",
+  "name": "контраст #contact number (lavender, 16px) ≥ 4.5",
+  "ok": true,
+  "detail": "7.1:1"
+ },
+ {
+  "id": "A.contrast.lavender.#contact.tag",
+  "name": "контраст #contact tag (lavender, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "7.1:1"
+ },
+ {
+  "id": "A.contrast.lavender.footer.label",
+  "name": "контраст footer label (lavender, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "7.2:1"
+ },
+ {
+  "id": "A.contrast.lavender.footer.number",
+  "name": "контраст footer number (lavender, 14px) ≥ 4.5",
+  "ok": true,
+  "detail": "12.75:1"
+ },
+ {
+  "id": "A.contrast.lavender.footer.tag",
+  "name": "контраст footer tag (lavender, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "5.83:1"
+ },
+ {
+  "id": "A.contrast.emerald.#contact.label",
+  "name": "контраст #contact label (emerald, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "7.68:1"
+ },
+ {
+  "id": "A.contrast.emerald.#contact.number",
+  "name": "контраст #contact number (emerald, 16px) ≥ 4.5",
+  "ok": true,
+  "detail": "7.68:1"
+ },
+ {
+  "id": "A.contrast.emerald.#contact.tag",
+  "name": "контраст #contact tag (emerald, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "7.68:1"
+ },
+ {
+  "id": "A.contrast.emerald.footer.label",
+  "name": "контраст footer label (emerald, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "5.76:1"
+ },
+ {
+  "id": "A.contrast.emerald.footer.number",
+  "name": "контраст footer number (emerald, 14px) ≥ 4.5",
+  "ok": true,
+  "detail": "10.19:1"
+ },
+ {
+  "id": "A.contrast.emerald.footer.tag",
+  "name": "контраст footer tag (emerald, 12px) ≥ 4.5",
+  "ok": true,
+  "detail": "4.58:1"
+ },
+ {
+  "id": "B.legacy",
+  "name": "старый конфиг без contacts/version (локальная база): номера по умолчанию",
+  "ok": true,
+  "detail": "авигация Процесс Туризм Блог / Статьи Политика конфиденциальности Контакты CALL-ЦЕНТР +7 (7172) 57-20-09 КООРДИНАТОР +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 support@nnmc.kz www.nnmc.kz г. Астана, просп. Абылай хана, 42 © 2026 MedTour. Политика конфиденциальности Условия использования"
+ },
+ {
+  "id": "B.v2.filled",
+  "name": "v2 с заполненным телефоном: показан номер админа, а не значение по умолчанию",
+  "ok": true,
+  "detail": "авигация Процесс Туризм Блог / Статьи Политика конфиденциальности Контакты CALL-ЦЕНТР +7 (7172) 99-88-77 КООРДИНАТОР +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 support@nnmc.kz www.nnmc.kz г. Астана, просп. Абылай хана, 42 © 2026 MedTour. Политика конфиденциальности Условия использования"
+ },
+ {
+  "id": "B.v2.hiddenWebsite",
+  "name": "v2 с пустым сайтом: сайт остаётся скрытым (у сайта и раньше было значение по умолчанию)",
+  "ok": true,
+  "detail": "аправления Навигация Процесс Туризм Блог / Статьи Политика конфиденциальности Контакты CALL-ЦЕНТР +7 (7172) 57-20-09 КООРДИНАТОР +7 (700) 085-31-44 WhatsApp Telegram +7 (7172) 57-74-40 support@nnmc.kz г. Астана, просп. Абылай хана, 42 © 2026 MedTour. Политика конфиденциальности Условия использования"
+ },
+ {
+  "id": "B.v3.empty",
+  "name": "v3 с пустыми телефонами: номера скрыты (решение админа)",
+  "ok": true,
+  "detail": "ля лечения в Казахстане под ключ. Лечение Институт сердца Нейрохирургия Check-up Все направления Навигация Процесс Туризм Блог / Статьи Политика конфиденциальности Контакты support@nnmc.kz www.nnmc.kz г. Астана, просп. Абылай хана, 42 © 2026 MedTour. Политика конфиденциальности Условия использования"
+ },
+ {
+  "id": "B.v3.emptyContactBlock",
+  "name": "v3 без телефонов: в блоке «Контакты» нет «висящего» заголовка без номеров",
+  "ok": true,
+  "detail": " защищённом кабинете, где можно добавить документы и общаться с координатором. Медицинские документы загружаются только после входа в защищённый кабинет. г. Астана, просп. Абылай хана, 42 Что вас беспокоит? Текст помогает сформулировать запрос и не отправляется с этой страницы. Продолжить в кабинете"
+ },
+ {
+  "id": "C.fields",
+  "name": "админка: 8 полей контактов с подписями (ru)",
+  "ok": true,
+  "detail": "{\"Call-центр\":1,\"Координатор — мобильный\":1,\"Координатор — городской\":1,\"Email\":1,\"Сайт\":1,\"WhatsApp (номер)\":1,\"Telegram (@username или ссылка)\":1,\"Instagram (@username или ссылка)\":1}"
+ },
+ {
+  "id": "C.prefill",
+  "name": "админка на конфиге с прода: поля заполнены номерами ННМЦ",
+  "ok": true,
+  "detail": "+7 (7172) 57-20-09 / +7 (700) 085-31-44 / +7 (7172) 57-74-40"
+ },
+ {
+  "id": "C.save.api",
+  "name": "сохранение: version 3, новые значения в Global.landingConfig",
+  "ok": true,
+  "detail": "{\"version\":3,\"phone\":\"+7 (7172) 11-22-33\",\"coordinatorMobile\":\"+7 (700) 085-31-44\",\"coordinatorPhone\":\"\",\"email\":\"support@nnmc.kz\",\"website\":\"https://www.nnmc.kz/\",\"whatsapp\":\"+7 (700) 085-31-44\",\"telegram\":\"@nnmc_medtour\",\"instagram\":\"\",\"address\":{},\"hours\":{}}"
+ },
+ {
+  "id": "C.save.site",
+  "name": "сайт: новый номер call-центра, городской координатора скрыт",
+  "ok": true,
+  "detail": "я Check-up Все направления Навигация Процесс Туризм Блог / Статьи Политика конфиденциальности Контакты CALL-ЦЕНТР +7 (7172) 11-22-33 КООРДИНАТОР +7 (700) 085-31-44 WhatsApp support@nnmc.kz www.nnmc.kz г. Астана, просп. Абылай хана, 42 © 2026 MedTour. Политика конфиденциальности Условия использования"
+ },
+ {
+  "id": "C.save.tgIcon",
+  "name": "Telegram на другом аккаунте: подпись у номера пропала, иконка в ряду соцсетей ведёт на t.me/nnmc_medtour",
+  "ok": true,
+  "detail": "[{\"href\":\"https://wa.me/77000853144\",\"text\":\"WhatsApp\",\"label\":null},{\"href\":\"https://t.me/nnmc_medtour\",\"text\":\"\",\"label\":\"Telegram\"}]"
+ },
+ {
+  "id": "C.persist",
+  "name": "после перезагрузки админки значения сохранены, кнопка «Сохранить» неактивна",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "C.invalidPhone",
+  "name": "админка: «звоните нам» в поле телефона помечается как ошибка",
+  "ok": true,
+  "detail": "ошибок на странице: 1"
+ },
+ {
+  "id": "C.invalidPhone.site",
+  "name": "сайт: телефон без цифр не превращается в пустую ссылку «tel:»",
+  "ok": true,
+  "detail": "[\"tel:+77000853144\"]"
+ },
+ {
+  "id": "C.xss",
+  "name": "HTML в номере выводится текстом, javascript: не становится ссылкой",
+  "ok": true,
+  "detail": "xss=undefined imgs=0 jsLinks=0 dialog=undefined"
+ },
+ {
+  "id": "C.noPhones.footer",
+  "name": "все телефоны очищены: в подвале нет подписей «Call-центр»/«Координатор»",
+  "ok": true,
+  "detail": "ля лечения в Казахстане под ключ. Лечение Институт сердца Нейрохирургия Check-up Все направления Навигация Процесс Туризм Блог / Статьи Политика конфиденциальности Контакты support@nnmc.kz www.nnmc.kz г. Астана, просп. Абылай хана, 42 © 2026 MedTour. Политика конфиденциальности Условия использования"
+ },
+ {
+  "id": "C.noPhones.contact",
+  "name": "все телефоны очищены: в блоке «Контакты» нет заголовка над пустым списком",
+  "ok": true,
+  "detail": " защищённом кабинете, где можно добавить документы и общаться с координатором. Медицинские документы загружаются только после входа в защищённый кабинет. г. Астана, просп. Абылай хана, 42 Что вас беспокоит? Текст помогает сформулировать запрос и не отправляется с этой страницы. Продолжить в кабинете"
+ },
+ {
+  "id": "C.ctaTitle",
+  "name": "заголовок над контактами меняется из админки",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "id": "C.noFalseOverrides",
+  "name": "сохранение редактора не записывает тексты по умолчанию как правки (heroTitle с nbsp)",
+  "ok": true,
+  "detail": "[\"ctaContactsTitle\"]"
+ },
+ {
+  "id": "C.labels.en",
+  "name": "подписи полей телефонов (en)",
+  "ok": true,
+  "detail": "{\"Call center\":1,\"Coordinator — mobile\":1,\"Coordinator — landline\":1}"
+ },
+ {
+  "id": "C.labels.kk",
+  "name": "подписи полей телефонов (kk)",
+  "ok": true,
+  "detail": "{\"Call-орталық\":1,\"Үйлестіруші — ұялы\":1,\"Үйлестіруші — қалалық\":1}"
+ },
+ {
+  "id": "C.errors",
+  "name": "админка: нет ошибок JS",
+  "ok": true,
+  "detail": ""
+ }
+]
