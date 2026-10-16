@@ -44,6 +44,8 @@ const PaymentSuccess = lazy(() => import('./pages/PaymentSuccess'))
 const PaymentFailure = lazy(() => import('./pages/PaymentFailure'))
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'))
 const TermsPage = lazy(() => import('./pages/TermsPage'))
+const DocumentsPage = lazy(() => import('./pages/DocumentsPage'))
+const DocumentPage = lazy(() => import('./pages/DocumentPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 const DoctorDashboard = lazy(() => import('./pages/doctor/DoctorDashboard'))
@@ -59,6 +61,7 @@ const AdminAppointments = lazy(() => import('./pages/admin/AdminAppointments'))
 const AdminSpecializations = lazy(() => import('./pages/admin/AdminSpecializations'))
 const AdminPriceList = lazy(() => import('./pages/admin/AdminPriceList'))
 const AdminGuideVideos = lazy(() => import('./pages/admin/AdminGuideVideos'))
+const AdminLegalDocuments = lazy(() => import('./pages/admin/AdminLegalDocuments'))
 const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'))
 const AdminContent = lazy(() => import('./pages/admin/AdminContent'))
 const AdminTreatmentDepartments = lazy(() => import('./pages/admin/AdminTreatmentDepartments'))
@@ -189,6 +192,8 @@ function App() {
           <Route path="/about" element={<LandingPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/documents" element={<DocumentsPage />} />
+          <Route path="/documents/:slug" element={<DocumentPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
 
@@ -280,6 +285,7 @@ function App() {
           <Route path="prices" element={<AdminPriceList />} />
           <Route path="price-requests" element={<StaffPriceRequests />} />
           <Route path="guide-videos" element={<AdminGuideVideos />} />
+          <Route path="legal-documents" element={<AdminLegalDocuments />} />
           <Route path="analytics" element={<AdminAnalytics />} />
           <Route path="settings" element={<AdminContent />} />
           <Route path="cases" element={<MedicalCasesPage />} />

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import {
   Check,
   ExternalLink,
@@ -90,6 +91,7 @@ const copyByLanguage = {
     navVisible: 'Показывать', navLabel: 'Подпись', navHidden: 'Скрыт', navHint: 'Пустая подпись — стандартная для языка.',
     privacy: 'Политика конфиденциальности', terms: 'Пользовательское соглашение',
     legalSyntax: 'Разметка: «## Заголовок» — новый раздел, «- текст» — пункт списка, остальные строки — абзацы.',
+    legalMoved: 'Публичная оферта и согласия пациента — в отдельном разделе', legalMovedLink: 'Правовые документы',
     legalReset: 'Вернуть текст по умолчанию', legalCustom: 'Изменён', legalDefault: 'По умолчанию', legalOpen: 'Открыть страницу',
     siteName: 'Название сайта', siteDescription: 'Описание сайта',
     seoTitle: 'Заголовок главной в поиске', seoDescription: 'Описание главной в поиске',
@@ -120,6 +122,7 @@ const copyByLanguage = {
     navVisible: 'Show', navLabel: 'Label', navHidden: 'Hidden', navHint: 'An empty label uses the standard one for the language.',
     privacy: 'Privacy policy', terms: 'Terms of use',
     legalSyntax: 'Markup: “## Title” starts a section, “- text” is a list item, other lines are paragraphs.',
+    legalMoved: 'The public offer and patient consents are edited in a separate section', legalMovedLink: 'Legal documents',
     legalReset: 'Restore default text', legalCustom: 'Edited', legalDefault: 'Default', legalOpen: 'Open page',
     siteName: 'Site name', siteDescription: 'Site description',
     seoTitle: 'Home page title in search', seoDescription: 'Home page description in search',
@@ -150,6 +153,7 @@ const copyByLanguage = {
     navVisible: 'Көрсету', navLabel: 'Атауы', navHidden: 'Жасырын', navHint: 'Бос атау — тілдің стандартты атауы.',
     privacy: 'Құпиялылық саясаты', terms: 'Пайдаланушы келісімі',
     legalSyntax: 'Белгілеу: «## Тақырып» — жаңа бөлім, «- мәтін» — тізім тармағы, қалған жолдар — абзацтар.',
+    legalMoved: 'Жария оферта мен пациент келісімдері бөлек бөлімде өңделеді', legalMovedLink: 'Құқықтық құжаттар',
     legalReset: 'Әдепкі мәтінді қайтару', legalCustom: 'Өзгертілген', legalDefault: 'Әдепкі', legalOpen: 'Бетті ашу',
     siteName: 'Сайт атауы', siteDescription: 'Сайт сипаттамасы',
     seoTitle: 'Басты беттің іздеудегі тақырыбы', seoDescription: 'Басты беттің іздеудегі сипаттамасы',
@@ -635,6 +639,13 @@ function AdminContent() {
             })}
           </div>
         </Panel>
+      )}
+
+      {activeSection === 'legal' && (
+        <p className='flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-teal-100 bg-teal-50 px-5 py-3 text-sm text-teal-900'>
+          {copy.legalMoved}:
+          <Link to='/admin/legal-documents' className='font-semibold underline underline-offset-2'>{copy.legalMovedLink}</Link>
+        </p>
       )}
 
       {activeSection === 'legal' && (

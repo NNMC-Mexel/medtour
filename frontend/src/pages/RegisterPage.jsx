@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import {
   Eye, EyeOff, Mail, Lock, User, Phone, CreditCard,
   ArrowLeft, CheckCircle, Stethoscope, UserCircle, GraduationCap,
@@ -525,15 +525,16 @@ function RegisterPage() {
                         onChange={(e) => setAgreedToTerms(e.target.checked)}
                         className={`w-4 h-4 mt-1 rounded border-slate-300 text-${accentColor}-600 focus:ring-${accentColor}-500`}
                       />
+                      {/* По тексту оферты регистрация с этой галочкой — акцепт оферты и согласий. */}
                       <span className="text-sm text-slate-600">
-                        {t('auth.register.agree_with')}{' '}
-                        <a href="/terms" target="_blank" rel="noopener noreferrer" className={`text-${accentColor}-600 hover:underline`}>
-                          {t('auth.register.terms')}
-                        </a>{' '}
-                        {t('common.and')}{' '}
-                        <a href="/privacy" target="_blank" rel="noopener noreferrer" className={`text-${accentColor}-600 hover:underline`}>
-                          {t('auth.register.privacy')}
-                        </a>
+                        <Trans
+                          i18nKey="auth.register.accept_documents"
+                          components={{
+                            offer: <a href="/documents/offer" target="_blank" rel="noopener noreferrer" className={`text-${accentColor}-600 hover:underline`} />,
+                            consent: <a href="/documents/consent" target="_blank" rel="noopener noreferrer" className={`text-${accentColor}-600 hover:underline`} />,
+                            privacy: <a href="/privacy" target="_blank" rel="noopener noreferrer" className={`text-${accentColor}-600 hover:underline`} />,
+                          }}
+                        />
                       </span>
                     </label>
                     {formErrors.terms && <p className="text-sm text-rose-600">{formErrors.terms}</p>}

@@ -467,8 +467,8 @@ function PublicLayout() {
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link to='/privacy' className='text-slate-400 hover:text-white transition-colors text-sm'>
-                                        {t("footer.privacy")}
+                                    <Link to='/documents' className='text-slate-400 hover:text-white transition-colors text-sm'>
+                                        {t("footer.documents")}
                                     </Link>
                                 </li>
                             </ul>
@@ -527,7 +527,10 @@ function PublicLayout() {
 
                     <div className='mt-12 pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4'>
                         <p className='text-slate-500 text-sm'>© {new Date().getFullYear()} MedTour.</p>
-                        <div className='flex items-center gap-6'>
+                        <div className='flex flex-wrap items-center justify-center gap-x-6 gap-y-2'>
+                            <Link to='/documents/offer' className='text-slate-500 hover:text-white text-sm transition-colors'>
+                                {t("footer.offer")}
+                            </Link>
                             <Link to='/privacy' className='text-slate-500 hover:text-white text-sm transition-colors'>
                                 {t("footer.privacy")}
                             </Link>

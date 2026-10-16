@@ -562,6 +562,14 @@ export const contentAPI = {
     updateAbout: (data) => api.put("/api/about", { data }),
 };
 
+// Правовые документы (оферта, согласия): страницы /documents/:slug.
+export const legalDocumentsAPI = {
+    list: () => api.get("/api/legal-documents"),
+    get: (slug, lang) => api.get(`/api/legal-documents/${encodeURIComponent(slug)}`, { params: { lang } }),
+    getForEdit: (slug) => api.get(`/api/legal-documents/${encodeURIComponent(slug)}/edit`),
+    update: (slug, data) => api.put(`/api/legal-documents/${encodeURIComponent(slug)}`, { data }),
+};
+
 // ===========================================
 // API для прейскуранта
 // ===========================================
