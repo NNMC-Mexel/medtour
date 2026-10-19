@@ -552,6 +552,7 @@ const normalizeMatchValue = (value) => String(value || '')
   .toLocaleLowerCase('ru')
   .replace(/ё/g, 'е')
   .replace(/[–—]/g, '-')
+  .replace(/\s+/g, ' ')
   .trim()
 
 export function doctorBelongsToTreatmentDepartment(doctor, department) {
@@ -570,11 +571,13 @@ export function doctorBelongsToTreatmentDepartment(doctor, department) {
     .flatMap((specialization) => [specialization.name, specialization.nameEn, specialization.nameKk])
     .map(normalizeMatchValue)
     .filter(Boolean)
-  const matches = [...(department.specialtyMatches || []), ...(specialtyAliases[department.slug] || [])]
+  const matches = new Set([...(department.specialtyMatches || []), ...(specialtyAliases[department.slug] || [])]
     .map(normalizeMatchValue)
-    .filter(Boolean)
+    .filter(Boolean))
 
-  return matches.some((match) => names.some((name) => name.includes(match) || match.includes(name)))
+  // Специальность совпадает целиком: по подстроке «уролог» находился в
+  // «neurologist», а «хирург» — в «нейрохирург».
+  return names.some((name) => matches.has(name))
 }
 
 export function localizeDepartment(department, language = 'ru') {
