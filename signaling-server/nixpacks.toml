@@ -1,3 +1,9 @@
+# Node 22, как у сигналинга MedConnect: на Node 18 fetch к Strapi по имени
+# контейнера уходил только на IPv6-адрес, а Strapi слушает IPv4 (0.0.0.0) —
+# ECONNREFUSED, и видеозвонок падал с «Ошибкой подключения».
+[variables]
+NIXPACKS_NODE_VERSION = "22"
+
 [phases.install]
 cmds = ["npm ci"]
 

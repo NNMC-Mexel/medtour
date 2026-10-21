@@ -682,7 +682,10 @@ function VideoConsultation({
           setConnectionState('waiting')
         })
 
-        socket.on('connect_error', () => {
+        socket.on('connect_error', (err) => {
+          // Причина от сигналинга (токен не принят / Strapi недоступен) — для
+          // разбора по консоли, пользователю показываем общий текст.
+          console.error('[video] signaling connect_error:', err?.message, err?.data || '')
           setError(t('video.conn_error'))
           setConnectionState('failed')
         })
