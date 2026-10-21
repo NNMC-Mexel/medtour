@@ -314,6 +314,31 @@ export const uploadFile = async (file) => {
     return response.data[0];
 };
 
+// Несколько файлов одним запросом: на загрузку стоит лимит запросов с одного
+// IP (server/src/middlewares/rate-limit.ts), и галерея по фото на запрос
+// упиралась в него за один сеанс заполнения. Порядок ответа — порядок файлов.
+export const uploadFiles = async (files) => {
+    const formData = new FormData();
+    for (const file of files) {
+        if (!UPLOAD_ALLOWED_TYPES.includes(file.type)) {
+            throw new Error(`Недопустимый тип файла. Разрешены: JPEG, PNG, WebP, MP4, WebM, MOV, PDF, DOC, DOCX`)
+        }
+        if (file.size > UPLOAD_MAX_SIZE_BYTES) {
+            throw new Error(`Файл слишком большой. Максимальный размер: 300 МБ`)
+        }
+        const safeName = file.name.replace(/[^\p{L}\p{N}_.-]/gu, '_').slice(0, 255)
+        formData.append("files", new File([file], safeName, { type: file.type }));
+    }
+
+    const response = await api.post("/api/upload", formData, {
+        headers: {
+            "Content-Type": "multipart/form-data",
+        },
+    });
+
+    return Array.isArray(response.data) ? response.data : [];
+};
+
 export const deleteFile = async (fileId) => {
     await api.delete(`/api/upload/files/${fileId}`);
 };

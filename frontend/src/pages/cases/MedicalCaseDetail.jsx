@@ -22,6 +22,7 @@ import Button from '../../components/ui/Button'
 import Badge from '../../components/ui/Badge'
 import Modal from '../../components/ui/Modal'
 import Select from '../../components/ui/Select'
+import SearchableSelect from '../../components/ui/SearchableSelect'
 import Textarea from '../../components/ui/Textarea'
 import Input from '../../components/ui/Input'
 import { useToast } from '../../components/ui/Toast'
@@ -29,7 +30,8 @@ import useAuthStore from '../../stores/authStore'
 import { formatKztAsUsd, useUsdRate } from '../../hooks/useUsdRate'
 import CaseSlotPicker from '../../components/cases/CaseSlotPicker'
 import CaseConsultationsPanel from '../../components/cases/CaseConsultationsPanel'
-import { cn } from '../../utils/helpers'
+import CaseChatPanel from '../../components/cases/CaseChatPanel'
+import { cn, getDoctorSpecLabel } from '../../utils/helpers'
 import { formatDateTimeInTimeZone, getDeviceTimeZone, KAZAKHSTAN_TIME_ZONE } from '../../utils/kazakhstanTime'
 import {
   documentsAPI,
@@ -1874,12 +1876,21 @@ function MedicalCaseDetail() {
                       options={clinics.map(clinic => ({ value: getRef(clinic), label: clinic.name }))}
                     />
                   )}
-                  <Select
+                  {/* Врачей больше полусотни — нативный select без поиска листать неудобно.
+                      Специальность в подписи, чтобы находить врача и по ней. */}
+                  <SearchableSelect
                     label={t('admin_apt.col_doctor')}
                     value={form.doctor}
-                    onChange={(e) => update('doctor', e.target.value)}
+                    onChange={(doctor) => update('doctor', doctor)}
                     placeholder={t('case_detail.not_assigned_placeholder')}
-                    options={selectedClinicDoctors.map(doctor => ({ value: getRef(doctor), label: doctor.fullName }))}
+                    searchPlaceholder={t('case_detail.doctor_search_placeholder')}
+                    options={[
+                      { value: '', label: t('case_detail.not_assigned_placeholder') },
+                      ...selectedClinicDoctors.map(doctor => {
+                        const specs = getDoctorSpecLabel(doctor, i18n.language)
+                        return { value: getRef(doctor), label: specs ? `${doctor.fullName} · ${specs}` : doctor.fullName }
+                      }),
+                    ]}
                   />
                   {role === 'admin' && (
                     <Select
@@ -2051,6 +2062,8 @@ function MedicalCaseDetail() {
             </CardContent>
             </Card>
           )}
+
+          {canManage && <CaseChatPanel caseId={medicalCase.documentId || medicalCase.id} />}
 
           {/*
           Finance ledger is temporarily hidden from the case page.

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowDown, ArrowUp, Check, Eye, EyeOff, ImagePlus, Loader2, MapPinned, Plus, RotateCcw, Save, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Eye, EyeOff, ImagePlus, Images, Loader2, MapPinned, Plus, RotateCcw, Save, Trash2, X } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import LocalizedFields from '../../components/admin/LocalizedFields'
+import TourismPageSettings from '../../components/admin/TourismPageSettings'
 import { useToast } from '../../components/ui/Toast'
-import { contentAPI, deleteFile, normalizeResponse, uploadFile } from '../../services/api'
+import { contentAPI, deleteFile, normalizeResponse, uploadFile, uploadFiles } from '../../services/api'
 import {
   localizeTourismRegion,
   resolveTourismImage,
@@ -12,6 +13,7 @@ import {
   tourismTypes,
 } from '../../data/kazakhstanTourism'
 import { cn } from '../../utils/helpers'
+import { getMediaId, isAcceptableImage, linesToArray, toStoredMedia, uniqueSlug, withOrder } from '../../utils/adminMedia'
 
 /**
  * Места на странице «Туризм»: регионы, курорты, маршруты — всё, куда пациент
@@ -34,6 +36,12 @@ const copyByLanguage = {
     loadError: 'Не удалось загрузить места', saveError: 'Не удалось сохранить места', saved: 'Места сохранены',
     nameRequired: 'У каждого показываемого места должно быть название на русском',
     empty: 'Мест пока нет — добавьте первое.', leaveConfirm: 'Есть несохранённые изменения. Уйти со страницы?',
+    rateLimited: 'Слишком много загрузок подряд — подождите несколько минут и повторите.',
+    tabPlaces: 'Места', tabPage: 'Страница «Туризм»',
+    gallery: 'Галерея', galleryHint: 'До 20 фото. В карточке места обложка показывается первой, дальше — эти фото по порядку.',
+    galleryUpload: 'Добавить фото', galleryEmpty: 'Пока только обложка. Добавьте фото, чтобы в карточке места их можно было листать.',
+    galleryLimit: 'В галерее не больше 20 фото', removePhoto: 'Убрать фото', moveLeft: 'Раньше', moveRight: 'Позже',
+    details: 'Подробное описание (в открытой карточке)', detailsHint: 'Абзацы разделяйте пустой строкой',
     preview: 'Открыть страницу', cleanupWarning: 'Изменения сохранены, но старые фото не удалось удалить из хранилища.',
   },
   en: {
@@ -50,6 +58,12 @@ const copyByLanguage = {
     loadError: 'Failed to load places', saveError: 'Failed to save places', saved: 'Places saved',
     nameRequired: 'Every visible place needs a Russian name',
     empty: 'No places yet — add the first one.', leaveConfirm: 'You have unsaved changes. Leave the page?',
+    rateLimited: 'Too many uploads in a row — wait a few minutes and try again.',
+    tabPlaces: 'Places', tabPage: 'Tourism page',
+    gallery: 'Gallery', galleryHint: 'Up to 20 photos. The place card shows the cover first, then these photos in order.',
+    galleryUpload: 'Add photos', galleryEmpty: 'Only the cover so far. Add photos so visitors can browse them in the place card.',
+    galleryLimit: 'The gallery holds at most 20 photos', removePhoto: 'Remove photo', moveLeft: 'Earlier', moveRight: 'Later',
+    details: 'Full description (in the opened card)', detailsHint: 'Separate paragraphs with an empty line',
     preview: 'Open page', cleanupWarning: 'Saved, but old photos could not be removed from storage.',
   },
   kk: {
@@ -66,47 +80,23 @@ const copyByLanguage = {
     loadError: 'Орындарды жүктеу мүмкін болмады', saveError: 'Орындарды сақтау мүмкін болмады', saved: 'Орындар сақталды',
     nameRequired: 'Көрсетілетін әр орынның орысша атауы болуы керек',
     empty: 'Әзірге орын жоқ — алғашқысын қосыңыз.', leaveConfirm: 'Сақталмаған өзгерістер бар. Беттен шығасыз ба?',
+    rateLimited: 'Қатарынан тым көп жүктеу — бірнеше минут күтіп, қайталаңыз.',
+    tabPlaces: 'Орындар', tabPage: '«Туризм» беті',
+    gallery: 'Галерея', galleryHint: '20 фотоға дейін. Орын карточкасында алдымен мұқаба, одан кейін осы фотолар ретімен көрсетіледі.',
+    galleryUpload: 'Фото қосу', galleryEmpty: 'Әзірге тек мұқаба. Карточкада парақтау үшін фото қосыңыз.',
+    galleryLimit: 'Галереяда 20 фотодан аспауы керек', removePhoto: 'Фотоны алып тастау', moveLeft: 'Алдыға', moveRight: 'Артқа',
+    details: 'Толық сипаттама (ашылған карточкада)', detailsHint: 'Абзацтарды бос жолмен бөліңіз',
     preview: 'Бетті ашу', cleanupWarning: 'Сақталды, бірақ ескі суреттерді қоймадан жою мүмкін болмады.',
   },
 }
 
-const imageTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
-const maxImageBytes = 10 * 1024 * 1024
 const defaultImage = '/tourism/astana.jpg'
 const LOCALES = ['ru', 'en', 'kk']
+const MAX_GALLERY = 20
 
 const clone = (value) => JSON.parse(JSON.stringify(value))
-const getMediaId = (media) => (media && typeof media === 'object' ? Number(media.id) || null : null)
 
-// Сервер принимает только пути (/api/file-proxy/…, /uploads/…): S3-провайдер
-// отдаёт полный адрес, а сохранённый адрес не должен зависеть от домена.
-const toStoredMedia = (media) => {
-  let url = media.url
-  if (typeof url === 'string' && url.startsWith('http')) {
-    try {
-      const parsed = new URL(url)
-      if (parsed.pathname.startsWith('/uploads/') || parsed.pathname.startsWith('/api/file-proxy/')) {
-        url = `${parsed.pathname}${parsed.search}`
-      }
-    } catch {
-      // оставляем как есть — сервер отклонит, админ увидит ошибку
-    }
-  }
-  return { id: media.id, url, name: media.name || '', alternativeText: media.alternativeText || '' }
-}
-
-const transliterateSlug = (value) => {
-  const map = { а: 'a', ә: 'a', б: 'b', в: 'v', г: 'g', ғ: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'i', і: 'i', к: 'k', қ: 'q', л: 'l', м: 'm', н: 'n', ң: 'n', о: 'o', ө: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ұ: 'u', ү: 'u', ф: 'f', х: 'h', һ: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya' }
-  return String(value || '').toLocaleLowerCase('ru').split('').map((char) => map[char] ?? char).join('')
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70)
-}
-
-const withOrder = (items) => items.map((item, index) => ({ ...item, sortOrder: index + 1 }))
-
-// Строки «Что посмотреть» редактируются как текст, в данных — массив.
-const linesToArray = (value) => String(value || '').split('\n').map((line) => line.trim()).filter(Boolean)
-
-function AdminTourism() {
+function TourismPlacesEditor({ hidden }) {
   const { i18n } = useTranslation()
   const language = ['ru', 'en', 'kk'].includes(i18n.language) ? i18n.language : 'ru'
   const copy = copyByLanguage[language]
@@ -148,7 +138,8 @@ function AdminTourism() {
         const resolved = withOrder(resolveTourismRegions(data?.tourismRegions).map((item) => ({
           ...item,
           isActive: item.isActive !== false,
-          content: Object.fromEntries(LOCALES.map((locale) => [locale, { name: '', center: '', summary: '', highlights: [], ...(item.content?.[locale] || {}) }])),
+          gallery: Array.isArray(item.gallery) ? item.gallery : [],
+          content: Object.fromEntries(LOCALES.map((locale) => [locale, { name: '', center: '', summary: '', details: '', highlights: [], ...(item.content?.[locale] || {}) }])),
         })))
         setPlaces(resolved)
         setSavedPlaces(clone(resolved))
@@ -213,20 +204,18 @@ function AdminTourism() {
   const addPlace = () => {
     const name = window.prompt(copy.newName, '')?.trim()
     if (!name) return
-    const base = transliterateSlug(name) || 'place'
-    const used = new Set(places.map((place) => place.id))
-    let id = base
-    for (let suffix = 2; used.has(id); suffix += 1) id = `${base}-${suffix}`
+    const id = uniqueSlug(name, places.map((place) => place.id), 'place')
     const place = {
       id,
       image: defaultImage,
+      gallery: [],
       types: [],
       isActive: true,
       sortOrder: places.length + 1,
       content: {
-        ru: { name, center: '', summary: '', highlights: [] },
-        en: { name: '', center: '', summary: '', highlights: [] },
-        kk: { name: '', center: '', summary: '', highlights: [] },
+        ru: { name, center: '', summary: '', details: '', highlights: [] },
+        en: { name: '', center: '', summary: '', details: '', highlights: [] },
+        kk: { name: '', center: '', summary: '', details: '', highlights: [] },
       },
     }
     setPlaces((items) => withOrder([...items, place]))
@@ -246,7 +235,7 @@ function AdminTourism() {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file || !activePlace) return
-    if (!imageTypes.has(file.type) || file.size > maxImageBytes) {
+    if (!isAcceptableImage(file)) {
       toast.warning(copy.uploadError)
       return
     }
@@ -258,10 +247,54 @@ function AdminTourism() {
       toast.success(copy.uploaded)
     } catch (error) {
       console.error('Error uploading tourism image:', error)
-      toast.error(copy.uploadError)
+      toast.error(error?.response?.status === 429 ? copy.rateLimited : copy.uploadError)
     } finally {
       setIsUploading(false)
     }
+  }
+
+  // Фото галереи. Место запоминаем до загрузки: пока файлы грузятся, админ
+  // может переключиться на другое место.
+  const handleGalleryUpload = async (event) => {
+    const files = [...(event.target.files || [])]
+    event.target.value = ''
+    if (!files.length || !activePlace) return
+    const placeId = activePlace.id
+    const free = MAX_GALLERY - (activePlace.gallery?.length || 0)
+    if (files.length > free) toast.warning(copy.galleryLimit)
+    const accepted = files.slice(0, Math.max(free, 0))
+    if (accepted.some((file) => !isAcceptableImage(file))) toast.warning(copy.uploadError)
+    const valid = accepted.filter(isAcceptableImage)
+    if (!valid.length) return
+    setIsUploading(true)
+    try {
+      const uploaded = await uploadFiles(valid)
+      uploaded.forEach((file) => pendingUploadIds.current.add(Number(file.id)))
+      const media = uploaded.map(toStoredMedia)
+      setPlaces((items) => items.map((item) => (
+        item.id === placeId ? { ...item, gallery: [...(item.gallery || []), ...media].slice(0, MAX_GALLERY) } : item
+      )))
+      toast.success(copy.uploaded)
+    } catch (error) {
+      console.error('Error uploading tourism gallery:', error)
+      toast.error(error?.response?.status === 429 ? copy.rateLimited : copy.uploadError)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const removeGalleryPhoto = (photoIndex) => {
+    if (!activePlace) return
+    updatePlace({ gallery: activePlace.gallery.filter((_, index) => index !== photoIndex) })
+  }
+
+  const moveGalleryPhoto = (photoIndex, direction) => {
+    if (!activePlace) return
+    const target = photoIndex + direction
+    if (target < 0 || target >= activePlace.gallery.length) return
+    const gallery = [...activePlace.gallery]
+    ;[gallery[photoIndex], gallery[target]] = [gallery[target], gallery[photoIndex]]
+    updatePlace({ gallery })
   }
 
   const handleDiscard = () => {
@@ -284,9 +317,10 @@ function AdminTourism() {
       await contentAPI.updateGlobal({ tourismRegions: payload })
 
       // Фото, которые больше нигде не используются, удаляем из хранилища.
-      const usedIds = new Set(payload.map((place) => getMediaId(place.image)).filter(Boolean))
+      const placeMediaIds = (place) => [place.image, ...(place.gallery || [])].map(getMediaId)
+      const usedIds = new Set(payload.flatMap(placeMediaIds).filter(Boolean))
       const replacedIds = [...new Set([
-        ...savedPlaces.map((place) => getMediaId(place.image)),
+        ...savedPlaces.flatMap(placeMediaIds),
         ...pendingUploadIds.current,
       ])].filter((id) => id && !usedIds.has(id))
       const cleanup = await Promise.allSettled(replacedIds.map((id) => deleteFile(id)))
@@ -306,14 +340,14 @@ function AdminTourism() {
     }
   }
 
+  if (hidden) return null
   if (isLoading) return <div className='flex justify-center py-20'><Loader2 className='h-8 w-8 animate-spin text-teal-600' /></div>
 
   return (
-    <div className='space-y-6 pb-16'>
+    <div className='space-y-6'>
       <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
         <div>
-          <h1 className='text-2xl font-bold text-slate-950'>{copy.title}</h1>
-          <p className='mt-1 text-slate-600'>{copy.subtitle}</p>
+          <p className='text-slate-600'>{copy.subtitle}</p>
           {isDirty && <p className='mt-2 text-sm font-medium text-amber-600'>{copy.unsaved}</p>}
         </div>
         <div className='flex flex-wrap gap-2'>
@@ -382,6 +416,48 @@ function AdminTourism() {
             </section>
 
             <section className='rounded-3xl border border-slate-200 bg-white p-5 sm:p-7'>
+              <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+                <div>
+                  <h2 className='flex items-center gap-2 text-lg font-bold text-slate-900'><Images className='h-5 w-5 text-teal-600' />{copy.gallery}</h2>
+                  <p className='mt-1 text-xs text-slate-500'>{copy.galleryHint}</p>
+                </div>
+                <label className={cn('inline-flex shrink-0', activePlace.gallery.length >= MAX_GALLERY ? 'pointer-events-none opacity-50' : 'cursor-pointer')}>
+                  <input type='file' multiple accept='image/jpeg,image/png,image/webp' className='hidden' onChange={handleGalleryUpload} disabled={isUploading || activePlace.gallery.length >= MAX_GALLERY} data-testid='tourism-gallery-input' />
+                  <span className='inline-flex items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-200'>
+                    {isUploading ? <Loader2 className='h-4 w-4 animate-spin' /> : <ImagePlus className='h-4 w-4' />}
+                    {isUploading ? copy.uploading : copy.galleryUpload}
+                  </span>
+                </label>
+              </div>
+              {activePlace.gallery.length === 0 ? (
+                <p className='mt-5 rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500'>{copy.galleryEmpty}</p>
+              ) : (
+                <ul className='mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4'>
+                  {activePlace.gallery.map((media, photoIndex) => (
+                    <li key={`${getMediaId(media) || resolveTourismImage(media)}-${photoIndex}`} className='group relative aspect-[4/3] overflow-hidden rounded-xl bg-slate-100'>
+                      <img src={resolveTourismImage(media)} alt='' className='h-full w-full object-cover' />
+                      <span className='absolute left-2 top-2 rounded-full bg-slate-950/60 px-2 py-0.5 text-[11px] font-medium text-white'>{photoIndex + 2}</span>
+                      <button type='button' onClick={() => removeGalleryPhoto(photoIndex)} aria-label={copy.removePhoto} title={copy.removePhoto}
+                        className='absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-rose-600 shadow hover:bg-white'>
+                        <X className='h-4 w-4' />
+                      </button>
+                      <div className='absolute inset-x-2 bottom-2 flex justify-between'>
+                        <button type='button' onClick={() => moveGalleryPhoto(photoIndex, -1)} disabled={photoIndex === 0} aria-label={copy.moveLeft} title={copy.moveLeft}
+                          className='flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow hover:bg-white disabled:opacity-40'>
+                          <ArrowLeft className='h-4 w-4' />
+                        </button>
+                        <button type='button' onClick={() => moveGalleryPhoto(photoIndex, 1)} disabled={photoIndex === activePlace.gallery.length - 1} aria-label={copy.moveRight} title={copy.moveRight}
+                          className='flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow hover:bg-white disabled:opacity-40'>
+                          <ArrowRight className='h-4 w-4' />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className='rounded-3xl border border-slate-200 bg-white p-5 sm:p-7'>
               <h2 className='mb-5 text-lg font-bold text-slate-900'>{copy.content}</h2>
               <LocalizedFields
                 key={activePlace.id}
@@ -389,6 +465,7 @@ function AdminTourism() {
                   { key: 'name', label: copy.name, required: true, maxLength: 200 },
                   { key: 'center', label: copy.center, maxLength: 200 },
                   { key: 'summary', label: copy.summary, multiline: true, rows: 3, maxLength: 2000 },
+                  { key: 'details', label: `${copy.details} — ${copy.detailsHint}`, multiline: true, rows: 6, maxLength: 8000 },
                   { key: 'highlights', label: `${copy.highlights} — ${copy.highlightsHint}`, multiline: true, rows: 4 },
                 ]}
                 getValue={getValue}
@@ -439,6 +516,46 @@ function AdminTourism() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Admin > Туризм: «Места» — карточки регионов и курортов; «Страница» —
+ * картинка первого экрана и маршруты из турпакета. У вкладок своё сохранение;
+ * скрытая вкладка не размонтируется, чтобы не терять несохранённое.
+ */
+function AdminTourism() {
+  const { i18n } = useTranslation()
+  const language = ['ru', 'en', 'kk'].includes(i18n.language) ? i18n.language : 'ru'
+  const copy = copyByLanguage[language]
+  const [tab, setTab] = useState('places')
+  const tabs = [['places', copy.tabPlaces], ['page', copy.tabPage]]
+
+  return (
+    <div className='space-y-6 pb-16'>
+      <div>
+        <h1 className='text-2xl font-bold text-slate-950'>{copy.title}</h1>
+        <div role='tablist' className='mt-4 inline-flex rounded-xl bg-slate-100 p-1'>
+          {tabs.map(([id, label]) => (
+            <button
+              key={id}
+              type='button'
+              role='tab'
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={cn(
+                'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
+                tab === id ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600 hover:text-slate-900',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <TourismPlacesEditor hidden={tab !== 'places'} />
+      <TourismPageSettings hidden={tab !== 'page'} />
     </div>
   )
 }

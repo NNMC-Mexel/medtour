@@ -109,12 +109,14 @@ function PublicLayout() {
         ["instagram", Instagram, "Instagram"],
     ].filter(([kind]) => !messengersOnPhones.has(kind) && contactHref(kind, contacts[kind]));
 
-    // Пункты и подписи — из Admin > Контент сайта > Шапка и меню.
+    // Пункты и подписи — из Admin > Контент сайта > Шапка и меню. Пустая
+    // подпись — стандартная для языка (как обещает подсказка в админке), а не
+    // русская: иначе переименованный по-русски пункт был по-русски и на en/kk.
     const navLinks = NAV_ITEMS
         .filter((item) => siteContent.navigation.items[item.id]?.visible !== false)
         .map((item) => ({
             ...item,
-            label: pickLocalized(siteContent.navigation.items[item.id]?.label, lang) || t(item.labelKey),
+            label: String(siteContent.navigation.items[item.id]?.label?.[lang] || "").trim() || t(item.labelKey),
         }));
 
     // На лендинге подсвечиваем пункт той секции, до которой докрутили;
@@ -148,7 +150,7 @@ function PublicLayout() {
             {/* Mobile Menu Overlay */}
             <div
                 className={cn(
-                    'fixed inset-0 bg-slate-900/50 z-40 lg:hidden transition-opacity duration-300',
+                    'fixed inset-0 bg-slate-900/50 z-40 xl:hidden transition-opacity duration-300',
                     isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
                 )}
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -157,7 +159,7 @@ function PublicLayout() {
             {/* Mobile Menu Panel */}
             <div
                 className={cn(
-                    'fixed left-0 top-0 h-(--app-height) w-72 bg-white z-60 transition-transform duration-300 lg:hidden flex flex-col',
+                    'fixed left-0 top-0 h-(--app-height) w-72 bg-white z-60 transition-transform duration-300 xl:hidden flex flex-col',
                     isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
                 )}
             >
@@ -274,8 +276,9 @@ function PublicLayout() {
                             </div>
                         </Link>
 
-                        {/* Desktop Navigation */}
-                        <nav className='hidden lg:flex items-center gap-5'>
+                        {/* Desktop Navigation — с 1280 px: на 1024 восемь пунктов, язык и
+                            кнопки входа не помещаются в строку, там — меню-бургер. */}
+                        <nav className='hidden xl:flex items-center gap-5 whitespace-nowrap'>
                             {navLinks.map((link) => (
                                 <Link
                                     key={link.id}
@@ -296,7 +299,7 @@ function PublicLayout() {
                         </nav>
 
                         {/* Right: Auth + Language */}
-                        <div className='hidden lg:flex items-center gap-3'>
+                        <div className='hidden xl:flex items-center gap-3'>
                             <LanguageSwitcher variant={showDarkHeader ? "dark" : "light"} />
 
                             {isAuthenticated ? (
@@ -388,7 +391,7 @@ function PublicLayout() {
                         <button
                             onClick={() => setIsMobileMenuOpen(true)}
                             className={cn(
-                                "lg:hidden p-2 rounded-lg transition-colors",
+                                "xl:hidden p-2 rounded-lg transition-colors",
                                 showDarkHeader
                                     ? "text-white hover:bg-white/10"
                                     : "text-slate-700 hover:bg-slate-100",

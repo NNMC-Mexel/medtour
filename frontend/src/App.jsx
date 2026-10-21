@@ -149,11 +149,44 @@ function ScrollRestoration() {
 
   useEffect(() => {
     if (location.hash) {
-      const id = location.hash.slice(1)
-      window.requestAnimationFrame(() => {
-        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
-      })
-      return
+      // Переход на /#contact с другой страницы: главная грузится лениво, и к
+      // первому кадру блока ещё нет — раньше страница оставалась наверху.
+      // Ждём блок до ~3 с; появившийся позже — без анимации, иначе плавная
+      // прокрутка промахивается, пока страница дорастает.
+      // Пока страница дорастает (картинки, ленивые секции), блок уезжает вниз:
+      // ~2,5 с доводим его к верху при каждом изменении высоты, но перестаём,
+      // как только посетитель сам начал прокручивать.
+      const id = decodeURIComponent(location.hash.slice(1))
+      let frame = 0
+      let attempts = 0
+      let stopSettling = () => {}
+      const settle = (target) => {
+        const observer = new ResizeObserver(() => target.scrollIntoView({ block: 'start' }))
+        const userEvents = ['wheel', 'touchstart', 'keydown', 'pointerdown']
+        const timer = window.setTimeout(() => stopSettling(), 2500)
+        stopSettling = () => {
+          observer.disconnect()
+          window.clearTimeout(timer)
+          userEvents.forEach((type) => window.removeEventListener(type, stopSettling))
+        }
+        userEvents.forEach((type) => window.addEventListener(type, stopSettling, { passive: true }))
+        observer.observe(document.body)
+      }
+      const scrollToTarget = () => {
+        const target = document.getElementById(id)
+        if (target) {
+          target.scrollIntoView({ behavior: attempts === 0 ? 'smooth' : 'auto', block: 'start' })
+          settle(target)
+          return
+        }
+        attempts += 1
+        if (attempts < 180) frame = window.requestAnimationFrame(scrollToTarget)
+      }
+      frame = window.requestAnimationFrame(scrollToTarget)
+      return () => {
+        window.cancelAnimationFrame(frame)
+        stopSettling()
+      }
     }
 
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })

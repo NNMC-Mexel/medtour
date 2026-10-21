@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
+  ArrowRight,
   Building2,
+  Camera,
   Check,
   ChevronRight,
   Compass,
@@ -23,8 +25,20 @@ import {
   Waves,
 } from 'lucide-react'
 import Button from '../components/ui/Button'
-import { localizeTourismRegion, resolveTourismImage, resolveTourismRegions, tourismPageCopy, tourismTypes } from '../data/kazakhstanTourism'
+import TourismPlaceModal from '../components/tourism/TourismPlaceModal'
+import {
+  DEFAULT_TOURISM_HERO,
+  localizeTourismRegion,
+  localizeTourismTour,
+  resolveTourismImage,
+  resolveTourismPage,
+  resolveTourismRegions,
+  tourismPageCopy,
+  tourismPhotos,
+  tourismTypes,
+} from '../data/kazakhstanTourism'
 import { contentAPI, normalizeResponse } from '../services/api'
+import useAuthStore from '../stores/authStore'
 import { cn } from '../utils/helpers'
 import useSeo from '../components/seo/useSeo'
 
@@ -43,25 +57,6 @@ const typeIcons = {
   space: Rocket,
 }
 
-const signatureTours = [
-  {
-    id: 'burabay-day',
-    name: { ru: 'Бурабай: лес, озёра и легенды', en: 'Burabay: forests, lakes and legends', kk: 'Бурабай: орман, көлдер және аңыздар' },
-    label: { ru: 'Однодневный маршрут из Астаны', en: 'Day route from Astana', kk: 'Астанадан бір күндік бағыт' },
-    text: { ru: 'Болектау, Окжетпес, Жумбактас, поляна Абылай хана и прогулка вдоль озера в окружении соснового леса.', en: 'Bolektau, Okzhetpes, Zhumbaktas, Abylai Khan meadow and a lakeside walk through pine forest.', kk: 'Бөлектау, Оқжетпес, Жұмбақтас, Абылай хан алаңы және қарағайлы ормандағы көл жағалауы.' },
-    image: '/tourism/burabay.jpg',
-    highlights: { ru: ['Трансфер из Астаны', 'Гид и национальный парк', 'Маршрут можно адаптировать'], en: ['Transfer from Astana', 'Guide and national park', 'Adaptable itinerary'], kk: ['Астанадан трансфер', 'Гид және ұлттық парк', 'Бағытты бейімдеуге болады'] },
-  },
-  {
-    id: 'bayanaul-day',
-    name: { ru: 'Баянаул: природная перезагрузка', en: 'Bayanaul: a natural reset', kk: 'Баянауыл: табиғаттағы тынығу' },
-    label: { ru: 'Насыщенный однодневный маршрут', en: 'Immersive day route', kk: 'Мазмұнды бір күндік бағыт' },
-    text: { ru: 'Озеро Жасыбай, Коныр-Аулие, скалы Саймантас и Кемпиртас, Аулие-Булак и панорамные тропы национального парка.', en: 'Lake Jasybay, Konyr-Aulie, Saimantas and Kempirtas rocks, Aulie-Bulak spring and panoramic park trails.', kk: 'Жасыбай көлі, Қоңыр Әулие, Саймантас пен Кемпіртас жартастары, Әулие бұлақ және ұлттық парк соқпақтары.' },
-    image: '/tourism/bayanaul.webp',
-    highlights: { ru: ['Трансфер из Астаны', 'Сопровождение гида', 'Природа и сакральные места'], en: ['Transfer from Astana', 'Guide support', 'Nature and sacred sites'], kk: ['Астанадан трансфер', 'Гид сүйемелдеуі', 'Табиғат және киелі орындар'] },
-  },
-]
-
 function localize(value, lang) {
   if (!value || typeof value === 'string') return value || ''
   return value[lang] || value.ru || value.en || ''
@@ -72,8 +67,13 @@ function TourismPage() {
   useSeo({ title: i18n.t('seo.tourism_title'), description: i18n.t('seo.tourism_description'), path: '/tourism' })
   const lang = i18n.language?.split('-')?.[0] || 'ru'
   const copy = tourismPageCopy[lang] || tourismPageCopy.ru
+  const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [selectedType, setSelectedType] = useState('all')
   const [storedRegions, setStoredRegions] = useState(null)
+  const [storedPage, setStoredPage] = useState(null)
+  const [isContentLoaded, setIsContentLoaded] = useState(false)
+  const [openPlaceId, setOpenPlaceId] = useState(null)
 
   useEffect(() => {
     let active = true
@@ -82,10 +82,28 @@ function TourismPage() {
         if (!active) return
         const { data } = normalizeResponse(response) || {}
         setStoredRegions(data?.tourismRegions || null)
+        setStoredPage(data?.tourismPage || null)
       })
       .catch(() => {})
+      .finally(() => { if (active) setIsContentLoaded(true) })
     return () => { active = false }
   }, [])
+
+  const page = useMemo(() => resolveTourismPage(storedPage), [storedPage])
+  // Пока Global не ответил, первый экран без картинки: иначе встроенная
+  // картинка мелькала бы перед загруженной из админки.
+  const heroImage = isContentLoaded ? (resolveTourismImage(page.heroImage) || DEFAULT_TOURISM_HERO) : ''
+  const tours = useMemo(
+    () => page.tours.filter((tour) => tour.isActive !== false).map((tour) => localizeTourismTour(tour, lang)),
+    [lang, page.tours],
+  )
+
+  // Подбор маршрута — через чат с менеджером; у сотрудников виджета нет,
+  // им — контакты на главной.
+  const openPlanner = () => {
+    if (!user || user.userRole === 'patient') window.dispatchEvent(new Event('medtour:open-support-chat'))
+    else navigate('/#contact')
+  }
 
   const regions = useMemo(
     () => resolveTourismRegions(storedRegions)
@@ -104,15 +122,19 @@ function TourismPage() {
     return regions.filter((region) => region.types.includes(selectedType))
   }, [regions, selectedType])
 
+  const openPlace = regions.find((region) => region.id === openPlaceId) || null
+
   return (
     <div className='bg-white text-slate-900'>
       <section className='relative min-h-[760px] overflow-hidden pt-28 text-white'>
         <div className='absolute inset-0'>
-          <img
-            src='/kazakhstan-tourism-hero.png'
-            alt=''
-            className='h-full w-full object-cover'
-          />
+          {heroImage && (
+            <img
+              src={heroImage}
+              alt=''
+              className='h-full w-full object-cover'
+            />
+          )}
           <div className='absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-900/55 to-slate-950/20' />
           <div className='absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-white to-transparent' />
         </div>
@@ -208,21 +230,23 @@ function TourismPage() {
         </div>
       </section>
 
-      <section className='bg-[#f4f7fb] py-20'>
-        <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
-          <div className='max-w-3xl'>
-            <span className='text-xs font-bold uppercase tracking-[.18em] text-mt-coral'>{lang === 'en' ? 'Routes from the tour package' : lang === 'kk' ? 'Турпакет бағыттары' : 'Маршруты из турпакета'}</span>
-            <h2 className='mt-4 text-3xl font-semibold tracking-[-.03em] text-mt-ink sm:text-4xl'>{lang === 'en' ? 'Two ways to discover nature from Astana' : lang === 'kk' ? 'Астанадан табиғатқа екі бағыт' : 'Два способа открыть природу из Астаны'}</h2>
-            <p className='mt-4 text-lg leading-8 text-[#626b82]'>{lang === 'en' ? 'The program includes the core logistics and can be adjusted to the patient’s condition and doctor’s guidance.' : lang === 'kk' ? 'Бағдарлама негізгі логистиканы қамтиды және дәрігер ұсынысына қарай бейімделеді.' : 'В программу входит основная логистика; темп и состав маршрута можно адаптировать под состояние пациента и рекомендации врача.'}</p>
+      {tours.length > 0 && (
+        <section className='bg-[#f4f7fb] py-20'>
+          <div className='mx-auto max-w-7xl px-4 sm:px-6 lg:px-8'>
+            <div className='max-w-3xl'>
+              <span className='text-xs font-bold uppercase tracking-[.18em] text-mt-coral'>{copy.toursBadge}</span>
+              <h2 className='mt-4 text-3xl font-semibold tracking-[-.03em] text-mt-ink sm:text-4xl'>{copy.toursTitle}</h2>
+              <p className='mt-4 text-lg leading-8 text-[#626b82]'>{copy.toursText}</p>
+            </div>
+            <div className='mt-10 grid gap-6 lg:grid-cols-2'>
+              {tours.map((tour) => <article key={tour.id} className='group overflow-hidden rounded-[2rem] border border-[#dfe3ec] bg-white shadow-sm'>
+                <div className='h-72 overflow-hidden'><img src={resolveTourismImage(tour.image)} alt={tour.name} loading='lazy' className='h-full w-full object-cover transition duration-700 group-hover:scale-105' /></div>
+                <div className='p-7 sm:p-8'>{tour.label && <div className='text-xs font-bold uppercase tracking-[.14em] text-mt-blue'>{tour.label}</div>}<h3 className='mt-3 text-2xl font-semibold text-mt-ink'>{tour.name}</h3>{tour.text && <p className='mt-4 leading-7 text-[#626b82]'>{tour.text}</p>}{tour.highlights.length > 0 && <div className='mt-6 flex flex-wrap gap-2'>{tour.highlights.map((item, itemIndex) => <span key={`${itemIndex}-${item}`} className='inline-flex items-center gap-2 rounded-full bg-[#edf2f9] px-3 py-2 text-xs font-medium text-[#39435f]'><Check className='h-3.5 w-3.5 text-mt-coral' />{item}</span>)}</div>}</div>
+              </article>)}
+            </div>
           </div>
-          <div className='mt-10 grid gap-6 lg:grid-cols-2'>
-            {signatureTours.map((tour) => <article key={tour.id} className='group overflow-hidden rounded-[2rem] border border-[#dfe3ec] bg-white shadow-sm'>
-              <div className='h-72 overflow-hidden'><img src={tour.image} alt={localize(tour.name, lang)} loading='lazy' className='h-full w-full object-cover transition duration-700 group-hover:scale-105' /></div>
-              <div className='p-7 sm:p-8'><div className='text-xs font-bold uppercase tracking-[.14em] text-mt-blue'>{localize(tour.label, lang)}</div><h3 className='mt-3 text-2xl font-semibold text-mt-ink'>{localize(tour.name, lang)}</h3><p className='mt-4 leading-7 text-[#626b82]'>{localize(tour.text, lang)}</p><div className='mt-6 flex flex-wrap gap-2'>{localize(tour.highlights, lang).map((item) => <span key={item} className='inline-flex items-center gap-2 rounded-full bg-[#edf2f9] px-3 py-2 text-xs font-medium text-[#39435f]'><Check className='h-3.5 w-3.5 text-mt-coral' />{item}</span>)}</div></div>
-            </article>)}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <section id='history' className='relative isolate scroll-mt-32 overflow-hidden bg-slate-950 py-20 text-white'>
         <div className='absolute inset-0 -z-10'>
@@ -271,11 +295,9 @@ function TourismPage() {
               <h2 className='mt-4 text-3xl font-bold text-slate-900 sm:text-4xl'>{copy.regionsTitle}</h2>
               <p className='mt-4 text-lg leading-8 text-slate-600'>{copy.regionsText}</p>
             </div>
-            <Link to='/register'>
-              <Button size='lg' className='w-full sm:w-auto' leftIcon={<Plane className='h-5 w-5' />}>
-                {copy.heroCta}
-              </Button>
-            </Link>
+            <Button size='lg' className='w-full sm:w-auto' onClick={openPlanner} leftIcon={<Plane className='h-5 w-5' />}>
+              {copy.planCta}
+            </Button>
           </div>
 
           <div className='mt-8 flex gap-2 overflow-x-auto pb-2'>
@@ -313,10 +335,15 @@ function TourismPage() {
           </div>
 
           <div className='mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3'>
-            {filteredRegions.map((region) => (
-              <article
+            {filteredRegions.map((region) => {
+              const photoCount = tourismPhotos(region).length
+              return (
+              <button
                 key={region.id}
-                className='group flex min-h-[460px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl'
+                type='button'
+                onClick={() => setOpenPlaceId(region.id)}
+                aria-haspopup='dialog'
+                className='group flex min-h-[460px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2'
               >
                 <div className='relative h-44 overflow-hidden bg-slate-200'>
                   <img
@@ -337,6 +364,12 @@ function TourismPage() {
                   <div className='absolute right-5 top-5 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-white/90 text-teal-700 shadow-sm backdrop-blur'>
                     <MapPinned className='h-5 w-5' />
                   </div>
+                  {photoCount > 1 && (
+                    <span className='absolute left-5 top-5 inline-flex items-center gap-1.5 rounded-full bg-slate-950/60 px-2.5 py-1 text-xs font-medium text-white backdrop-blur'>
+                      <Camera className='h-3.5 w-3.5' />
+                      {photoCount}
+                    </span>
+                  )}
                 </div>
 
                 <div className='flex flex-1 flex-col p-6'>
@@ -353,20 +386,36 @@ function TourismPage() {
                   {region.highlights.length > 0 && <div className='mt-5 border-t border-slate-100 pt-4'>
                     <div className='text-sm font-semibold text-slate-900'>{copy.highlightsLabel}</div>
                     <ul className='mt-3 space-y-2'>
-                      {region.highlights.map((item) => (
-                        <li key={item} className='flex gap-2 text-sm leading-6 text-slate-600'>
+                      {region.highlights.map((item, itemIndex) => (
+                        <li key={`${itemIndex}-${item}`} className='flex gap-2 text-sm leading-6 text-slate-600'>
                           <span className='mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-teal-500' />
                           {item}
                         </li>
                       ))}
                     </ul>
                   </div>}
+                  <span className='mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-teal-700'>
+                    {copy.moreLabel}
+                    <ArrowRight className='h-4 w-4 transition-transform group-hover:translate-x-0.5' />
+                  </span>
                 </div>
-              </article>
-            ))}
+              </button>
+              )
+            })}
           </div>
         </div>
       </section>
+
+      {openPlace && (
+        <TourismPlaceModal
+          key={openPlace.id}
+          place={openPlace}
+          copy={copy}
+          typeLabel={(type) => localize(tourismTypes[type], lang)}
+          onClose={() => setOpenPlaceId(null)}
+          onPlan={() => { setOpenPlaceId(null); openPlanner() }}
+        />
+      )}
     </div>
   )
 }

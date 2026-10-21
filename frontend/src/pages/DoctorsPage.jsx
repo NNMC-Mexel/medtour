@@ -13,7 +13,7 @@ import { Card, CardContent } from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import DoctorCard from '../components/doctors/DoctorCard'
 import useAppointmentStore from '../stores/appointmentStore'
-import { doctorMatchesSpec, getDoctorSpecNames, getSpecName } from '../utils/helpers'
+import { doctorMatchesSpec, getDoctorSpecNames, getSpecName, toDigits } from '../utils/helpers'
 import { SHOW_DOCTOR_PRICES } from '../utils/constants'
 import { useUsdRate } from '../hooks/useUsdRate'
 import useSeo from '../components/seo/useSeo'
@@ -38,6 +38,7 @@ function DoctorsPage() {
   const [sortBy, setSortBy] = useState('rating')
   const [showFilters, setShowFilters] = useState(false)
   const [priceRange, setPriceRange] = useState({ min: '', max: '' })
+  const [specSearch, setSpecSearch] = useState('')
 
   const { 
     doctors, 
@@ -86,6 +87,25 @@ function DoctorsPage() {
       }
     })
 
+  // Специальностей больше двух десятков, и список прокручивается внутри
+  // фильтра. Поиск ищет по всем трём языкам названия, чтобы «кардио» находило
+  // специальность независимо от текущей локали интерфейса.
+  const specNeedle = specSearch.trim().toLowerCase()
+  const visibleSpecializations = specNeedle
+    ? specializations.filter((spec) =>
+        [spec.name, spec.nameKk, spec.nameEn]
+          .filter(Boolean)
+          .some((name) => name.toLowerCase().includes(specNeedle))
+      )
+    : specializations
+
+  const resetFilters = () => {
+    setSelectedSpec('')
+    setPriceRange({ min: '', max: '' })
+    setSearchQuery('')
+    setSpecSearch('')
+  }
+
   const isInDashboard = basePath === '/patient'
 
   return (
@@ -107,11 +127,7 @@ function DoctorsPage() {
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="font-semibold text-slate-900">{t('doctors_page.filter_title')}</h3>
                   <button
-                    onClick={() => {
-                      setSelectedSpec('')
-                      setPriceRange({ min: '', max: '' })
-                      setSearchQuery('')
-                    }}
+                    onClick={resetFilters}
                     className="text-sm text-teal-600 hover:text-teal-700"
                   >
                     {t('doctors_page.reset_filters')}
@@ -123,6 +139,27 @@ function DoctorsPage() {
                   <label className="block text-sm font-medium text-slate-700 mb-3">
                     {t('doctors_page.spec_label')}
                   </label>
+                  <div className="relative mb-3">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      aria-label={t('doctors_page.spec_search_placeholder')}
+                      placeholder={t('doctors_page.spec_search_placeholder')}
+                      value={specSearch}
+                      onChange={(e) => setSpecSearch(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    />
+                    {specSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setSpecSearch('')}
+                        aria-label={t('common.clear_search')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -134,7 +171,7 @@ function DoctorsPage() {
                       />
                       <span className="text-sm text-slate-700">{t('doctors_page.all_specs')}</span>
                     </label>
-                    {specializations.map((spec) => (
+                    {visibleSpecializations.map((spec) => (
                       <label key={spec.id} className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="radio"
@@ -146,6 +183,9 @@ function DoctorsPage() {
                         <span className="text-sm text-slate-700">{getSpecName(spec, i18n.language)}</span>
                       </label>
                     ))}
+                    {specNeedle && visibleSpecializations.length === 0 && (
+                      <p className="py-2 text-sm text-slate-500">{t('doctors_page.spec_search_empty')}</p>
+                    )}
                   </div>
                 </div>
 
@@ -157,17 +197,21 @@ function DoctorsPage() {
                     </label>
                     <div className="flex gap-3">
                       <Input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        aria-label={`${t('doctors_page.price_label')}: ${t('doctors_page.price_from')}`}
                         placeholder={t('doctors_page.price_from')}
                         value={priceRange.min}
-                        onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
+                        onChange={(e) => setPriceRange({ ...priceRange, min: toDigits(e.target.value, 8) })}
                         className="text-sm"
                       />
                       <Input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
+                        aria-label={`${t('doctors_page.price_label')}: ${t('doctors_page.price_to')}`}
                         placeholder={t('doctors_page.price_to')}
                         value={priceRange.max}
-                        onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
+                        onChange={(e) => setPriceRange({ ...priceRange, max: toDigits(e.target.value, 8) })}
                         className="text-sm"
                       />
                     </div>
@@ -269,11 +313,7 @@ function DoctorsPage() {
                   </p>
                   <Button
                     variant="secondary"
-                    onClick={() => {
-                      setSelectedSpec('')
-                      setPriceRange({ min: '', max: '' })
-                      setSearchQuery('')
-                    }}
+                    onClick={resetFilters}
                   >
                     {t('doctors_page.reset_button')}
                   </Button>

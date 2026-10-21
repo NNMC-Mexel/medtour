@@ -803,25 +803,36 @@ async function strapiJson(path, token, options = {}) {
 // No positive token cache: a cached user kept a JWT working for minutes after
 // logout, password change or blocking. Sessions are re-checked on a timer instead.
 //
-// Returns { status: 'valid', user } | { status: 'revoked' } | { status: 'unknown' }.
+// Returns { status: 'valid', user } | { status: 'revoked', reason } | { status: 'unknown', reason }.
 // 'unknown' (Strapi unreachable, 5xx) must not drop a live video call.
-async function checkSocketSession(token) {
-  if (!token) return { status: 'revoked' }
-  const res = await fetch(`${STRAPI_API_URL}/api/users/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(5000),
-  }).catch(() => null)
+async function checkSocketSession(token, { timeoutMs = 5000 } = {}) {
+  if (!token) return { status: 'revoked', reason: 'no token' }
+  let res
+  try {
+    res = await fetch(`${STRAPI_API_URL}/api/users/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+  } catch (error) {
+    // Код сетевой ошибки (ENOTFOUND, ECONNREFUSED, таймаут) — без него в логах
+    // не отличить «Strapi недоступен» от «токен не принят».
+    const code = error?.cause?.code || error?.cause?.message || error?.message
+    return { status: 'unknown', reason: `Strapi unreachable (${code})` }
+  }
 
-  if (!res) return { status: 'unknown' }
-  if (res.status === 401 || res.status === 403) return { status: 'revoked' }
-  if (!res.ok) return { status: 'unknown' }
+  if (res.status === 401 || res.status === 403) return { status: 'revoked', reason: `Strapi /users/me ${res.status}` }
+  if (!res.ok) return { status: 'unknown', reason: `Strapi /users/me ${res.status}` }
   const user = await res.json().catch(() => null)
-  return user?.id ? { status: 'valid', user } : { status: 'unknown' }
+  return user?.id ? { status: 'valid', user } : { status: 'unknown', reason: 'Strapi /users/me returned no user' }
 }
 
+// При подключении Strapi могут не ответить с первого раза (холодный старт,
+// перезапуск) — одна повторная попытка с увеличенным таймаутом, прежде чем
+// отказать: иначе видеозвонок падает с «Ошибкой подключения».
 async function verifySocketToken(token) {
-  const session = await checkSocketSession(token)
-  return session.status === 'valid' ? session.user : null
+  let session = await checkSocketSession(token)
+  if (session.status === 'unknown') session = await checkSocketSession(token, { timeoutMs: 10000 })
+  return session
 }
 
 // Room access cache: roomId -> { patientId, doctorUserId, expiresAt }
@@ -910,9 +921,13 @@ async function revertInProgressToConfirmed(roomId) {
 // Auth middleware — rejects unauthenticated socket connections
 io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace('Bearer ', '')
-  const user = await verifySocketToken(token)
+  const session = await verifySocketToken(token)
+  const user = session.status === 'valid' ? session.user : null
   if (!user?.id) {
-    return next(new Error('Authentication required'))
+    console.warn(`[auth] socket rejected: ${session.reason} (STRAPI_API_URL=${STRAPI_API_URL})`)
+    const error = new Error(session.status === 'unknown' ? 'Auth service unavailable' : 'Authentication required')
+    error.data = { reason: session.reason }
+    return next(error)
   }
   socket.verifiedUser = user
   socket.verifiedUserId = user.id
@@ -1520,6 +1535,11 @@ configureRedisAdapter()
   .then(() => {
     server.listen(PORT, () => {
       console.log(`Signaling server running on port ${PORT}`)
+      // Сокеты авторизуются через Strapi: сразу видно в логах, достижим ли он
+      // по STRAPI_API_URL изнутри контейнера.
+      fetch(`${STRAPI_API_URL}/_health`, { signal: AbortSignal.timeout(10000) })
+        .then((res) => console.log(`[STARTUP] Strapi ${STRAPI_API_URL} reachable: HTTP ${res.status}`))
+        .catch((error) => console.error(`[STARTUP] Strapi ${STRAPI_API_URL} UNREACHABLE: ${error?.cause?.code || error?.cause?.message || error?.message}`))
     })
   })
   .catch((error) => {

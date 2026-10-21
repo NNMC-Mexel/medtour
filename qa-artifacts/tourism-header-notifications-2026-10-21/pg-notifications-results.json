@@ -1,0 +1,106 @@
+{
+  "passed": 20,
+  "total": 20,
+  "results": [
+    {
+      "id": "N1 patient: 3 unread → «Прочитать все» → 0",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N1 doctor: 3 unread → «Прочитать все» → 0",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N1 manager: 3 unread → «Прочитать все» → 0",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N1 coordinator: 3 unread → «Прочитать все» → 0",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N1 admin: 3 unread → «Прочитать все» → 0",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N2 another manager’s unread stay unread (5)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N3 nothing unread → 200 {count: 0}",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N4 anonymous: mark-all and unread-count refused",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N5 2600 unread → all marked in one request",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N5b it is fast (25 ms < 3000)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N6 the 50 newest in the bell are all read",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N7 marking one notification read still works",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N7b someone else cannot mark it (403)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N8 deleting own notification still works",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N9 a notification arriving afterwards is unread (1)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N10 manager UI: badge «9+» → empty after click and after reload; server 0",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N10 coordinator UI: badge «9+» → empty after click and after reload; server 0",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N10 doctor UI: badge «9+» → empty after click and after reload; server 0",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N11 doctor: «Прочитать все» on the Notifications page → 0",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "N12 no page errors / 5xx",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}
