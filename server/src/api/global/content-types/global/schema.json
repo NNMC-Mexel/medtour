@@ -43,6 +43,9 @@
     },
     "tourismRegions": {
       "type": "json"
+    },
+    "tourismPage": {
+      "type": "json"
     }
   }
 }

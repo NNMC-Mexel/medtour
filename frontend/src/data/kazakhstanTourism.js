@@ -64,6 +64,15 @@ export const tourismPageCopy = {
     allTypes: 'Все направления',
     centerLabel: 'Центр',
     highlightsLabel: 'Что посмотреть',
+    planCta: 'Подобрать маршрут',
+    moreLabel: 'Подробнее',
+    aboutPlace: 'О месте',
+    prevPhoto: 'Предыдущее фото',
+    nextPhoto: 'Следующее фото',
+    showPhoto: 'Показать фото {n}',
+    toursBadge: 'Маршруты из турпакета',
+    toursTitle: 'Два способа открыть природу из Астаны',
+    toursText: 'В программу входит основная логистика; темп и состав маршрута можно адаптировать под состояние пациента и рекомендации врача.',
   },
   en: {
     heroBadge: 'Tourism in Kazakhstan',
@@ -103,6 +112,15 @@ export const tourismPageCopy = {
     allTypes: 'All directions',
     centerLabel: 'Center',
     highlightsLabel: 'Highlights',
+    planCta: 'Plan a route',
+    moreLabel: 'Learn more',
+    aboutPlace: 'About the place',
+    prevPhoto: 'Previous photo',
+    nextPhoto: 'Next photo',
+    showPhoto: 'Show photo {n}',
+    toursBadge: 'Routes from the tour package',
+    toursTitle: 'Two ways to discover nature from Astana',
+    toursText: 'The program includes the core logistics and can be adjusted to the patient’s condition and doctor’s guidance.',
   },
   kk: {
     heroBadge: 'Қазақстандағы туризм',
@@ -142,6 +160,15 @@ export const tourismPageCopy = {
     allTypes: 'Барлық бағыттар',
     centerLabel: 'Орталығы',
     highlightsLabel: 'Көруге болады',
+    planCta: 'Бағыт таңдау',
+    moreLabel: 'Толығырақ',
+    aboutPlace: 'Орын туралы',
+    prevPhoto: 'Алдыңғы фото',
+    nextPhoto: 'Келесі фото',
+    showPhoto: '{n}-фотоны көрсету',
+    toursBadge: 'Турпакет бағыттары',
+    toursTitle: 'Астанадан табиғатқа екі бағыт',
+    toursText: 'Бағдарлама негізгі логистиканы қамтиды және дәрігер ұсынысына қарай бейімделеді.',
   },
 }
 
@@ -275,8 +302,18 @@ export function localizeTourismRegion(item, language = 'ru') {
     name: String(local.name || '').trim() || ru.name || item?.id || '',
     center: String(local.center || '').trim() || ru.center || '',
     summary: String(local.summary || '').trim() || ru.summary || '',
+    details: String(local.details || '').trim() || String(ru.details || '').trim(),
     highlights: highlights.map((line) => String(line).trim()).filter(Boolean),
+    gallery: Array.isArray(item?.gallery) ? item.gallery.filter(Boolean) : [],
   }
+}
+
+/** Все фото места для просмотра: обложка первой, затем галерея без повторов. */
+export function tourismPhotos(item) {
+  const seen = new Set()
+  return [item?.image, ...(Array.isArray(item?.gallery) ? item.gallery : [])]
+    .map((media) => resolveTourismImage(media))
+    .filter((url) => url && !seen.has(url) && seen.add(url))
 }
 
 /**
@@ -299,6 +336,60 @@ export function resolveTourismRegions(stored) {
 /** Картинки по умолчанию лежат во frontend/public, загруженные — в Strapi. */
 export function resolveTourismImage(image) {
   const url = typeof image === 'string' ? image : image?.url
-  if (typeof url === 'string' && (url.startsWith('/tourism/') || url.startsWith('/treatments/'))) return url
+  if (typeof url === 'string' && (url.startsWith('/tourism/') || url.startsWith('/treatments/') || url === DEFAULT_TOURISM_HERO)) return url
   return getMediaUrl(image) || ''
+}
+
+// ── Страница «Туризм»: первый экран и маршруты из турпакета ─────────────
+// Хранится в Global.tourismPage; пока там пусто, — встроенные значения.
+
+export const DEFAULT_TOURISM_HERO = '/kazakhstan-tourism-hero.png'
+
+const tour = (id, image, ru, en, kk) => ({
+  id,
+  image,
+  isActive: true,
+  content: Object.fromEntries([['ru', ru], ['en', en], ['kk', kk]].map(([locale, [name, label, text, highlights]]) => [locale, { name, label, text, highlights }])),
+})
+
+export const defaultTourismTours = [
+  tour('burabay-day', '/tourism/burabay.jpg',
+    ['Бурабай: лес, озёра и легенды', 'Однодневный маршрут из Астаны', 'Болектау, Окжетпес, Жумбактас, поляна Абылай хана и прогулка вдоль озера в окружении соснового леса.', ['Трансфер из Астаны', 'Гид и национальный парк', 'Маршрут можно адаптировать']],
+    ['Burabay: forests, lakes and legends', 'Day route from Astana', 'Bolektau, Okzhetpes, Zhumbaktas, Abylai Khan meadow and a lakeside walk through pine forest.', ['Transfer from Astana', 'Guide and national park', 'Adaptable itinerary']],
+    ['Бурабай: орман, көлдер және аңыздар', 'Астанадан бір күндік бағыт', 'Бөлектау, Оқжетпес, Жұмбақтас, Абылай хан алаңы және қарағайлы ормандағы көл жағалауы.', ['Астанадан трансфер', 'Гид және ұлттық парк', 'Бағытты бейімдеуге болады']]),
+  tour('bayanaul-day', '/tourism/bayanaul.webp',
+    ['Баянаул: природная перезагрузка', 'Насыщенный однодневный маршрут', 'Озеро Жасыбай, Коныр-Аулие, скалы Саймантас и Кемпиртас, Аулие-Булак и панорамные тропы национального парка.', ['Трансфер из Астаны', 'Сопровождение гида', 'Природа и сакральные места']],
+    ['Bayanaul: a natural reset', 'Immersive day route', 'Lake Jasybay, Konyr-Aulie, Saimantas and Kempirtas rocks, Aulie-Bulak spring and panoramic park trails.', ['Transfer from Astana', 'Guide support', 'Nature and sacred sites']],
+    ['Баянауыл: табиғаттағы тынығу', 'Мазмұнды бір күндік бағыт', 'Жасыбай көлі, Қоңыр Әулие, Саймантас пен Кемпіртас жартастары, Әулие бұлақ және ұлттық парк соқпақтары.', ['Астанадан трансфер', 'Гид сүйемелдеуі', 'Табиғат және киелі орындар']]),
+].map((item, index) => ({ ...item, sortOrder: index + 1 }))
+
+/**
+ * Сохранённые настройки страницы. heroImage = null — встроенная картинка;
+ * маршруты — встроенные, только пока список в CMS ни разу не сохраняли.
+ */
+export function resolveTourismPage(stored) {
+  const page = isPlainObject(stored) ? stored : {}
+  const tours = (Array.isArray(page.tours) ? page.tours : defaultTourismTours)
+    .filter((item) => isPlainObject(item) && item.id)
+    .map((item, index) => ({ ...item, sortOrder: Number(item.sortOrder) || index + 1 }))
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+  return { heroImage: page.heroImage || null, tours }
+}
+
+/** Маршрут на языке посетителя; пустые поля перевода — из русского. */
+export function localizeTourismTour(item, language = 'ru') {
+  const lang = TOURISM_LOCALES.includes(language) ? language : 'ru'
+  const ru = item?.content?.ru || {}
+  const local = item?.content?.[lang] || {}
+  const pick = (key) => String(local[key] || '').trim() || String(ru[key] || '').trim()
+  const highlights = (Array.isArray(local.highlights) && local.highlights.some((line) => String(line).trim()))
+    ? local.highlights
+    : (Array.isArray(ru.highlights) ? ru.highlights : [])
+  return {
+    ...item,
+    name: pick('name') || item?.id || '',
+    label: pick('label'),
+    text: pick('text'),
+    highlights: highlights.map((line) => String(line).trim()).filter(Boolean),
+  }
 }

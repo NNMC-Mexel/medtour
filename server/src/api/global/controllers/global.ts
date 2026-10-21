@@ -78,6 +78,15 @@ const TOURISM_TYPES = new Set([
 ]);
 const MEDIA_PREFIXES = ['/tourism/', '/treatments/', '/uploads/', '/api/file-proxy/'];
 const isShortText = (value: unknown, max: number) => value === undefined || value === null || (typeof value === 'string' && value.length <= max);
+const isAllowedMedia = (media: any) => {
+  const url = typeof media === 'string' ? media : media?.url;
+  return typeof url === 'string' && MEDIA_PREFIXES.some((prefix) => url.startsWith(prefix));
+};
+const MAX_GALLERY = 20;
+const isValidGallery = (gallery: unknown) => gallery === undefined
+  || (Array.isArray(gallery) && gallery.length <= MAX_GALLERY && gallery.every(isAllowedMedia));
+const isValidLines = (lines: unknown, maxItems = 20, maxLength = 300) => lines === undefined
+  || (Array.isArray(lines) && lines.length <= maxItems && lines.every((line) => typeof line === 'string' && line.length <= maxLength));
 
 // Места на странице «Туризм». Русский — обязательный язык опубликованного
 // места; пустые переводы сайт заменяет русским текстом.
@@ -97,24 +106,57 @@ function validateTourismRegions(value: unknown): string | null {
     if (typeof item.isActive !== 'boolean') return 'Tourism place visibility is invalid';
     const order = Number(item.sortOrder);
     if (!Number.isInteger(order) || order < 1) return 'Tourism place order is invalid';
-    const mediaUrl = typeof item.image === 'string' ? item.image : item.image?.url;
-    if (typeof mediaUrl !== 'string' || !MEDIA_PREFIXES.some((prefix) => mediaUrl.startsWith(prefix))) {
-      return 'Tourism place image is invalid';
-    }
+    if (!isAllowedMedia(item.image)) return 'Tourism place image is invalid';
+    if (!isValidGallery(item.gallery)) return `Tourism place gallery is invalid (at most ${MAX_GALLERY} photos)`;
     for (const locale of LOCALES) {
       const content = item.content?.[locale];
       if (content === undefined) continue;
       if (!content || typeof content !== 'object') return `Tourism place ${locale} content is invalid`;
-      if (!isShortText(content.name, 200) || !isShortText(content.center, 200) || !isShortText(content.summary, 2000)) {
+      if (!isShortText(content.name, 200) || !isShortText(content.center, 200) || !isShortText(content.summary, 2000)
+        || !isShortText(content.details, 8000)) {
         return `Tourism place ${locale} text is too long`;
       }
-      if (content.highlights !== undefined && (!Array.isArray(content.highlights) || content.highlights.length > 20
-        || content.highlights.some((line: unknown) => typeof line !== 'string' || line.length > 300))) {
-        return `Tourism place ${locale} highlights are invalid`;
-      }
+      if (!isValidLines(content.highlights)) return `Tourism place ${locale} highlights are invalid`;
     }
     if (item.isActive && !(typeof item.content?.ru?.name === 'string' && item.content.ru.name.trim())) {
       return 'Tourism place needs a Russian name';
+    }
+  }
+  return null;
+}
+
+// Страница «Туризм»: картинка первого экрана и маршруты из турпакета.
+// heroImage = null — встроенная картинка сайта.
+function validateTourismPage(value: unknown): string | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return 'Tourism page content is invalid';
+  if (JSON.stringify(value).length > 500_000) return 'Tourism page content is too large';
+  const page = value as any;
+  if (page.heroImage !== undefined && page.heroImage !== null && !isAllowedMedia(page.heroImage)) {
+    return 'Tourism hero image is invalid';
+  }
+  if (page.tours === undefined) return null;
+  if (!Array.isArray(page.tours) || page.tours.length > 20) return 'Tourism routes must be a list of at most 20 items';
+  const ids = new Set<string>();
+  for (const tour of page.tours) {
+    if (!tour || typeof tour !== 'object' || typeof tour.id !== 'string' || !SLUG_PATTERN.test(tour.id) || tour.id.length > 80 || ids.has(tour.id)) {
+      return 'Tourism route id is invalid or duplicated';
+    }
+    ids.add(tour.id);
+    if (typeof tour.isActive !== 'boolean') return 'Tourism route visibility is invalid';
+    const order = Number(tour.sortOrder);
+    if (!Number.isInteger(order) || order < 1) return 'Tourism route order is invalid';
+    if (!isAllowedMedia(tour.image)) return 'Tourism route image is invalid';
+    for (const locale of LOCALES) {
+      const content = tour.content?.[locale];
+      if (content === undefined) continue;
+      if (!content || typeof content !== 'object') return `Tourism route ${locale} content is invalid`;
+      if (!isShortText(content.name, 200) || !isShortText(content.label, 200) || !isShortText(content.text, 2000)) {
+        return `Tourism route ${locale} text is too long`;
+      }
+      if (!isValidLines(content.highlights, 10, 120)) return `Tourism route ${locale} highlights are invalid`;
+    }
+    if (tour.isActive && !(typeof tour.content?.ru?.name === 'string' && tour.content.ru.name.trim())) {
+      return 'Tourism route needs a Russian name';
     }
   }
   return null;
@@ -129,6 +171,10 @@ export default factories.createCoreController('api::global.global', ({ strapi })
     }
     if (body && Object.prototype.hasOwnProperty.call(body, 'tourismRegions')) {
       const validationError = validateTourismRegions(body.tourismRegions);
+      if (validationError) return ctx.badRequest(validationError);
+    }
+    if (body && Object.prototype.hasOwnProperty.call(body, 'tourismPage')) {
+      const validationError = validateTourismPage(body.tourismPage);
       if (validationError) return ctx.badRequest(validationError);
     }
     if (body && Object.prototype.hasOwnProperty.call(body, 'landingConfig')) {
