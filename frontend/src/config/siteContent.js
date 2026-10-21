@@ -170,6 +170,7 @@ export function mergeLandingCopy(base, overrides) {
 export const NAV_ITEMS = [
   { id: 'home', href: '/', labelKey: 'nav.home' },
   { id: 'treatments', href: '#specializations', labelKey: 'nav.treatments', isAnchor: true },
+  { id: 'doctors', href: '/doctors', labelKey: 'nav.our_doctors' },
   { id: 'tourism', href: '/tourism', labelKey: 'nav.tourism' },
   { id: 'blog', href: '/blog', labelKey: 'nav.blog' },
   { id: 'process', href: '#process', labelKey: 'nav.process', isAnchor: true },
