@@ -5,7 +5,7 @@ import Button from '../../components/ui/Button'
 import LocalizedFields from '../../components/admin/LocalizedFields'
 import TourismPageSettings from '../../components/admin/TourismPageSettings'
 import { useToast } from '../../components/ui/Toast'
-import { contentAPI, deleteFile, normalizeResponse, uploadFile } from '../../services/api'
+import { contentAPI, deleteFile, normalizeResponse, uploadFile, uploadFiles } from '../../services/api'
 import {
   localizeTourismRegion,
   resolveTourismImage,
@@ -36,6 +36,7 @@ const copyByLanguage = {
     loadError: 'Не удалось загрузить места', saveError: 'Не удалось сохранить места', saved: 'Места сохранены',
     nameRequired: 'У каждого показываемого места должно быть название на русском',
     empty: 'Мест пока нет — добавьте первое.', leaveConfirm: 'Есть несохранённые изменения. Уйти со страницы?',
+    rateLimited: 'Слишком много загрузок подряд — подождите несколько минут и повторите.',
     tabPlaces: 'Места', tabPage: 'Страница «Туризм»',
     gallery: 'Галерея', galleryHint: 'До 20 фото. В карточке места обложка показывается первой, дальше — эти фото по порядку.',
     galleryUpload: 'Добавить фото', galleryEmpty: 'Пока только обложка. Добавьте фото, чтобы в карточке места их можно было листать.',
@@ -57,6 +58,7 @@ const copyByLanguage = {
     loadError: 'Failed to load places', saveError: 'Failed to save places', saved: 'Places saved',
     nameRequired: 'Every visible place needs a Russian name',
     empty: 'No places yet — add the first one.', leaveConfirm: 'You have unsaved changes. Leave the page?',
+    rateLimited: 'Too many uploads in a row — wait a few minutes and try again.',
     tabPlaces: 'Places', tabPage: 'Tourism page',
     gallery: 'Gallery', galleryHint: 'Up to 20 photos. The place card shows the cover first, then these photos in order.',
     galleryUpload: 'Add photos', galleryEmpty: 'Only the cover so far. Add photos so visitors can browse them in the place card.',
@@ -78,6 +80,7 @@ const copyByLanguage = {
     loadError: 'Орындарды жүктеу мүмкін болмады', saveError: 'Орындарды сақтау мүмкін болмады', saved: 'Орындар сақталды',
     nameRequired: 'Көрсетілетін әр орынның орысша атауы болуы керек',
     empty: 'Әзірге орын жоқ — алғашқысын қосыңыз.', leaveConfirm: 'Сақталмаған өзгерістер бар. Беттен шығасыз ба?',
+    rateLimited: 'Қатарынан тым көп жүктеу — бірнеше минут күтіп, қайталаңыз.',
     tabPlaces: 'Орындар', tabPage: '«Туризм» беті',
     gallery: 'Галерея', galleryHint: '20 фотоға дейін. Орын карточкасында алдымен мұқаба, одан кейін осы фотолар ретімен көрсетіледі.',
     galleryUpload: 'Фото қосу', galleryEmpty: 'Әзірге тек мұқаба. Карточкада парақтау үшін фото қосыңыз.',
@@ -244,7 +247,7 @@ function TourismPlacesEditor({ hidden }) {
       toast.success(copy.uploaded)
     } catch (error) {
       console.error('Error uploading tourism image:', error)
-      toast.error(copy.uploadError)
+      toast.error(error?.response?.status === 429 ? copy.rateLimited : copy.uploadError)
     } finally {
       setIsUploading(false)
     }
@@ -265,18 +268,16 @@ function TourismPlacesEditor({ hidden }) {
     if (!valid.length) return
     setIsUploading(true)
     try {
-      for (const file of valid) {
-        const uploaded = await uploadFile(file)
-        pendingUploadIds.current.add(Number(uploaded.id))
-        const media = toStoredMedia(uploaded)
-        setPlaces((items) => items.map((item) => (
-          item.id === placeId ? { ...item, gallery: [...(item.gallery || []), media].slice(0, MAX_GALLERY) } : item
-        )))
-      }
+      const uploaded = await uploadFiles(valid)
+      uploaded.forEach((file) => pendingUploadIds.current.add(Number(file.id)))
+      const media = uploaded.map(toStoredMedia)
+      setPlaces((items) => items.map((item) => (
+        item.id === placeId ? { ...item, gallery: [...(item.gallery || []), ...media].slice(0, MAX_GALLERY) } : item
+      )))
       toast.success(copy.uploaded)
     } catch (error) {
       console.error('Error uploading tourism gallery:', error)
-      toast.error(copy.uploadError)
+      toast.error(error?.response?.status === 429 ? copy.rateLimited : copy.uploadError)
     } finally {
       setIsUploading(false)
     }

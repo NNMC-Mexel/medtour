@@ -126,8 +126,8 @@ function TourismPlaceModal({ place, copy, typeLabel, onClose, onPlan }) {
           <div>
             <h3 className='text-sm font-semibold text-slate-900'>{copy.aboutPlace}</h3>
             <div className='mt-2 space-y-3'>
-              {paragraphs.map((text) => (
-                <p key={text} className='whitespace-pre-line leading-7 text-slate-600'>{text}</p>
+              {paragraphs.map((text, paragraphIndex) => (
+                <p key={paragraphIndex} className='whitespace-pre-line leading-7 text-slate-600'>{text}</p>
               ))}
             </div>
           </div>
@@ -136,8 +136,8 @@ function TourismPlaceModal({ place, copy, typeLabel, onClose, onPlan }) {
           <div className='border-t border-slate-100 pt-4'>
             <h3 className='text-sm font-semibold text-slate-900'>{copy.highlightsLabel}</h3>
             <ul className='mt-3 grid gap-2 sm:grid-cols-2'>
-              {place.highlights.map((item) => (
-                <li key={item} className='flex gap-2 text-sm leading-6 text-slate-600'>
+              {place.highlights.map((item, itemIndex) => (
+                <li key={`${itemIndex}-${item}`} className='flex gap-2 text-sm leading-6 text-slate-600'>
                   <span className='mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-teal-500' />
                   {item}
                 </li>

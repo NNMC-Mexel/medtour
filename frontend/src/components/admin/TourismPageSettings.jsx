@@ -30,6 +30,7 @@ const copyByLanguage = {
     name: 'Название', label: 'Подпись над названием', text: 'Описание', highlights: 'Что входит — каждый пункт с новой строки',
     visible: 'Показывать на сайте', hidden: 'Скрыт', moveUp: 'Выше', moveDown: 'Ниже', remove: 'Удалить маршрут',
     confirmRemove: 'Удалить маршрут «{name}»?', empty: 'Маршрутов нет — блок на странице скрыт.',
+    rateLimited: 'Слишком много загрузок подряд — подождите несколько минут и повторите.',
     uploadError: 'Не удалось загрузить изображение', uploaded: 'Фото загружено. Сохраните изменения.',
     loadError: 'Не удалось загрузить настройки страницы', saveError: 'Не удалось сохранить', saved: 'Страница сохранена',
     nameRequired: 'У каждого показываемого маршрута должно быть название на русском',
@@ -45,6 +46,7 @@ const copyByLanguage = {
     name: 'Name', label: 'Label above the name', text: 'Description', highlights: 'What is included — one item per line',
     visible: 'Show on the site', hidden: 'Hidden', moveUp: 'Move up', moveDown: 'Move down', remove: 'Delete route',
     confirmRemove: 'Delete the route “{name}”?', empty: 'No routes — the block is hidden on the page.',
+    rateLimited: 'Too many uploads in a row — wait a few minutes and try again.',
     uploadError: 'Failed to upload image', uploaded: 'Photo uploaded. Save your changes.',
     loadError: 'Failed to load page settings', saveError: 'Failed to save', saved: 'Page saved',
     nameRequired: 'Every visible route needs a Russian name',
@@ -60,6 +62,7 @@ const copyByLanguage = {
     name: 'Атауы', label: 'Атау үстіндегі жазу', text: 'Сипаттама', highlights: 'Не кіреді — әр тармақ жаңа жолдан',
     visible: 'Сайтта көрсету', hidden: 'Жасырын', moveUp: 'Жоғары', moveDown: 'Төмен', remove: 'Бағытты жою',
     confirmRemove: '«{name}» бағытын жою керек пе?', empty: 'Бағыттар жоқ — бетте блок жасырылған.',
+    rateLimited: 'Қатарынан тым көп жүктеу — бірнеше минут күтіп, қайталаңыз.',
     uploadError: 'Суретті жүктеу мүмкін болмады', uploaded: 'Фото жүктелді. Өзгерістерді сақтаңыз.',
     loadError: 'Бет баптауларын жүктеу мүмкін болмады', saveError: 'Сақтау мүмкін болмады', saved: 'Бет сақталды',
     nameRequired: 'Көрсетілетін әр бағыттың орысша атауы болуы керек',
@@ -179,7 +182,7 @@ function TourismPageSettings({ hidden }) {
       toast.success(copy.uploaded)
     } catch (error) {
       console.error('Error uploading tourism page image:', error)
-      toast.error(copy.uploadError)
+      toast.error(error?.response?.status === 429 ? copy.rateLimited : copy.uploadError)
     } finally {
       setUploadTarget('')
     }

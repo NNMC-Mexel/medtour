@@ -241,7 +241,7 @@ function TourismPage() {
             <div className='mt-10 grid gap-6 lg:grid-cols-2'>
               {tours.map((tour) => <article key={tour.id} className='group overflow-hidden rounded-[2rem] border border-[#dfe3ec] bg-white shadow-sm'>
                 <div className='h-72 overflow-hidden'><img src={resolveTourismImage(tour.image)} alt={tour.name} loading='lazy' className='h-full w-full object-cover transition duration-700 group-hover:scale-105' /></div>
-                <div className='p-7 sm:p-8'>{tour.label && <div className='text-xs font-bold uppercase tracking-[.14em] text-mt-blue'>{tour.label}</div>}<h3 className='mt-3 text-2xl font-semibold text-mt-ink'>{tour.name}</h3>{tour.text && <p className='mt-4 leading-7 text-[#626b82]'>{tour.text}</p>}{tour.highlights.length > 0 && <div className='mt-6 flex flex-wrap gap-2'>{tour.highlights.map((item) => <span key={item} className='inline-flex items-center gap-2 rounded-full bg-[#edf2f9] px-3 py-2 text-xs font-medium text-[#39435f]'><Check className='h-3.5 w-3.5 text-mt-coral' />{item}</span>)}</div>}</div>
+                <div className='p-7 sm:p-8'>{tour.label && <div className='text-xs font-bold uppercase tracking-[.14em] text-mt-blue'>{tour.label}</div>}<h3 className='mt-3 text-2xl font-semibold text-mt-ink'>{tour.name}</h3>{tour.text && <p className='mt-4 leading-7 text-[#626b82]'>{tour.text}</p>}{tour.highlights.length > 0 && <div className='mt-6 flex flex-wrap gap-2'>{tour.highlights.map((item, itemIndex) => <span key={`${itemIndex}-${item}`} className='inline-flex items-center gap-2 rounded-full bg-[#edf2f9] px-3 py-2 text-xs font-medium text-[#39435f]'><Check className='h-3.5 w-3.5 text-mt-coral' />{item}</span>)}</div>}</div>
               </article>)}
             </div>
           </div>
@@ -386,8 +386,8 @@ function TourismPage() {
                   {region.highlights.length > 0 && <div className='mt-5 border-t border-slate-100 pt-4'>
                     <div className='text-sm font-semibold text-slate-900'>{copy.highlightsLabel}</div>
                     <ul className='mt-3 space-y-2'>
-                      {region.highlights.map((item) => (
-                        <li key={item} className='flex gap-2 text-sm leading-6 text-slate-600'>
+                      {region.highlights.map((item, itemIndex) => (
+                        <li key={`${itemIndex}-${item}`} className='flex gap-2 text-sm leading-6 text-slate-600'>
                           <span className='mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-teal-500' />
                           {item}
                         </li>

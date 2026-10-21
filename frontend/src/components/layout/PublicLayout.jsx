@@ -109,12 +109,14 @@ function PublicLayout() {
         ["instagram", Instagram, "Instagram"],
     ].filter(([kind]) => !messengersOnPhones.has(kind) && contactHref(kind, contacts[kind]));
 
-    // Пункты и подписи — из Admin > Контент сайта > Шапка и меню.
+    // Пункты и подписи — из Admin > Контент сайта > Шапка и меню. Пустая
+    // подпись — стандартная для языка (как обещает подсказка в админке), а не
+    // русская: иначе переименованный по-русски пункт был по-русски и на en/kk.
     const navLinks = NAV_ITEMS
         .filter((item) => siteContent.navigation.items[item.id]?.visible !== false)
         .map((item) => ({
             ...item,
-            label: pickLocalized(siteContent.navigation.items[item.id]?.label, lang) || t(item.labelKey),
+            label: String(siteContent.navigation.items[item.id]?.label?.[lang] || "").trim() || t(item.labelKey),
         }));
 
     // На лендинге подсвечиваем пункт той секции, до которой докрутили;
