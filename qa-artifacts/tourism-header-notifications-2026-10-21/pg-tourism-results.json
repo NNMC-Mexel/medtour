@@ -1,0 +1,206 @@
+{
+  "passed": 40,
+  "total": 40,
+  "results": [
+    {
+      "id": "P1 default hero image",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P2 default tour routes shown",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P3 regions button is now «Подобрать маршрут»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P4 guest: opens the manager chat, stays on /tourism",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P5 card shows «Подробнее»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P6 card opens a dialog with the place",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P6b one photo → no arrows/counter",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P7 Escape closes it",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P8 keyboard: Enter on a card opens it",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P9 «Подобрать маршрут» in the dialog closes it and opens the chat",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "P10 en: «Learn more» and «Plan a route»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A1 two tabs: Места / Страница «Туризм»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A2 gallery section with empty state",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A3 three photos uploaded into the gallery",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A4 non-image refused",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A5 reorder + remove in the editor",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A6 saved: gallery (2, new order) and details",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A7 card shows photo count 3",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A8 dialog: counter 1 / 3 and 3 thumbnails",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A9 next arrow → 2 / 3",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A10 → key → 3 / 3",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A11 wraps around to 1 / 3",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A12 thumbnail jumps to 3 / 3",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A13 details shown as two paragraphs",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A14 uploaded photo is publicly reachable",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "A15 mobile: dialog fits the screen",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S1 page tab: default hero noted",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S1b default routes listed",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S2 hero uploaded, preview switched",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S3 saved: hero + route image + name",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S4 public hero is the uploaded image",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S5 routes: renamed one shown, hidden one gone, new one shown",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "S6 «Вернуть стандартную» saves heroImage = null",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "V1 hero from a foreign URL → 400",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "V2 route without Russian name → 400",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "V3 gallery of 21 photos → 400",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "V4 gallery photo from a foreign URL → 400",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "V5 details over 8000 chars → 400",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "V6 anonymous PUT is refused",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "T-END no page errors / 5xx",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

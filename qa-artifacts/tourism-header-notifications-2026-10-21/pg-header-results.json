@@ -1,0 +1,291 @@
+{
+  "passed": 57,
+  "total": 57,
+  "results": [
+    {
+      "id": "H1 ru 1920px /: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 ru 1920px /tourism: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 ru 1920px /doctors: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 ru 1440px /: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 ru 1440px /tourism: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 ru 1440px /doctors: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 ru 1280px /: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 ru 1280px /tourism: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 ru 1280px /doctors: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 en 1920px /: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 en 1920px /tourism: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 en 1920px /doctors: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 en 1440px /: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 en 1440px /tourism: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 en 1440px /doctors: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 en 1280px /: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 en 1280px /tourism: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 en 1280px /doctors: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 kk 1920px /: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 kk 1920px /tourism: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 kk 1920px /doctors: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 kk 1440px /: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 kk 1440px /tourism: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 kk 1440px /doctors: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 kk 1280px /: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 kk 1280px /tourism: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H1 kk 1280px /doctors: item shown, one line, nothing cut",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H2 1279px: desktop menu hidden, burger shown, no page overflow",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H2b 1279px: burger menu contains «Наши врачи»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H2c 1279px: tap → /doctors, menu closes",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H2 1024px: desktop menu hidden, burger shown, no page overflow",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H2b 1024px: burger menu contains «Наши врачи»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H2c 1024px: tap → /doctors, menu closes",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H2 768px: desktop menu hidden, burger shown, no page overflow",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H2b 768px: burger menu contains «Наши врачи»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H2c 768px: tap → /doctors, menu closes",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H2 390px: desktop menu hidden, burger shown, no page overflow",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H2b 390px: burger menu contains «Наши врачи»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H2c 390px: tap → /doctors, menu closes",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H3 on /doctors only «Наши врачи» is current",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H3c on /tourism the current item is «Туризм»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H4 signed-in patient: item shown, «Личный кабинет» fits",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H9 «Контакты» from /doctors → home page scrolled to #contact",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H9 «Процесс» from /doctors → home page scrolled to #process",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H9 «Лечение» from /doctors → home page scrolled to #specializations",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H10 /documents/consent#sample-inpatient: section at the top after load",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H10 /documents/offer#appendix-2: section at the top after load",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H10 /documents/consent#personal-data: section at the top after load",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H10b on the home page «Контакты» still scrolls in place",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H11 user scroll during settling is respected (not pulled back to #contact)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H5 config saved before this release (no «doctors» key) → item visible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H6 admin «Шапка и меню» lists «Наши врачи»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H6b hidden in admin → gone from the header",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H6c renamed in admin → new label in the header (ru)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H6d en keeps the standard label (only ru renamed)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H7 original landing config restored",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "H8 no page errors / 5xx",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

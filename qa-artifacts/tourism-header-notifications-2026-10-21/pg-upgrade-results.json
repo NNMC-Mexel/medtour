@@ -1,0 +1,61 @@
+{
+  "passed": 11,
+  "total": 11,
+  "results": [
+    {
+      "id": "M1 new column tourism_page added (jsonb), old ones kept",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "M2 saved places and landing config unchanged byte for byte",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "M3 public API: places as saved, tourismPage empty",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "M4 tourism page: default hero and routes, the 2 saved places",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "M4b legacy place card opens",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "M5 header with the pre-release config: «Наши врачи» shown, the admin’s «Статьи» rename kept",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "M6 1200 notifications created before the release → all marked read",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "M7 admin opens a pre-release place: empty gallery, nothing unsaved",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "M7b on the upgraded base: gallery, full description and hero saved; Astana untouched",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "M7c public dialog shows 1 / 3 and the description",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "M8 no page errors / 5xx",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

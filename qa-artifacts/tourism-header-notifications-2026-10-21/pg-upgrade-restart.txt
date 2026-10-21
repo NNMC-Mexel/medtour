@@ -1,0 +1,1 @@
+M9 PASS restart is idempotent

@@ -1,0 +1,216 @@
+{
+  "passed": 42,
+  "total": 42,
+  "results": [
+    {
+      "id": "X1 legacy regions (no gallery/details) accepted by the server",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X1b public: legacy card opens, no empty «О месте» block",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X1c admin: legacy place opens with empty gallery, nothing «unsaved»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X2 API down: default hero, built-in routes and regions, no crash",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X3 markup in texts is shown as text, nothing executes",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X4 22 files → warning, exactly 20 kept, upload disabled at the limit",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X4a 20 photos go in one upload request (server limit: 60 requests / 15 min)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X4b saved with 20 photos",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X4c dialog: 1 / 21, thumbnail strip scrolls, last thumbnail → 21 / 21",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X5 discard → uploaded files removed from storage, gallery empty again",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X6 removed photo deleted from storage, the other two kept and saved",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X7b the place switched to gets nothing",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X7 photos land in the place they were uploaded for",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X8 switching tabs keeps unsaved text and the «unsaved» note",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X9 leaving with unsaved changes asks for confirmation",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X10 page save + places save → both kept",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X11 manager: cannot change the tourism page (403)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X11 coordinator: cannot change the tourism page (403)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X11 doctor: cannot change the tourism page (403)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X11 patient: cannot change the tourism page (403)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X11b manager opening /admin/tourism does not get the editor",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X12 hidden place is not on the page",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X12b type filter works and a filtered card opens",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X13 background scroll locked while open",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X14 touch: swipe left → next, right → previous, a small move does nothing",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X13b tap outside closes, page scroll unlocked",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X13c arrow keys after closing do nothing (no dialog, no errors)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X15 routes follow sortOrder (Б before А)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X18 empty label/highlights → no empty elements in the card",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X15b all routes hidden → the block is gone",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X15c all routes deleted → block gone, admin shows the empty state (not the defaults again)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X16 patient: opens the manager chat on the page",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X16b manager (no chat widget): goes to the contacts on the home page",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X17 en without a translated full description → the Russian one is shown, labels in English",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X19 200-char name + 8000-char details at 390 px: no horizontal overflow",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X20 11 MB image refused before upload, preview unchanged",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X22 429 on upload → «Слишком много загрузок подряд — подождите…»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X22b same message for the hero upload",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X21 admin in English: tabs and sections translated",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X21b places tab: gallery strings translated",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X-END original tourism data restored",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "X-END no page errors / 5xx (besides the 429 that X22 fakes)",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}
