@@ -2,7 +2,7 @@
  * Notification controller.
  * - find: каждый, включая админа, видит только свои уведомления
  * - unreadCount: число непрочитанных у текущего пользователя
- * - markAllAsRead: помечает все непрочитанные текущего пользователя
+ * - markAllAsRead: помечает все непрочитанные текущего пользователя (одним запросом)
  * - update/delete: только владелец
  *
  * Раньше админ получал в колокольчике уведомления всех пользователей
@@ -47,34 +47,37 @@ export default factories.createCoreController('api::notification.notification', 
     const user = ctx.state.user;
     if (!user) return ctx.forbidden('Not authenticated');
 
-    const items = await strapi.documents('api::notification.notification').findMany({
+    const count = await strapi.documents('api::notification.notification').count({
       filters: { user: { id: user.id }, isRead: false },
-      fields: ['id'],
-      limit: 1000,
     });
 
-    return { data: { count: items.length } };
+    return { data: { count } };
   },
 
   async markAllAsRead(ctx) {
     const user = ctx.state.user;
     if (!user) return ctx.forbidden('Not authenticated');
 
-    const unread = await strapi.documents('api::notification.notification').findMany({
-      filters: { user: { id: user.id }, isRead: false },
-      fields: ['id'],
-      limit: 1000,
+    // Одним запросом и без лимита. Раньше помечалась первая 1000 по одной:
+    // у менеджера, которому приходят уведомления по всем чатам, свежие
+    // оставались непрочитанными, и бейдж возвращался при следующем опросе.
+    // У уведомлений нет черновиков, поэтому обновление на уровне БД безопасно.
+    // updateMany не фильтрует по связи, поэтому сначала берём id, затем
+    // обновляем пачками (у SQLite ограничено число параметров в запросе).
+    const query = strapi.db.query('api::notification.notification');
+    const unread = await query.findMany({
+      where: { user: { id: user.id }, isRead: false },
+      select: ['id'],
     });
-
-    for (const n of unread as any[]) {
-      if (!n?.documentId) continue;
-      await strapi.documents('api::notification.notification').update({
-        documentId: n.documentId,
-        data: { isRead: true } as any,
+    const ids = unread.map((item: any) => item.id);
+    for (let start = 0; start < ids.length; start += 500) {
+      await query.updateMany({
+        where: { id: { $in: ids.slice(start, start + 500) } },
+        data: { isRead: true },
       });
     }
 
-    return { data: { count: unread.length } };
+    return { data: { count: ids.length } };
   },
 
   async update(ctx) {
