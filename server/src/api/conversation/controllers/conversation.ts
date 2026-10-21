@@ -547,6 +547,9 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     let count = 0;
     for (const message of messages as any[]) {
       if (message?.sender?.id === user.id) continue;
+      // Уже прочитанные не переписываем: иначе каждое открытие чата обновляло
+      // всю историю и сдвигало время прочтения.
+      if (message?.readBy?.[String(user.id)]) continue;
       const readBy = { ...(message.readBy || {}), [String(user.id)]: now };
       await strapi.documents(MESSAGE_UID).update({
         documentId: message.documentId,
@@ -563,8 +566,10 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
       status: 'published',
     });
 
+    // Событие — только когда действительно было что прочитать, иначе
+    // «Активность» заявки забивалась строками «Чат прочитан».
     const medicalCaseRef = getRelationRef((conversation as any).medical_case);
-    if (medicalCaseRef) {
+    if (medicalCaseRef && count > 0) {
       await createCaseEvent(strapi, {
         medical_case: medicalCaseRef,
         actor: user.documentId || user.id,
