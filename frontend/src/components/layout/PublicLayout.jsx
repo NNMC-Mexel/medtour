@@ -108,6 +108,13 @@ function PublicLayout() {
         ["telegram", Send, "Telegram"],
         ["instagram", Instagram, "Instagram"],
     ].filter(([kind]) => !messengersOnPhones.has(kind) && contactHref(kind, contacts[kind]));
+    const partnerName = pickLocalized(contacts.partnerName, lang) || t("footer.partner_name");
+    const partnerLinks = [
+        { key: "partnerWebsite", kind: "website", Icon: Globe },
+        { key: "partnerEmail", kind: "email", Icon: Mail },
+    ]
+        .filter(({ key, kind }) => contactHref(kind, contacts[key]))
+        .map((link) => ({ ...link, label: contacts[link.key].replace(/^https?:\/\//, "").replace(/\/$/, "") }));
 
     // Пункты и подписи — из Admin > Контент сайта > Шапка и меню. Пустая
     // подпись — стандартная для языка (как обещает подсказка в админке), а не
@@ -525,6 +532,21 @@ function PublicLayout() {
                                     </li>
                                 )}
                             </ul>
+                            {/* Без сайта и email партнёра блок скрыт: у названия есть стандартное, а убрать блок админ должен уметь. */}
+                            {partnerLinks.length > 0 && (
+                                <div className='mt-6 border-t border-white/10 pt-5'>
+                                    <p className='text-xs font-semibold uppercase tracking-[.12em] text-slate-400'>{t("footer.partner")}</p>
+                                    <p className='mt-1 text-sm font-medium text-slate-200'>{partnerName}</p>
+                                    <ul className='mt-3 space-y-3'>
+                                        {partnerLinks.map(({ key, kind, Icon, label }) => (
+                                            <li key={key} className='flex items-center gap-3 text-slate-400'>
+                                                <Icon className='w-5 h-5 shrink-0 text-teal-500' />
+                                                <a href={contactHref(kind, contacts[key])} {...(kind === 'website' ? { target: '_blank', rel: 'noreferrer' } : {})} className='text-sm hover:text-white break-all'>{label}</a>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
                         </div>
                     </div>
 

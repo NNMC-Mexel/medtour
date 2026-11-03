@@ -114,6 +114,7 @@ export const ADMIN_NAV_ITEMS = [
   { path: '/admin/tourism', label: 'nav.admin_tourism', icon: 'map-pinned' },
   { path: '/admin/prices', label: 'nav.admin_prices', icon: 'receipt-text' },
   { path: '/admin/price-requests', label: 'nav.price_requests', icon: 'shopping-cart' },
+  { path: '/admin/blog', label: 'nav.admin_blog', icon: 'newspaper' },
   { path: '/admin/guide-videos', label: 'nav.admin_guide_videos', icon: 'circle-help' },
   { path: '/admin/legal-documents', label: 'nav.admin_legal_documents', icon: 'file-text' },
   { path: '/admin/analytics', label: 'nav.admin_analytics', icon: 'bar-chart' },

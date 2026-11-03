@@ -2,11 +2,12 @@
 //
 // Всё хранится в Global.landingConfig одним документом:
 //   {
-//     version: 3,
+//     version: 4,
 //     siteTheme: { paletteId, accentColor },
 //     landing:   { ru: { heroTitle: '…', … }, en: {…}, kk: {…} },   // только изменённые тексты
 //     contacts:  { phone, coordinatorMobile, coordinatorPhone, email, website, whatsapp, telegram, instagram,
-//                  address: {ru,en,kk}, hours: {ru,en,kk} },
+//                  partnerWebsite, partnerEmail,
+//                  address: {ru,en,kk}, hours: {ru,en,kk}, partnerName: {ru,en,kk} },
 //     navigation:{ items: { home: { visible, label: {ru,en,kk} }, … } },
 //     legal:     { privacy: {ru,en,kk}, terms: {ru,en,kk} },        // текст разметкой (см. parseLegalText)
 //     seo:       { ru: { title, description }, en: {…}, kk: {…} },
@@ -178,37 +179,52 @@ export const NAV_ITEMS = [
   { id: 'contacts', href: '#contact', labelKey: 'nav.contacts', isAnchor: true },
 ]
 
-const CONTENT_VERSION = 3
+const CONTENT_VERSION = 4
 
 // phone — call-центр ННМЦ; coordinatorMobile — мобильный координатора
 // (он же WhatsApp и Telegram); coordinatorPhone — городской координатора.
-export const CONTACT_FIELDS = ['phone', 'coordinatorMobile', 'coordinatorPhone', 'email', 'website', 'whatsapp', 'telegram', 'instagram']
+// partner* — партнёрская клиника (онкоцентр томотерапии «Umit»).
+export const CONTACT_FIELDS = ['phone', 'coordinatorMobile', 'coordinatorPhone', 'email', 'website', 'whatsapp', 'telegram', 'instagram', 'partnerWebsite', 'partnerEmail']
 const PHONE_FIELDS = new Set(['phone', 'coordinatorMobile', 'coordinatorPhone'])
+const PARTNER_KINDS = { partnerWebsite: 'website', partnerEmail: 'email' }
 
 /** Поле контактов → kind для contactHref: все номера — 'phone'. */
-export const contactKind = (key) => (PHONE_FIELDS.has(key) ? 'phone' : key)
+export const contactKind = (key) => (PHONE_FIELDS.has(key) ? 'phone' : PARTNER_KINDS[key] || key)
 
 export const DEFAULT_CONTACTS = Object.freeze({
-  phone: '+7 (7172) 57-20-09',
+  phone: '+7 (7172) 57-74-40',
   coordinatorMobile: '+7 (700) 085-31-44',
-  coordinatorPhone: '+7 (7172) 57-74-40',
-  email: 'support@nnmc.kz',
-  website: 'https://www.nnmc.kz/',
+  coordinatorPhone: '',
+  email: 'medtour@nnmc.kz',
+  website: 'https://nnmc.kz/',
   whatsapp: '+7 (700) 085-31-44',
   telegram: 'https://t.me/+77000853144',
   instagram: '',
+  partnerWebsite: 'https://www.tomo.kz/',
+  partnerEmail: 'info@tomo.kz',
   address: {},
   hours: {},
+  partnerName: {},
 })
 
 // До версии 3 у этих полей не было значений по умолчанию, и админка
 // сохраняла их пустыми. В таком конфиге пустое = «не заполнено», а не «скрыть».
 const FIELDS_WITHOUT_LEGACY_DEFAULT = new Set(['phone', 'whatsapp', 'telegram'])
 
+// Значения по умолчанию до версии 4. Админка сохраняла их как есть, поэтому
+// в старом конфиге такое значение = «админ не менял» → берём новое по умолчанию.
+const REPLACED_DEFAULTS = {
+  phone: '+7 (7172) 57-20-09',
+  coordinatorPhone: '+7 (7172) 57-74-40',
+  email: 'support@nnmc.kz',
+  website: 'https://www.nnmc.kz/',
+}
+
 function readContactField(contacts, key, version) {
   const value = contacts[key]
   if (typeof value !== 'string') return DEFAULT_CONTACTS[key]
-  if (!value.trim() && version < CONTENT_VERSION && FIELDS_WITHOUT_LEGACY_DEFAULT.has(key)) return DEFAULT_CONTACTS[key]
+  if (!value.trim() && version < 3 && FIELDS_WITHOUT_LEGACY_DEFAULT.has(key)) return DEFAULT_CONTACTS[key]
+  if (version < 4 && REPLACED_DEFAULTS[key] === value.trim()) return DEFAULT_CONTACTS[key]
   return value
 }
 
@@ -234,6 +250,7 @@ export function readSiteContent(raw) {
       ...Object.fromEntries(CONTACT_FIELDS.map((key) => [key, readContactField(contacts, key, version)])),
       address: localizedMap(contacts.address),
       hours: localizedMap(contacts.hours),
+      partnerName: localizedMap(contacts.partnerName),
     },
     navigation: {
       items: Object.fromEntries(NAV_ITEMS.map((item) => {
@@ -285,6 +302,7 @@ export function compactSiteContent(content) {
       ...Object.fromEntries(CONTACT_FIELDS.map((key) => [key, str(contacts[key]).trim()])),
       address: localizedMap(contacts.address),
       hours: localizedMap(contacts.hours),
+      partnerName: localizedMap(contacts.partnerName),
     },
     navigation: { items: navigationItems },
     legal: {

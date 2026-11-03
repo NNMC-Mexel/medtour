@@ -1,0 +1,59 @@
+{
+  "kind": "collectionType",
+  "collectionName": "blog_posts",
+  "info": {
+    "singularName": "blog-post",
+    "pluralName": "blog-posts",
+    "displayName": "Blog Post",
+    "description": "Статьи раздела «Блог / Статьи» (/blog, /blog/:slug)"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "slug": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "title": {
+      "type": "json"
+    },
+    "excerpt": {
+      "type": "json"
+    },
+    "content": {
+      "type": "json"
+    },
+    "category": {
+      "type": "enumeration",
+      "enum": ["preparation", "treatment", "astana", "recovery", "routes", "planning"],
+      "default": "preparation",
+      "required": true
+    },
+    "readTime": {
+      "type": "integer"
+    },
+    "cover": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": ["images"]
+    },
+    "coverUrl": {
+      "type": "string"
+    },
+    "isActive": {
+      "type": "boolean",
+      "default": true
+    },
+    "isFeatured": {
+      "type": "boolean",
+      "default": false
+    },
+    "sortOrder": {
+      "type": "integer",
+      "default": 0
+    }
+  }
+}

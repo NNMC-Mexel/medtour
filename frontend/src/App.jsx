@@ -27,6 +27,7 @@ const VerifyEmailSentPage = lazy(() => import('./pages/VerifyEmailSentPage'))
 const EmailConfirmedPage = lazy(() => import('./pages/EmailConfirmedPage'))
 const TourismPage = lazy(() => import('./pages/TourismPage'))
 const BlogPage = lazy(() => import('./pages/BlogPage'))
+const BlogPostPage = lazy(() => import('./pages/BlogPostPage'))
 const PriceListPage = lazy(() => import('./pages/PriceListPage'))
 const PatientDashboard = lazy(() => import('./pages/patient/PatientDashboard'))
 const PatientAppointments = lazy(() => import('./pages/patient/PatientAppointments'))
@@ -61,6 +62,7 @@ const AdminAppointments = lazy(() => import('./pages/admin/AdminAppointments'))
 const AdminSpecializations = lazy(() => import('./pages/admin/AdminSpecializations'))
 const AdminPriceList = lazy(() => import('./pages/admin/AdminPriceList'))
 const AdminGuideVideos = lazy(() => import('./pages/admin/AdminGuideVideos'))
+const AdminBlog = lazy(() => import('./pages/admin/AdminBlog'))
 const AdminLegalDocuments = lazy(() => import('./pages/admin/AdminLegalDocuments'))
 const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'))
 const AdminContent = lazy(() => import('./pages/admin/AdminContent'))
@@ -220,6 +222,7 @@ function App() {
           <Route path="/specializations" element={<DoctorsPage />} />
           <Route path="/tourism" element={<TourismPage />} />
           <Route path="/blog" element={<BlogPage />} />
+          <Route path="/blog/:slug" element={<BlogPostPage />} />
           <Route path="/prices" element={<PriceListPage />} />
           <Route path="/treatments/:slug" element={<TreatmentDepartmentPage />} />
           <Route path="/about" element={<LandingPage />} />
@@ -317,6 +320,7 @@ function App() {
           <Route path="tourism" element={<AdminTourism />} />
           <Route path="prices" element={<AdminPriceList />} />
           <Route path="price-requests" element={<StaffPriceRequests />} />
+          <Route path="blog" element={<AdminBlog />} />
           <Route path="guide-videos" element={<AdminGuideVideos />} />
           <Route path="legal-documents" element={<AdminLegalDocuments />} />
           <Route path="analytics" element={<AdminAnalytics />} />

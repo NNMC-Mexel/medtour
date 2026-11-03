@@ -17,6 +17,7 @@ import {
   Activity,
   CircleHelp,
   ClipboardList,
+  Newspaper,
   ShoppingCart,
   BarChart3,
   X,
@@ -47,6 +48,7 @@ const iconMap = {
   'map-pinned': MapPinned,
   'circle-help': CircleHelp,
   'clipboard-list': ClipboardList,
+  newspaper: Newspaper,
 }
 
 function Sidebar({ navItems, onNavClick }) {

@@ -5,6 +5,7 @@ import { GLOBAL_DEFAULTS } from './utils/global-defaults';
 import { backfillDoctorSpecializations, repairDoctorPrimarySpecializations } from './utils/doctor-specializations-backfill';
 import offerSeed from './api/legal-document/seed/offer.json';
 import consentSeed from './api/legal-document/seed/consent.json';
+import blogPostsSeed from './api/blog-post/seed/posts.json';
 
 // Все запросы сводки аналитики фильтруют по дню, а таблица растёт с каждым
 // визитом. Strapi индексы по полям schema.json не создаёт — ставим сами.
@@ -473,6 +474,11 @@ const roleDefinitions = {
       'api::article.article.create',
       'api::article.article.update',
       'api::article.article.delete',
+      // Блог / Статьи — правка в админке (чтение публичное, auth: false)
+      'api::blog-post.blog-post.manage',
+      'api::blog-post.blog-post.create',
+      'api::blog-post.blog-post.update',
+      'api::blog-post.blog-post.delete',
       // Landing content — управление single types
       'api::global.global.find',
       'api::global.global.findOne',
@@ -602,6 +608,25 @@ async function ensureLegalDocuments(strapi: Core.Strapi) {
     } catch (error: any) {
       strapi.log.warn(`[bootstrap] Legal document "${seed.slug}" was not created: ${error?.message}`);
     }
+  }
+}
+
+// Стартовые статьи блога (раньше были зашиты в BlogPage.jsx). Создаём один раз:
+// если админ потом удалит их все, при перезапуске они не вернутся.
+async function ensureBlogPosts(strapi: Core.Strapi) {
+  const store = strapi.store({ type: 'core', name: 'medtour' });
+  try {
+    if (await store.get({ key: 'blogPostsSeeded' })) return;
+    const count = await strapi.documents('api::blog-post.blog-post' as any).count({} as any);
+    if (!count) {
+      for (const post of blogPostsSeed as any[]) {
+        await strapi.documents('api::blog-post.blog-post' as any).create({ data: post } as any);
+      }
+      strapi.log.info(`[bootstrap] ${blogPostsSeed.length} blog posts created.`);
+    }
+    await store.set({ key: 'blogPostsSeeded', value: true });
+  } catch (error: any) {
+    strapi.log.warn(`[bootstrap] Blog posts were not seeded: ${error?.message}`);
   }
 }
 
@@ -951,6 +976,7 @@ export default {
     await seedClinics(strapi);
     await ensureGlobal(strapi);
     await ensureLegalDocuments(strapi);
+    await ensureBlogPosts(strapi);
     try {
       await backfillDoctorSpecializations(strapi);
       await repairDoctorPrimarySpecializations(strapi);

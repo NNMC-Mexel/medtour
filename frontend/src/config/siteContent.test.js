@@ -39,11 +39,44 @@ test('v2 config keeps phone numbers the admin entered', () => {
 
 test('after saving, an empty phone stays hidden', () => {
   const saved = compactSiteContent({ ...readSiteContent(null), contacts: { ...DEFAULT_CONTACTS, phone: '  ', coordinatorPhone: '' } })
-  assert.equal(saved.version, 3)
+  assert.equal(saved.version, 4)
   const { contacts } = readSiteContent(saved)
   assert.equal(contacts.phone, '')
   assert.equal(contacts.coordinatorPhone, '')
   assert.equal(contacts.coordinatorMobile, DEFAULT_CONTACTS.coordinatorMobile)
+})
+
+test('v2/v3 config with untouched old defaults shows the new MedTour contacts', () => {
+  // Так выглядит конфиг на проде: email и сайт сохранены со старыми значениями по умолчанию.
+  const { contacts } = readSiteContent({
+    version: 2,
+    contacts: { phone: '', email: 'support@nnmc.kz', website: 'https://www.nnmc.kz/' },
+  })
+  assert.equal(contacts.phone, '+7 (7172) 57-74-40')
+  assert.equal(contacts.coordinatorMobile, '+7 (700) 085-31-44')
+  assert.equal(contacts.coordinatorPhone, '')
+  assert.equal(contacts.email, 'medtour@nnmc.kz')
+  assert.equal(contacts.website, 'https://nnmc.kz/')
+  assert.equal(contacts.partnerWebsite, 'https://www.tomo.kz/')
+  assert.equal(contacts.partnerEmail, 'info@tomo.kz')
+
+  const v3 = readSiteContent({ version: 3, contacts: { phone: '+7 (7172) 57-20-09', coordinatorPhone: '+7 (7172) 57-74-40', email: 'team@nnmc.kz' } }).contacts
+  assert.equal(v3.phone, '+7 (7172) 57-74-40')
+  assert.equal(v3.coordinatorPhone, '')
+  assert.equal(v3.email, 'team@nnmc.kz')
+})
+
+test('v4 config keeps whatever the admin saved, including old numbers', () => {
+  const { contacts } = readSiteContent({ version: 4, contacts: { phone: '+7 (7172) 57-20-09', email: 'support@nnmc.kz', partnerEmail: '' } })
+  assert.equal(contacts.phone, '+7 (7172) 57-20-09')
+  assert.equal(contacts.email, 'support@nnmc.kz')
+  assert.equal(contacts.partnerEmail, '')
+})
+
+test('partner name is stored per language', () => {
+  const saved = compactSiteContent({ ...readSiteContent(null), contacts: { ...DEFAULT_CONTACTS, partnerName: { ru: 'Онкоцентр «Umit»', en: '' } } })
+  assert.deepEqual(saved.contacts.partnerName, { ru: 'Онкоцентр «Umit»' })
+  assert.deepEqual(readSiteContent(saved).contacts.partnerName, { ru: 'Онкоцентр «Umit»' })
 })
 
 // --- Ссылки и мессенджеры ----------------------------------------------------
@@ -52,6 +85,8 @@ test('all phone fields link as tel:', () => {
   assert.equal(contactKind('coordinatorMobile'), 'phone')
   assert.equal(contactKind('coordinatorPhone'), 'phone')
   assert.equal(contactKind('telegram'), 'telegram')
+  assert.equal(contactKind('partnerWebsite'), 'website')
+  assert.equal(contactKind('partnerEmail'), 'email')
 })
 
 test('messengers on the same number are matched regardless of formatting', () => {
