@@ -1,0 +1,116 @@
+[
+  {
+    "slug": "documents-for-online-consultation",
+    "title": {
+      "ru": "Какие документы подготовить для онлайн-консультации",
+      "kk": "Онлайн-кеңеске қандай құжаттар дайындау керек",
+      "en": "What to prepare for an online medical consultation"
+    },
+    "excerpt": {
+      "ru": "Короткий список медицинских выписок, снимков и анализов, который поможет врачу дать более точную первичную рекомендацию.",
+      "kk": "Дәрігерге нақтырақ алғашқы ұсыным беруге көмектесетін медициналық үзінділер, суреттер және талдаулардың қысқа тізімі.",
+      "en": "A concise list of medical reports, scans and test results that helps your doctor give a more useful initial opinion."
+    },
+    "category": "preparation",
+    "readTime": 6,
+    "coverUrl": "/treatments/medical-department-hero.png",
+    "isActive": true,
+    "isFeatured": true,
+    "sortOrder": 10
+  },
+  {
+    "slug": "first-day-in-astana",
+    "title": {
+      "ru": "Первый день в столице: мягкий маршрут после перелёта",
+      "kk": "Елордадағы алғашқы күн: ұшудан кейінгі жеңіл бағыт",
+      "en": "Your first day: a gentle route after the flight"
+    },
+    "excerpt": {
+      "ru": "Как спланировать день без спешки: трансфер, заселение, спокойная прогулка и время на адаптацию.",
+      "kk": "Күнді асықпай жоспарлау: трансфер, қонақүйге орналасу, тыныш серуен және бейімделуге уақыт.",
+      "en": "Plan an unhurried day with transfer, check-in, a short walk and enough time to adapt."
+    },
+    "category": "astana",
+    "readTime": 5,
+    "coverUrl": "/tourism/astana.jpg",
+    "isActive": true,
+    "isFeatured": false,
+    "sortOrder": 20
+  },
+  {
+    "slug": "travel-pace-after-treatment",
+    "title": {
+      "ru": "Как выбрать темп путешествия после лечения",
+      "kk": "Емнен кейін саяхат қарқынын қалай таңдау керек",
+      "en": "How to choose the right travel pace after treatment"
+    },
+    "excerpt": {
+      "ru": "На что обратить внимание, прежде чем добавлять экскурсии и природные маршруты в медицинскую поездку.",
+      "kk": "Медициналық сапарға экскурсиялар мен табиғи бағыттарды қоспас бұрын неге назар аудару керек.",
+      "en": "What to consider before adding excursions and nature routes to your medical journey."
+    },
+    "category": "recovery",
+    "readTime": 7,
+    "coverUrl": "/tourism/burabay.jpg",
+    "isActive": true,
+    "isFeatured": false,
+    "sortOrder": 30
+  },
+  {
+    "slug": "burabay-in-one-day",
+    "title": {
+      "ru": "Бурабай за один день: озёра, сосны и главные локации",
+      "kk": "Бурабай бір күнде: көлдер, қарағайлар және басты орындар",
+      "en": "Burabay in one day: lakes, pines and highlights"
+    },
+    "excerpt": {
+      "ru": "Продуманный маршрут из Астаны с прогулками, панорамными точками и временем для спокойного отдыха.",
+      "kk": "Астанадан серуендер, панорамалық нүктелер және тыныш демалысқа уақыты бар ойластырылған бағыт.",
+      "en": "A balanced route from Astana with scenic viewpoints, walks and time for quiet rest."
+    },
+    "category": "routes",
+    "readTime": 8,
+    "coverUrl": "/tourism/burabay.jpg",
+    "isActive": true,
+    "isFeatured": false,
+    "sortOrder": 40
+  },
+  {
+    "slug": "bayanaul-lake-jasybay",
+    "title": {
+      "ru": "Баянаул: природная перезагрузка у озера Жасыбай",
+      "kk": "Баянауыл: Жасыбай көлі жағасында табиғатпен қайта жаңару",
+      "en": "Bayanaul: a natural reset by Lake Jasybay"
+    },
+    "excerpt": {
+      "ru": "Что посмотреть в национальном парке и кому подойдёт более насыщенная однодневная программа.",
+      "kk": "Ұлттық паркте не көруге болады және мазмұнды бір күндік бағдарлама кімге лайық.",
+      "en": "What to see in the national park and who will enjoy this more immersive day route."
+    },
+    "category": "routes",
+    "readTime": 8,
+    "coverUrl": "/tourism/bayanaul.webp",
+    "isActive": true,
+    "isFeatured": false,
+    "sortOrder": 50
+  },
+  {
+    "slug": "how-the-coordinator-works",
+    "title": {
+      "ru": "Переводчик, трансфер и отель: как работает координатор",
+      "kk": "Аудармашы, трансфер және қонақүй: үйлестіруші қалай жұмыс істейді",
+      "en": "Interpreter, transfer and hotel: what your coordinator does"
+    },
+    "excerpt": {
+      "ru": "Разбираем, какие бытовые вопросы можно решить заранее и как устроено сопровождение во время поездки.",
+      "kk": "Қандай тұрмыстық мәселелерді алдын ала шешуге болатынын және сапар кезіндегі сүйемелдеуді түсіндіреміз.",
+      "en": "The practical details that can be arranged in advance and how support works during your journey."
+    },
+    "category": "planning",
+    "readTime": 6,
+    "coverUrl": "/astana-medtour-hero.webp",
+    "isActive": true,
+    "isFeatured": false,
+    "sortOrder": 60
+  }
+]

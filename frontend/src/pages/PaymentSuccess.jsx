@@ -7,6 +7,8 @@ import { ru, kk, enUS } from "date-fns/locale";
 import { io } from "socket.io-client";
 import Button from "../components/ui/Button";
 import useAuthStore from "../stores/authStore";
+import useSiteContentStore from "../stores/siteContentStore";
+import { DEFAULT_CONTACTS } from "../config/siteContent";
 import { useUsdRate, formatKztAsUsd } from '../hooks/useUsdRate';
 import { getSignalingUrl } from "../services/api";
 
@@ -16,6 +18,8 @@ function PaymentSuccess() {
     const { t, i18n } = useTranslation();
     const dateLocale = i18n.language === 'kk' ? kk : i18n.language === 'en' ? enUS : ru;
     const { _hasHydrated } = useAuthStore();
+    // Email поддержки — из Admin > Контент сайта → Контакты.
+    const supportEmail = useSiteContentStore((state) => state.content.contacts.email) || DEFAULT_CONTACTS.email;
     const [status, setStatus] = useState("creating"); // creating | success | error
     const [appointmentInfo, setAppointmentInfo] = useState(null);
     const [errorMessage, setErrorMessage] = useState(null);
@@ -146,8 +150,8 @@ function PaymentSuccess() {
                     </p>
                     <p className="text-sm text-slate-500 mb-6">
                         {t('payment.error_support')}{' '}
-                        <a href="mailto:support@nnmc.kz" className="text-teal-600 underline">
-                            support@nnmc.kz
+                        <a href={`mailto:${supportEmail}`} className="text-teal-600 underline">
+                            {supportEmail}
                         </a>{' '}
                         {t('payment.error_support_postfix')}
                     </p>
@@ -155,7 +159,7 @@ function PaymentSuccess() {
                         <Button variant="outline" onClick={() => navigate("/patient/appointments")}>
                             {t('payment.my_appointments')}
                         </Button>
-                        <Button onClick={() => window.location.href = "mailto:support@nnmc.kz"}>
+                        <Button onClick={() => window.location.href = `mailto:${supportEmail}`}>
                             {t('payment.contact_support')}
                         </Button>
                     </div>

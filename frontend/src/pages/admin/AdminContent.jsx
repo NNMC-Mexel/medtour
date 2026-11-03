@@ -86,8 +86,8 @@ const copyByLanguage = {
     accentReset: 'Цвет палитры', accentInvalid: 'Цвет в формате #RRGGBB',
     openSection: 'Открыть на сайте', resetField: 'Вернуть текст по умолчанию',
     linesHint: 'Каждый пункт — с новой строки', pairsHint: 'Каждый этап с новой строки: «Заголовок | Текст»',
-    phone: 'Call-центр', coordinatorMobile: 'Координатор — мобильный', coordinatorPhone: 'Координатор — городской', email: 'Email', website: 'Сайт', whatsapp: 'WhatsApp (номер)', telegram: 'Telegram (@username или ссылка)', instagram: 'Instagram (@username или ссылка)',
-    address: 'Адрес', hours: 'Часы работы', contactsHint: 'Пустое поле не показывается на сайте.', contactInvalid: 'Это не ссылка — поле не покажется на сайте',
+    phone: 'Call-центр', coordinatorMobile: 'Координатор — мобильный', coordinatorPhone: 'Координатор — городской', email: 'Email', website: 'Сайт', whatsapp: 'WhatsApp (номер)', telegram: 'Telegram (@username или ссылка)', instagram: 'Instagram (@username или ссылка)', partnerName: 'Партнёр — название', partnerWebsite: 'Партнёр — сайт', partnerEmail: 'Партнёр — email',
+    address: 'Адрес', hours: 'Часы работы', contactsHint: 'Пустое поле не показывается на сайте. Без сайта и email партнёра блок «Партнёрская клиника» скрыт.', contactInvalid: 'Это не ссылка — поле не покажется на сайте',
     navVisible: 'Показывать', navLabel: 'Подпись', navHidden: 'Скрыт', navHint: 'Пустая подпись — стандартная для языка.',
     privacy: 'Политика конфиденциальности', terms: 'Пользовательское соглашение',
     legalSyntax: 'Разметка: «## Заголовок» — новый раздел, «- текст» — пункт списка, остальные строки — абзацы.',
@@ -117,8 +117,8 @@ const copyByLanguage = {
     accentReset: 'Palette colour', accentInvalid: 'Use the #RRGGBB format',
     openSection: 'Open on site', resetField: 'Restore default text',
     linesHint: 'One item per line', pairsHint: 'One step per line: “Title | Text”',
-    phone: 'Call center', coordinatorMobile: 'Coordinator — mobile', coordinatorPhone: 'Coordinator — landline', email: 'Email', website: 'Website', whatsapp: 'WhatsApp (number)', telegram: 'Telegram (@username or link)', instagram: 'Instagram (@username or link)',
-    address: 'Address', hours: 'Opening hours', contactsHint: 'Empty fields are not shown on the site.', contactInvalid: 'Not a link — this field will not be shown',
+    phone: 'Call center', coordinatorMobile: 'Coordinator — mobile', coordinatorPhone: 'Coordinator — landline', email: 'Email', website: 'Website', whatsapp: 'WhatsApp (number)', telegram: 'Telegram (@username or link)', instagram: 'Instagram (@username or link)', partnerName: 'Partner — name', partnerWebsite: 'Partner — website', partnerEmail: 'Partner — email',
+    address: 'Address', hours: 'Opening hours', contactsHint: 'Empty fields are not shown on the site. Without the partner’s website and email the “Partner clinic” block is hidden.', contactInvalid: 'Not a link — this field will not be shown',
     navVisible: 'Show', navLabel: 'Label', navHidden: 'Hidden', navHint: 'An empty label uses the standard one for the language.',
     privacy: 'Privacy policy', terms: 'Terms of use',
     legalSyntax: 'Markup: “## Title” starts a section, “- text” is a list item, other lines are paragraphs.',
@@ -148,8 +148,8 @@ const copyByLanguage = {
     accentReset: 'Палитра түсі', accentInvalid: '#RRGGBB форматындағы түс',
     openSection: 'Сайтта ашу', resetField: 'Әдепкі мәтінді қайтару',
     linesHint: 'Әр тармақ жаңа жолдан', pairsHint: 'Әр кезең жаңа жолдан: «Тақырып | Мәтін»',
-    phone: 'Call-орталық', coordinatorMobile: 'Үйлестіруші — ұялы', coordinatorPhone: 'Үйлестіруші — қалалық', email: 'Email', website: 'Сайт', whatsapp: 'WhatsApp (нөмір)', telegram: 'Telegram (@username немесе сілтеме)', instagram: 'Instagram (@username немесе сілтеме)',
-    address: 'Мекенжай', hours: 'Жұмыс уақыты', contactsHint: 'Бос өріс сайтта көрсетілмейді.', contactInvalid: 'Бұл сілтеме емес — өріс сайтта көрсетілмейді',
+    phone: 'Call-орталық', coordinatorMobile: 'Үйлестіруші — ұялы', coordinatorPhone: 'Үйлестіруші — қалалық', email: 'Email', website: 'Сайт', whatsapp: 'WhatsApp (нөмір)', telegram: 'Telegram (@username немесе сілтеме)', instagram: 'Instagram (@username немесе сілтеме)', partnerName: 'Серіктес — атауы', partnerWebsite: 'Серіктес — сайт', partnerEmail: 'Серіктес — email',
+    address: 'Мекенжай', hours: 'Жұмыс уақыты', contactsHint: 'Бос өріс сайтта көрсетілмейді. Серіктестің сайты мен email-і болмаса, «Серіктес клиника» блогы жасырылады.', contactInvalid: 'Бұл сілтеме емес — өріс сайтта көрсетілмейді',
     navVisible: 'Көрсету', navLabel: 'Атауы', navHidden: 'Жасырын', navHint: 'Бос атау — тілдің стандартты атауы.',
     privacy: 'Құпиялылық саясаты', terms: 'Пайдаланушы келісімі',
     legalSyntax: 'Белгілеу: «## Тақырып» — жаңа бөлім, «- мәтін» — тізім тармағы, қалған жолдар — абзацтар.',
@@ -586,11 +586,12 @@ function AdminContent() {
               })}
             </div>
           </Panel>
-          <Panel title={`${copy.address} · ${copy.hours}`}>
+          <Panel title={`${copy.address} · ${copy.hours} · ${copy.partnerName}`}>
             <LocalizedFields
               fields={[
                 { key: 'address', label: copy.address, multiline: true, rows: 2, placeholder: t('footer.address') },
                 { key: 'hours', label: copy.hours, multiline: true, rows: 2 },
+                { key: 'partnerName', label: copy.partnerName, placeholder: t('footer.partner_name') },
               ]}
               getValue={(lang, key) => contacts[key]?.[lang] || ''}
               setValue={(lang, key, value) => setContacts((current) => ({ ...current, [key]: { ...(current[key] || {}), [lang]: value } }))}

@@ -587,6 +587,16 @@ export const contentAPI = {
     updateAbout: (data) => api.put("/api/about", { data }),
 };
 
+// Статьи блога: /blog и /blog/:slug, правка — Admin > Блог / Статьи.
+export const blogPostsAPI = {
+    list: () => api.get("/api/blog-posts"),
+    get: (slug) => api.get(`/api/blog-posts/${encodeURIComponent(slug)}`),
+    manage: () => api.get("/api/blog-posts/manage"),
+    create: (data) => api.post("/api/blog-posts", { data }),
+    update: (documentId, data) => api.put(`/api/blog-posts/${documentId}`, { data }),
+    delete: (documentId) => api.delete(`/api/blog-posts/${documentId}`),
+};
+
 // Правовые документы (оферта, согласия): страницы /documents/:slug.
 export const legalDocumentsAPI = {
     list: () => api.get("/api/legal-documents"),
